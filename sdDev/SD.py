@@ -1,5 +1,7 @@
 import sys
 
+from paintingBot import trans
+
 sys.path.append('.')
 import os.path
 import re
@@ -179,3 +181,22 @@ if __name__ == '__main__':
     str = '+huge breasts+-not cute+wide hips+'
     # print(deAssembly(str))
     # print(sd_diff('./output/huge breasts.png'))
+
+
+def NPL_reFormat(natural_sentence: str, split_keyword: str = None):
+    """
+
+    :param split_keyword:
+    :param natural_sentence:
+    :return:
+    """
+    if split_keyword:
+        word_pattern = split_keyword
+    else:
+        word_pattern = '要|画个|画一个|来一个|来一碗|来个|给我'
+    prompts = re.split(pattern=word_pattern, string=natural_sentence)
+    print(prompts)
+    if len(prompts) < 2:
+        return ''
+    else:
+        return trans.translate('en', prompts[-1])

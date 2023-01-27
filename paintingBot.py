@@ -1,9 +1,9 @@
 import json
 import os
 import random
-import re
 import time
-
+import requests
+import datetime
 from graia.ariadne.app import Ariadne
 from graia.ariadne.entry import config
 from graia.ariadne.message.chain import MessageChain
@@ -11,9 +11,7 @@ from graia.ariadne.message.element import Plain, At, Image
 from graia.ariadne.message.parser.base import MentionMe
 from graia.ariadne.model import Member, Group, Friend
 
-from sdDev.SD import sd_darw, sd_diff, deAssembly
-import requests
-import datetime
+from sdDev.SD import sd_darw, sd_diff, deAssembly, NPL_reFormat
 from baidu_translater.translater import Translater
 
 trans = Translater()
@@ -64,25 +62,6 @@ def download_image(url: str, save_dir: str):
         print(f'downloaded net image,save at: {path}')
         return path
     return None
-
-
-def NPL_reFormat(natural_sentence: str, split_keyword: str = None):
-    """
-
-    :param split_keyword:
-    :param natural_sentence:
-    :return:
-    """
-    if split_keyword:
-        word_pattern = split_keyword
-    else:
-        word_pattern = '要|画个|画一个|来一个|来个|给我'
-    prompts = re.split(pattern=word_pattern, string=natural_sentence)
-    print(prompts)
-    if len(prompts) < 2:
-        return ''
-    else:
-        return trans.translate('en', prompts[-1])
 
 
 async def groupDiffusion(app: Ariadne, group: Group, member: Member, chain: MessageChain,
