@@ -1,25 +1,31 @@
+import datetime
 import json
 import os
 import random
+import subprocess
 import time
+
 import requests
-import datetime
 from graia.ariadne.app import Ariadne
 from graia.ariadne.entry import config
 from graia.ariadne.message.chain import MessageChain
 from graia.ariadne.message.element import Plain, At, Image
 from graia.ariadne.message.parser.base import MentionMe
 from graia.ariadne.model import Member, Group, Friend
+from graia.scheduler import GraiaScheduler, timers
+
 from sdDev.SD import sd_draw, sd_diff, deAssembly, NPL_Reformat
 
 global finishResponseList, fastResponseList, agreeResponseList, disagreeResponseList, goodMorning
-global rewardResponseList
+global rewardResponseList, masterList
+global groups_list
 global app, SILENT_RATE, REWARD_RATE, AGREED_RATE
 
 
 def load_parm():
     global finishResponseList, fastResponseList, agreeResponseList, disagreeResponseList, goodMorning
-    global rewardResponseList
+    global rewardResponseList, masterList
+    global groups_list
     global app, SILENT_RATE, REWARD_RATE, AGREED_RATE
     with open('config.json', encoding='utf-8', mode='r') as f:
         # TODO:增加更多有趣的语料
@@ -30,12 +36,16 @@ def load_parm():
         disagreeResponseList = word_dict.get('disagree')
         rewardResponseList = word_dict.get('reward')
         goodMorning = word_dict.get("goodMorning")
+        groups_list = word_dict.get("groups")
+        masterList = word_dict.get('masterSan')
         print(f'Loaded: \n'
               f'\tfinishResponseList:{len(finishResponseList)}\n'
               f'\tfastResponseList:{len(fastResponseList)}\n'
               f'\tagreeResponseList:{len(agreeResponseList)}\n'
               f'\tdisagreeResponseList:{len(disagreeResponseList)}\n'
-              f'\tgoodMorningList:{len(goodMorning)}')
+              f'\tgoodMorningList:{len(goodMorning)}\n'
+              f'\tGroup list: {groups_list}\n'
+              f'\tMaster List: {len(masterList)}\n')
         # TODO:增加语料的有效判断
 
     with open('Bots.json', mode='r') as f:
@@ -53,7 +63,20 @@ def load_parm():
     # FIXME:reward picture clash,because Image use only one path
 
 
+def check_mcl_online(auto=True):
+    try:
+        requests.get('http://127.0.0.1:8080')
+    except:
+        mcl_name = "D:\mirai-cli\mcl.cmd"
+        mcl_dir = "D:\mirai-cli"
+
+        subprocess.Popen("cmd.exe /c" + mcl_name, cwd=mcl_dir)
+
+
 load_parm()
+
+# check_diffusion_online()
+check_mcl_online()
 
 
 def download_image(url: str, save_dir: str):
@@ -78,7 +101,7 @@ def download_image(url: str, save_dir: str):
 
 
 async def groupDiffusion(app: Ariadne, group: Group, member: Member, chain: MessageChain,
-                         neg_prompts: str, pos_prompts: str):
+                         neg_prompts: str, pos_prompts: str, use_korea_lora: bool = True, use_reward: bool = True):
     """
 
     :param app:
@@ -89,30 +112,23 @@ async def groupDiffusion(app: Ariadne, group: Group, member: Member, chain: Mess
     :param pos_prompts:
     :return:
     """
-    use_reward: bool = True
     if Image in chain:
         print('using img2img')
         # 如果包含图片则使用img2img
         img_path = download_image(chain[Image, 1][0].url, save_dir='./group_temp')
         generated_path = sd_diff(init_file_path=img_path, positive_prompt=pos_prompts, negative_prompt=neg_prompts)
-
+        await app.send_message(group, At(member) + Plain(random.choice(finishResponseList)) + Image(
+            path=generated_path))
     else:
         print('using txt2img')
+        generated_path = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts)
+        await app.send_message(group, At(member) + Plain(random.choice(finishResponseList)) + Image(
+            path=generated_path))
         if random.random() < REWARD_RATE and use_reward:
             print(f'with REWARD_RATE: {REWARD_RATE}|REWARDED')
-            generated_path = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts)
             generated_path_reward = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts)
-            await app.send_message(group, At(member) + Plain(random.choice(finishResponseList)) + Image(
-                path=generated_path))
-            time.sleep(5)
             await app.send_message(group, At(member) + Plain(random.choice(rewardResponseList)) + Image(
                 path=generated_path_reward))
-            return
-        else:
-            generated_path = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts)
-    await app.send_message(group, At(member) + Plain(random.choice(finishResponseList)) + Image(
-        path=generated_path))
-    # 实际上 MessageChain(...) 有没有 "[]" 都没关系
 
 
 @app.broadcast.receiver("GroupMessage", decorators=[MentionMe()])
@@ -215,35 +231,35 @@ async def img_gen_friend(app: Ariadne, friend: Friend, chain: MessageChain):
     # 实际上 MessageChain(...) 有没有 "[]" 都没关系
 
 
-@app.broadcast.receiver("GroupMessage")
-async def good_morning(app: Ariadne, chain: MessageChain):
+# <editor-fold desc="Schedules">
+scheduler = Ariadne.create(GraiaScheduler)
+
+
+@scheduler.schedule(timers.crontabify('0 7 * * * 0'))
+async def good_morning(channel: Ariadne = app):
     """
     good morning func
-    :param app:
-    :param chain:
+    :param channel:
     :return:
     """
-    key = 'asaoki'
     max_delay_seconds = 3600
     prompt = 'pink hair girl:1.4,blue eyes,student uniform:1.3,standing:1.3,landscape:1.5,blue sky,morning,' \
              'on the street:1.2,hello!,hi,wave hands,greeting,good morning,tie,collar'
-    start_greeting = False
-    if key in str(chain):
-        start_greeting = True
-        print('okimasu')
-    while start_greeting:
-        today = datetime.datetime.today()
-        rand_delay = datetime.timedelta(seconds=random.randint(0, max_delay_seconds))
-        max_delay = datetime.timedelta(seconds=max_delay_seconds)
-        send_time = datetime.datetime(year=today.year, month=today.month, day=today.day, hour=7,minute=0) + rand_delay
-        # max_send_time = datetime.datetime(year=today.year, month=today.month, day=today.day, hour=7,minute=0) + max_delay
-        remains=(send_time - datetime.datetime.now()).seconds
-        print(f'remaining: {send_time - datetime.datetime.now()},sleep: {remains} s')
-        time.sleep(remains)
-        generated_path = sd_draw(positive_prompt=prompt, size=[576, 768])
-        await app.send_group_message(105048175,
+    time.sleep(random.randint(0, max_delay_seconds))
+    generated_path = sd_draw(positive_prompt=prompt, size=[576, 768])
+    await channel.send_group_message(groups_list[1],
                                      Plain(random.choice(goodMorning)) + Image(path=generated_path))
 
+
+# </editor-fold>
+@scheduler.schedule(timers.every_custom_minutes(69))
+async def live(channel: Ariadne = app):
+    prompt = 'huge breast neko girl,loli:1.4,red hair,purple eyes,full body cloth,tie,standing,pink hair,'
+    if random.random() < 0.3:
+        prompt += 'blush naked,climax,sweat drop,wet cloth'
+    generated_path = sd_draw(positive_prompt=prompt, size=[576, 832])
+    await channel.send_friend_message(2191133626,
+                                      Plain(random.choice(masterList)) + Image(path=generated_path))
 
 
 app.launch_blocking()

@@ -1,15 +1,20 @@
+import base64
 import hashlib
-import sys
+import io
 import os.path
 import re
+import sys
+
 import requests
-import io
+import webuiapi
 from PIL import Image, PngImagePlugin
-import base64
 from slugify import slugify
 
 sys.path.append('..')
 from baidu_translater.translater import Translater
+
+# create API client with default sampler, steps.
+sd_api = webuiapi.WebUIApi(host='127.0.0.1', port=7860, sampler='DPM++ 2M Karras', steps=22)
 
 trans = Translater()
 
@@ -18,6 +23,8 @@ samplers_list = [
     "PLMS"
 ]
 url = "http://127.0.0.1:7860"
+start_method_name = "webui-user.bat"
+method_dir = r'G:\Games\StableDiffusion-WebUI'
 
 
 def deAssembly(message: str):
@@ -69,10 +76,12 @@ def rename_image_with_hash(image_path):
     return new_image_path
 
 
-def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int = 22,size:list=[512,768],
-            use_sampler: str or int = 'DPM++ SDE Karras', config_scale: float = 7.2, output_dir='./output'):
+def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int = 22, size: list = [512, 768],
+            use_sampler: str or int = 'DPM++ SDE Karras', config_scale: float = 7.2, output_dir='./output',
+            use_korea_lora: bool = True):
     """
-    SD Ai drawing txt2img api function
+    SD Ai drawing txt2img sd_api function
+    :param use_korea_lora:
     :param size:
     :param output_dir:
     :param positive_prompt:
@@ -82,6 +91,8 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
     :param config_scale:
     :return:
     """
+    korea_cmd = '<lora:koreanDollLikeness_v10:1>'
+
     if type(use_sampler) == str and use_sampler in samplers_list:
         usedSampler = use_sampler
     elif type(use_sampler) == int and 0 <= use_sampler < len(samplers_list):
@@ -99,10 +110,10 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
         positive_prompt = 'pink hair,hair pin,girl,student uniform,tank cloth,collar,stylish' \
                           ',white stocking,tie,hair behind ear,sfw:1.4,on the street,unhappy'
     if type(negative_prompt) != str or not negative_prompt.strip():
-        negative_prompt = 'nsfw:1.2, EasyNegative,bad-hands-5,claws,zoom out,'
+        negative_prompt = 'nsfw:1.2,claws,zoom out,'
 
     payload = {
-        "prompt": positive_prompt,
+        "prompt": positive_prompt if not use_korea_lora else positive_prompt + korea_cmd,
         "negative_prompt": negative_prompt,
         "sampler_name": usedSampler,
         "steps": steps,
@@ -153,7 +164,7 @@ def sd_diff(init_file_path: str, positive_prompt: str = '', negative_prompt: str
             use_sampler: str or int = "DDIM", denoising_strength: float = 0.7, config_scale: float = 7.5,
             output_dir: str = './output'):
     """
-    SD Ai drawing img2img api function
+    SD Ai drawing img2img sd_api function
     :param output_dir:
     :param init_file_path:
     :param denoising_strength:
@@ -245,6 +256,7 @@ def NPL_Reformat(natural_sentence: str, split_keyword: str = None):
         word_pattern = split_keyword
     else:
         word_pattern = '要|画个|画一个|来一个|来一碗|来个|给我|画'
+        # TODO:fix multiple division error caused bymultiple key split words
     prompts = re.split(pattern=word_pattern, string=natural_sentence)
     print(prompts)
     if len(prompts) < 2:
