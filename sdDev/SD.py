@@ -27,25 +27,30 @@ start_method_name = "webui-user.bat"
 method_dir = r'G:\Games\StableDiffusion-WebUI'
 
 
-def deAssembly(message: str):
+def deAssembly(message: str, specify_batch_size: bool = False):
     """
 
+    :param specify_batch_size:
     :param message:
     :return:
     """
+
     if message == "":
         return '', ''
-    pos_pattern = '\+(.*?)\+'
-    pos_prompt = ''
-    for sec in re.findall(pattern=pos_pattern, string=message):
-        pos_prompt += ' ' + sec
+    pos_pattern = '(\+(.*?)\+)?'
+    pos_prompt = re.findall(pattern=pos_pattern, string=message)[0][0]
 
-    neg_pattern = '\-(.*?)\-'
-    neg_prompt = ''
-    for sec in re.findall(pattern=neg_pattern, string=message):
-        neg_prompt += ' ' + sec
+    neg_pattern = '(\-(.*?)\-)?'
+    neg_prompt = re.findall(pattern=neg_pattern, string=message)[0][0]
 
-    return pos_prompt, neg_prompt
+    if specify_batch_size:
+        batch_size_pattern = '(\d+(p|P))?'
+        temp = re.findall(pattern=batch_size_pattern, string=message)[0]
+        if temp == '':
+            return pos_prompt, neg_prompt, 1  # default
+        batch_size = int(temp[0].strip(temp[1]))
+        return pos_prompt, neg_prompt, batch_size
+    return pos_prompt, neg_prompt,
 
 
 def rename_image_with_hash(image_path):
@@ -77,8 +82,8 @@ def rename_image_with_hash(image_path):
 
 
 def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int = 22, size: list = [512, 768],
-            use_sampler: str or int = 'DPM++ SDE Karras', config_scale: float = 7.2, output_dir='./output',
-            use_korea_lora: bool = True):
+            use_sampler: str or int = 'DPM++ SDE Karras', config_scale: float = 8.5, output_dir='./output',
+            use_korea_lora: bool = False):
     """
     SD Ai drawing txt2img sd_api function
     :param use_korea_lora:
@@ -103,20 +108,26 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
     if steps is not int or steps > 30 or steps < 0:
         steps = 22
 
-    if config_scale is not float or config_scale > 11 or config_scale < 5:
+    if config_scale > 11 or config_scale < 5:
         config_scale = 7.0
 
     if type(positive_prompt) != str or not positive_prompt.strip():
-        positive_prompt = 'pink hair,hair pin,girl,student uniform,tank cloth,collar,stylish' \
-                          ',white stocking,tie,hair behind ear,sfw:1.4,on the street,unhappy'
+        positive_prompt = 'pink hair:1.2,hair pin:1.2,girl,student uniform:1.4,tank cloth,collar:1.3,delicate and ' \
+                          'shiny skin,white stocking:1.3,tie:1.3,sfw:1.4,on the street,unhappy,medium breasts,' \
+                          'large breasts:0.3,watery eyes,beautiful eyes,delicate eys, luscious, ,high resolution,  ' \
+                          '( best quality, ultra-detailed), (best illumination, best shadow, an extremely delicate ' \
+                          'and beautiful), finely detail, depth of field, (shine), (airbrush), (sketch), ' \
+                          '((three-dimensional)), perfect lighting,sun,sunny,masterpiece:1.4'
     if type(negative_prompt) != str or not negative_prompt.strip():
-        negative_prompt = 'nsfw:1.2,claws,zoom out,'
+        negative_prompt = 'nsfw:1.2,zoom out,loli,eyeshadow,ugly face,eye pouches:1.3'
 
     payload = {
         "prompt": positive_prompt if not use_korea_lora else positive_prompt + korea_cmd,
         "negative_prompt": negative_prompt,
         "sampler_name": usedSampler,
         "steps": steps,
+        "subseed": -1,
+        "subseed_strength": 0.90,
         "cfg_scale": config_scale,
         "width": size[0],
         "height": size[1],
@@ -127,30 +138,9 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
     print(payload)
     response = requests.post(url=f'{url}/sdapi/v1/txt2img', json=payload)
     r = response.json()
-    for i in r['images']:
-        image = Image.open(io.BytesIO(base64.b64decode(i.split(",", 1)[0])))
-
-        png_payload = {
-            "image": "data:image/png;base64," + i
-        }
-        response2 = requests.post(url=f'{url}/sdapi/v1/png-info', json=png_payload)
-
-        pnginfo = PngImagePlugin.PngInfo()
-        pnginfo.add_text("parameters", response2.json().get("info"))
-        if len(positive_prompt) > 34:
-            # prevent bad path prompts
-            label = slugify(positive_prompt[0:34])
-        else:
-            label = slugify(positive_prompt)
-
-        if not os.path.exists(output_dir):
-            os.mkdir(output_dir)
-        saved_path = f'{output_dir}/{label}.png'
-
-        image.save(saved_path, pnginfo=pnginfo)
-        saved_path_with_hash = rename_image_with_hash(saved_path)
-        print(f'Saved at {saved_path_with_hash}')
-        return saved_path_with_hash
+    img_base64_list = r['images']
+    saved_path_with_hash = single_task(img_base64_list, output_dir)
+    return saved_path_with_hash
 
 
 def png_to_base64(file_path, log=False):
@@ -210,6 +200,8 @@ def sd_diff(init_file_path: str, positive_prompt: str = '', negative_prompt: str
         "prompt": positive_prompt,
         "negative_prompt": negative_prompt,
         "sampler_name": usedSampler,
+        "subseed": -1,
+        "subseed_strength": 0.90,
         "steps": steps,
         "cfg_scale": config_scale,
         "width": 512,
@@ -219,28 +211,45 @@ def sd_diff(init_file_path: str, positive_prompt: str = '', negative_prompt: str
     print(f'{payload}')
     response = requests.post(url=f'{url}/sdapi/v1/img2img', json=payload)
     r = response.json()
-    for i in r['images']:
+    img_base64_list = r['images']
+    saved_path_with_hash = single_task(img_base64_list, output_dir)
+    return saved_path_with_hash
+
+
+def single_task(img_base64_list: list[str], output_dir: str):
+    """
+
+    :param img_base64_list:
+    :param output_dir:
+    :return:
+    """
+    output_img_path = []
+    for i in img_base64_list:
         image = Image.open(io.BytesIO(base64.b64decode(i.split(",", 1)[0])))
 
         png_payload = {
             "image": "data:image/png;base64," + i
         }
         response2 = requests.post(url=f'{url}/sdapi/v1/png-info', json=png_payload)
-
+        req_pnginfo = response2.json().get("info")
         pnginfo = PngImagePlugin.PngInfo()
-        pnginfo.add_text("parameters", response2.json().get("info"))
-        if len(positive_prompt) > 34:
-            label = slugify(positive_prompt[0:34])
+        pnginfo.add_text("parameters", req_pnginfo)
+        if len(req_pnginfo) > 34:
+            label = slugify(req_pnginfo[0:34])
         else:
-            label = slugify(positive_prompt)
+            label = slugify(req_pnginfo)
 
         if not os.path.exists(output_dir):
             os.mkdir(output_dir)
-        saved_path = f'{output_dir}/{str(label)}.png'
+        saved_path = f'{output_dir}/{label}.png'
         image.save(saved_path, pnginfo=pnginfo)
         saved_path_with_hash = rename_image_with_hash(saved_path)
         print(f'Saved at {saved_path_with_hash}')
-        return saved_path_with_hash
+        output_img_path.append(saved_path_with_hash)
+    if len(output_img_path) == 1:
+        return output_img_path[0]
+
+    return output_img_path
 
 
 def NPL_Reformat(natural_sentence: str, split_keyword: str = None):
@@ -255,8 +264,7 @@ def NPL_Reformat(natural_sentence: str, split_keyword: str = None):
     if split_keyword:
         word_pattern = split_keyword
     else:
-        word_pattern = '要|画个|画一个|来一个|来一碗|来个|给我|画'
-        # TODO:fix multiple division error caused bymultiple key split words
+        word_pattern = '(要|画个|画一个|来一个|来一碗|来个|给我|画)?'
     prompts = re.split(pattern=word_pattern, string=natural_sentence)
     print(prompts)
     if len(prompts) < 2:

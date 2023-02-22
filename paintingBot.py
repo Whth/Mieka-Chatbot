@@ -198,37 +198,39 @@ async def img_gen_friend(app: Ariadne, friend: Friend, chain: MessageChain):
     :param chain:
     :return:
     """
+
     use_reward: bool = True
     dear_name = 'mika'
+    max_batch_size = 5
+    pos_prompts, neg_prompts, batch_size = '', '', 1
     if '+' not in str(chain) and dear_name not in str(chain):
         return
     if 'mika' in str(chain):
         pos_prompts, neg_prompts = NPL_Reformat(str(chain), split_keyword=dear_name), ''
     else:
-        pos_prompts, neg_prompts = deAssembly(str(chain))
+        pos_prompts, neg_prompts, batch_size = deAssembly(str(chain), specify_batch_size=True)
 
     if Image in chain:
         print('using img2img')
         # 如果包含图片则使用img2img
         img_path = download_image(chain[Image, 1][0].url, save_dir='./friend_temp')
         generated_path = sd_diff(init_file_path=img_path, positive_prompt=pos_prompts, negative_prompt=neg_prompts)
+        await app.send_message(friend,
+                               Plain(random.choice(finishResponseList)) + Image(path=generated_path))
     else:
         print('using txt2img')
-        if random.random() < REWARD_RATE and use_reward:
-            print(f'with REWARD_RATE: {REWARD_RATE}|REWARDED')
+        batch_size = max_batch_size if batch_size > max_batch_size else batch_size
+        print(f'going with [{batch_size}] pictures')
+        for _ in range(batch_size):
             generated_path = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts)
-            generated_path_reward = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts)
             await app.send_message(friend, Plain(random.choice(finishResponseList)) + Image(
                 path=generated_path))
-            time.sleep(5)
+
+        if random.random() < REWARD_RATE and use_reward:
+            print(f'with REWARD_RATE: {REWARD_RATE}|REWARDED')
+            generated_path_reward = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts)
             await app.send_message(friend, Plain(random.choice(rewardResponseList)) + Image(
                 path=generated_path_reward))
-            return
-        else:
-            generated_path = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts)
-    await app.send_message(friend,
-                           Plain(random.choice(finishResponseList)) + Image(path=generated_path))
-    # 实际上 MessageChain(...) 有没有 "[]" 都没关系
 
 
 # <editor-fold desc="Schedules">
