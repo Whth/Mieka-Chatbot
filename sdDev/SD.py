@@ -38,10 +38,17 @@ def deAssembly(message: str, specify_batch_size: bool = False):
     if message == "":
         return '', ''
     pos_pattern = '(\+(.*?)\+)?'
-    pos_prompt = re.findall(pattern=pos_pattern, string=message)[0][0]
-
+    pos_prompt = re.findall(pattern=pos_pattern, string=message)
+    for i in pos_prompt:
+        if i[0] != '':
+            pos_prompt = i[1]
+    print(f'pos: {pos_prompt}')
     neg_pattern = '(\-(.*?)\-)?'
-    neg_prompt = re.findall(pattern=neg_pattern, string=message)[0][0]
+    neg_prompt = re.findall(pattern=neg_pattern, string=message)
+    for i in neg_prompt:
+        if i[0] != '':
+            neg_prompt = i[1]
+    print(f'neg: {neg_prompt}')
 
     if specify_batch_size:
         batch_size_pattern = '(\d+(p|P))?'
@@ -83,9 +90,11 @@ def rename_image_with_hash(image_path):
 
 def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int = 22, size: list = [512, 768],
             use_sampler: str or int = 'DPM++ SDE Karras', config_scale: float = 8.5, output_dir='./output',
-            use_korea_lora: bool = False):
+            use_korea_lora: bool = False, safe_mode: bool = True, face_restore: bool = False):
     """
     SD Ai drawing txt2img sd_api function
+    :param safe_mode:
+    :param face_restore:
     :param use_korea_lora:
     :param size:
     :param output_dir:
@@ -113,13 +122,19 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
 
     if type(positive_prompt) != str or not positive_prompt.strip():
         positive_prompt = 'pink hair:1.2,hair pin:1.2,girl,student uniform:1.4,collar:1.3,delicate and ' \
-                          'shiny skin,white stocking:1.3,tie:1.3,sfw:1.4,on the street,unhappy,medium breasts,' \
+                          'shiny skin,white stocking:1.3,tie:1.3,on the street,unhappy,medium breasts,' \
                           'large breasts:0.3,watery eyes,beautiful eyes,delicate eys, luscious, ,high resolution,  ' \
                           '( best quality, ultra-detailed), (best illumination, best shadow, an extremely delicate ' \
                           'and beautiful), finely detail, depth of field, (shine), (airbrush), (sketch), ' \
                           '((three-dimensional)), perfect lighting,sun,sunny,masterpiece:1.4'
+        safe_word = 'sfw:1.5' if safe_mode else ''
+
+        positive_prompt = positive_prompt + safe_word
     if type(negative_prompt) != str or not negative_prompt.strip():
-        negative_prompt = 'nsfw:1.2,zoom out,loli,eyeshadow,ugly face,eye pouches:1.3'
+        negative_prompt = 'eyeshadow,eye pouches:1.3'
+        safe_word = 'nsfw:1.3' if safe_mode else ''
+
+        negative_prompt = negative_prompt + safe_word
 
     payload = {
         "prompt": positive_prompt + korea_cmd if use_korea_lora else positive_prompt,
@@ -128,7 +143,7 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
         "steps": steps,
         "subseed": -1,
         "subseed_strength": 0.90,
-        "restore_faces": use_korea_lora,
+        "restore_faces": face_restore,
         "cfg_scale": config_scale,
         "width": size[0],
         "height": size[1],

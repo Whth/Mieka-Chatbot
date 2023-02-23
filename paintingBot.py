@@ -222,7 +222,8 @@ async def img_gen_friend(app: Ariadne, friend: Friend, chain: MessageChain):
         batch_size = max_batch_size if batch_size > max_batch_size else batch_size
         print(f'going with [{batch_size}] pictures')
         for _ in range(batch_size):
-            generated_path = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts)
+            generated_path = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts, safe_mode=False,
+                                     face_restore=True)
             await app.send_message(friend, Plain(random.choice(finishResponseList)) + Image(
                 path=generated_path))
 
@@ -283,7 +284,7 @@ async def live(channel: Ariadne = app):
     prompt = 'huge breast neko girl,loli:1.4,red hair:1.4,purple eyes:1.4,full body cloth,tie,standing,grin'
     if random.random() < 0.3:
         prompt += 'blush naked,climax,sweat drop,wet cloth'
-    generated_path = sd_draw(positive_prompt=prompt, size=[576, 832])
+    generated_path = sd_draw(positive_prompt=prompt, size=[576, 832], safe_mode=False)
     await channel.send_friend_message(2191133626,
                                       Plain(random.choice(masterList)) + Image(path=generated_path))
 
