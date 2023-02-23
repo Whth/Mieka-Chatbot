@@ -4,3 +4,6 @@
 /friend_temp/
 /sdDev/test.py
 
+*config.json
+*Bots.json
+/output
