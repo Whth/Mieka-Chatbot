@@ -280,7 +280,7 @@ async def random_emoji(channel: Ariadne = app):
 # </editor-fold>
 @scheduler.schedule(timers.every_custom_minutes(69))
 async def live(channel: Ariadne = app):
-    prompt = 'huge breast neko girl,loli:1.4,red hair,purple eyes,full body cloth,tie,standing,pink hair,'
+    prompt = 'huge breast neko girl,loli:1.4,red hair:1.4,purple eyes:1.4,full body cloth,tie,standing,grin'
     if random.random() < 0.3:
         prompt += 'blush naked,climax,sweat drop,wet cloth'
     generated_path = sd_draw(positive_prompt=prompt, size=[576, 832])

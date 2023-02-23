@@ -112,7 +112,7 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
         config_scale = 7.0
 
     if type(positive_prompt) != str or not positive_prompt.strip():
-        positive_prompt = 'pink hair:1.2,hair pin:1.2,girl,student uniform:1.4,tank cloth,collar:1.3,delicate and ' \
+        positive_prompt = 'pink hair:1.2,hair pin:1.2,girl,student uniform:1.4,collar:1.3,delicate and ' \
                           'shiny skin,white stocking:1.3,tie:1.3,sfw:1.4,on the street,unhappy,medium breasts,' \
                           'large breasts:0.3,watery eyes,beautiful eyes,delicate eys, luscious, ,high resolution,  ' \
                           '( best quality, ultra-detailed), (best illumination, best shadow, an extremely delicate ' \
