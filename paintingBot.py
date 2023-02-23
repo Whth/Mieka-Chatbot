@@ -253,6 +253,30 @@ async def good_morning(channel: Ariadne = app):
                                      Plain(random.choice(goodMorning)) + Image(path=generated_path))
 
 
+def get_random_file(folder):
+    """
+
+    :param folder:
+    :return:
+    """
+    files = os.listdir(folder)
+    index = random.randint(0, len(files) - 1)
+    return os.path.join(folder, files[index])
+
+
+@scheduler.schedule(timers.crontabify('0 6 * * * *'))
+async def random_emoji(channel: Ariadne = app):
+    """
+    random send a gif  in a day
+    :param channel:
+    :return:
+    """
+    max_delay = 12 * 60 * 60
+    time.sleep(random.randint(1, max_delay))
+    gif_dir_path = './gifs'
+    await channel.send_group_message(groups_list[1], Image(path=get_random_file(gif_dir_path)))
+
+
 # </editor-fold>
 @scheduler.schedule(timers.every_custom_minutes(69))
 async def live(channel: Ariadne = app):

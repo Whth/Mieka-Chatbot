@@ -46,7 +46,7 @@ def deAssembly(message: str, specify_batch_size: bool = False):
     if specify_batch_size:
         batch_size_pattern = '(\d+(p|P))?'
         temp = re.findall(pattern=batch_size_pattern, string=message)[0]
-        if temp == '':
+        if temp[0] == '':
             return pos_prompt, neg_prompt, 1  # default
         batch_size = int(temp[0].strip(temp[1]))
         return pos_prompt, neg_prompt, batch_size
@@ -96,7 +96,7 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
     :param config_scale:
     :return:
     """
-    korea_cmd = '<lora:koreanDollLikeness_v10:1>'
+    korea_cmd = '<lora:koreanDollLikeness_v10:0.90>'
 
     if type(use_sampler) == str and use_sampler in samplers_list:
         usedSampler = use_sampler
@@ -122,12 +122,13 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
         negative_prompt = 'nsfw:1.2,zoom out,loli,eyeshadow,ugly face,eye pouches:1.3'
 
     payload = {
-        "prompt": positive_prompt if not use_korea_lora else positive_prompt + korea_cmd,
+        "prompt": positive_prompt + korea_cmd if use_korea_lora else positive_prompt,
         "negative_prompt": negative_prompt,
         "sampler_name": usedSampler,
         "steps": steps,
         "subseed": -1,
         "subseed_strength": 0.90,
+        "restore_faces": use_korea_lora,
         "cfg_scale": config_scale,
         "width": size[0],
         "height": size[1],
@@ -143,7 +144,12 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
     return saved_path_with_hash
 
 
-def png_to_base64(file_path, log=False):
+def png_to_base64(file_path):
+    """
+
+    :param file_path:
+    :return:
+    """
     assert file_path, 'file_path not valid'
     with open(file_path, 'rb') as f:
         data = f.read()

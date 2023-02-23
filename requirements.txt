@@ -1,4 +1,4 @@
-requests~=2.28.1
-Pillow~=9.2.0
-python-slugify~=7.0.0
+requests==2.28.2
+Pillow==9.4.0
+python-slugify==8.0.0
 webuiapi~=0.3.3
