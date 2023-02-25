@@ -6,7 +6,6 @@ import re
 import sys
 
 import requests
-import webuiapi
 from PIL import Image, PngImagePlugin
 from slugify import slugify
 
@@ -14,7 +13,8 @@ sys.path.append('..')
 from baidu_translater.translater import Translater
 
 # create API client with default sampler, steps.
-sd_api = webuiapi.WebUIApi(host='127.0.0.1', port=7860, sampler='DPM++ 2M Karras', steps=22)
+
+# sd_api = webuiapi.WebUIApi(host='127.0.0.1', port=7860, sampler='DPM++ 2M Karras', steps=22)
 
 trans = Translater()
 
@@ -23,6 +23,7 @@ samplers_list = [
     "PLMS"
 ]
 url = "http://127.0.0.1:7860"
+# url = 'http://172.17.32.1:7680'
 start_method_name = "webui-user.bat"
 method_dir = r'G:\Games\StableDiffusion-WebUI'
 
@@ -53,10 +54,12 @@ def deAssembly(message: str, specify_batch_size: bool = False):
     if specify_batch_size:
         batch_size_pattern = '(\d+(p|P))?'
         temp = re.findall(pattern=batch_size_pattern, string=message)[0]
-        if temp[0] == '':
-            return pos_prompt, neg_prompt, 1  # default
-        batch_size = int(temp[0].strip(temp[1]))
-        return pos_prompt, neg_prompt, batch_size
+        for match in temp:
+            if match[0] != '':
+                batch_size = int(match[0].strip(match[1]))
+                return pos_prompt, neg_prompt, batch_size
+        return pos_prompt, neg_prompt, 1  # default
+
     return pos_prompt, neg_prompt,
 
 
@@ -89,7 +92,7 @@ def rename_image_with_hash(image_path):
 
 
 def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int = 22, size: list = [512, 768],
-            use_sampler: str or int = 'DPM++ SDE Karras', config_scale: float = 8.5, output_dir='./output',
+            use_sampler: str or int = 'DPM++ SDE Karras', config_scale: float = 7.2, output_dir='./output',
             use_korea_lora: bool = False, safe_mode: bool = True, face_restore: bool = False):
     """
     SD Ai drawing txt2img sd_api function
@@ -273,13 +276,16 @@ def single_task(img_base64_list: list[str], output_dir: str):
     return output_img_path
 
 
-def NPL_Reformat(natural_sentence: str, split_keyword: str = None):
+def npl_reformat(natural_sentence: str, split_keyword: str = None, specify_batch_size: bool = False) -> object:
     """
 
+    :return:
+    :param specify_batch_size:
     :param split_keyword:
     :param natural_sentence:
     :return:
     """
+    batch_size = 1  # default
     if natural_sentence == split_keyword:
         return ''
     if split_keyword:
@@ -287,11 +293,20 @@ def NPL_Reformat(natural_sentence: str, split_keyword: str = None):
     else:
         word_pattern = '(要|画个|画一个|来一个|来一碗|来个|给我|画)?'
     prompts = re.split(pattern=word_pattern, string=natural_sentence)
+    if specify_batch_size:
+        batch_size_pattern = '(\d+(p|P))?'
+        temp = re.findall(pattern=batch_size_pattern, string=natural_sentence)
+        for match in temp:
+            if match[0] != '':
+                batch_size = int(match[0].strip(match[1]))
+
+    print(f'using NPL')
+    print(f'batch size: [{batch_size}]')
     print(prompts)
     if len(prompts) < 2:
-        return ''
+        return '', (batch_size if specify_batch_size else None)
     else:
-        return trans.translate('en', prompts[-1])
+        return trans.translate('en', prompts[-1]), (batch_size if specify_batch_size else None)
 
 
 if __name__ == '__main__':

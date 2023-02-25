@@ -14,7 +14,7 @@ from graia.ariadne.message.parser.base import MentionMe
 from graia.ariadne.model import Member, Group, Friend
 from graia.scheduler import GraiaScheduler, timers
 
-from sdDev.SD import sd_draw, sd_diff, deAssembly, NPL_Reformat
+from sdDev.SD import sd_draw, sd_diff, deAssembly, npl_reformat
 
 global finishResponseList, fastResponseList, agreeResponseList, disagreeResponseList, goodMorning
 global rewardResponseList, masterList
@@ -141,7 +141,7 @@ async def friend_message_listener(app: Ariadne, member: Member, group: Group, ch
     :param chain:
     :return:
     """
-    reFormatted = NPL_Reformat(str(chain))
+    reFormatted = npl_reformat(str(chain))
     if reFormatted == '':
 
         pos_prompts, neg_prompts = deAssembly(str(chain))
@@ -201,15 +201,18 @@ async def img_gen_friend(app: Ariadne, friend: Friend, chain: MessageChain):
 
     use_reward: bool = True
     dear_name = 'mika'
-    max_batch_size = 5
+    max_batch_size = 20
     pos_prompts, neg_prompts, batch_size = '', '', 1
+    use_fr = False
+
     if '+' not in str(chain) and dear_name not in str(chain):
         return
     if 'mika' in str(chain):
-        pos_prompts, neg_prompts = NPL_Reformat(str(chain), split_keyword=dear_name), ''
+        pos_prompts, batch_size = npl_reformat(str(chain), split_keyword=dear_name, specify_batch_size=True)
     else:
         pos_prompts, neg_prompts, batch_size = deAssembly(str(chain), specify_batch_size=True)
-
+    if '#' in str(chain):
+        use_fr = True
     if Image in chain:
         print('using img2img')
         # 如果包含图片则使用img2img
@@ -223,7 +226,7 @@ async def img_gen_friend(app: Ariadne, friend: Friend, chain: MessageChain):
         print(f'going with [{batch_size}] pictures')
         for _ in range(batch_size):
             generated_path = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts, safe_mode=False,
-                                     face_restore=True)
+                                     face_restore=use_fr)
             await app.send_message(friend, Plain(random.choice(finishResponseList)) + Image(
                 path=generated_path))
 
