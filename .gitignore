@@ -3,7 +3,5 @@
 /group_temp/
 /friend_temp/
 /sdDev/test.py
+*.json
 
-*config.json
-*Bots.json
-/output

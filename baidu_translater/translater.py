@@ -1,14 +1,13 @@
 import hashlib
 import json
-import os.path
+import random
 
 import requests
-import random
 
 
 class Translater:
     appid, appkey, url = None, None, None
-    # configPath = f'{os.path.dirname(os.getcwd())}/baidu_translater/config.json'
+    # configPath = f'{os.path.dirname(os.getcwd())}/baidu_translater/chat_dict.json'
     configPath='L:\pycharm projects\chatBotComponents\\baidu_translater\config.json'
     def __init__(self):
         assert self.load_secret() == 1

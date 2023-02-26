@@ -2,6 +2,7 @@ import datetime
 import json
 import os
 import random
+import re
 import subprocess
 import time
 
@@ -21,13 +22,16 @@ global rewardResponseList, masterList
 global groups_list
 global app, SILENT_RATE, REWARD_RATE, AGREED_RATE
 
+global scheduler_config
+
 
 def load_parm():
     global finishResponseList, fastResponseList, agreeResponseList, disagreeResponseList, goodMorning
     global rewardResponseList, masterList
     global groups_list
     global app, SILENT_RATE, REWARD_RATE, AGREED_RATE
-    with open('config.json', encoding='utf-8', mode='r') as f:
+    global scheduler_config
+    with open('chat_dict.json', encoding='utf-8', mode='r') as f:
         # TODO:增加更多有趣的语料
         word_dict = json.load(f)
         finishResponseList = word_dict.get('cute')
@@ -49,7 +53,6 @@ def load_parm():
         # TODO:增加语料的有效判断
 
     with open('Bots.json', mode='r') as f:
-        # TODO：多挂载几个机器人
         botInfo = json.load(f)
         app = Ariadne(
             config(
@@ -57,10 +60,14 @@ def load_parm():
                 account=botInfo.get('account'),  # 你的机器人的 qq 号
             ),
         )
+    with open('sch_config.json', mode='r') as f:
+        scheduler_config = json.load(f)
+    with open('sch_config.json', mode='w+') as f:
+        scheduler_config['live_enabled'] = False
+        json.dump(scheduler_config, f, indent=4)
     SILENT_RATE = 0.2
     REWARD_RATE = 0.1
     AGREED_RATE = 0.65
-    # FIXME:reward picture clash,because Image use only one path
 
 
 def check_mcl_online(auto=True):
@@ -234,6 +241,7 @@ async def img_gen_friend(app: Ariadne, friend: Friend, chain: MessageChain):
 
         if random.random() < REWARD_RATE and use_reward:
             print(f'with REWARD_RATE: {REWARD_RATE}|REWARDED')
+            size = [random.randint(MIN_PIXEL, MAX_PIXEL), random.randint(MIN_PIXEL, MAX_PIXEL)]
             generated_path_reward = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts, size=size)
             await app.send_message(friend, Plain(random.choice(rewardResponseList)) + Image(
                 path=generated_path_reward))
@@ -284,14 +292,52 @@ async def random_emoji(channel: Ariadne = app):
 
 
 # </editor-fold>
-@scheduler.schedule(timers.every_custom_minutes(69))
+@scheduler.schedule(timers.every_custom_minutes(1))
 async def live(channel: Ariadne = app):
-    prompt = 'huge breast neko girl,loli:1.4,red hair:1.4,purple eyes:1.4,full body cloth,tie,standing,grin'
-    if random.random() < 0.3:
-        prompt += 'blush naked,climax,sweat drop,wet cloth'
-    generated_path = sd_draw(positive_prompt=prompt, size=[576, 832], safe_mode=False)
-    await channel.send_friend_message(2191133626,
-                                      Plain(random.choice(masterList)) + Image(path=generated_path))
+    global scheduler_config
+    with open('sch_config.json', mode='r') as f:
+        scheduler_config = json.load(f)
+    if scheduler_config.get('live_enabled'):
+
+        live_max_time = scheduler_config.get('live_max_time')
+        live_interval = scheduler_config.get('live_interval')
+        live_times = int(live_max_time / live_interval) + 1
+        print(f'live started interval: [{live_interval}]|max_time: [{live_max_time}]|live_times: [{live_times}]')
+        for _ in range(live_times):
+
+            with open('sch_config.json', mode='r') as f:
+                scheduler_config = json.load(f)
+            if scheduler_config.get('live_enabled'):
+
+                prompt = 'huge breast neko girl,nekomimi,cat ears,loli:1.4,complete red hair:1.4,purple eyes:1.4,' \
+                         'full body ' \
+                         'cloth,tie:1.3,open cloth,standing,grin,happy feeling'
+                if random.random() < 0.3:
+                    prompt += 'blush naked,climax,sweaty,wet cloth'
+                generated_path = sd_draw(positive_prompt=prompt, size=[576, 832], safe_mode=False, )
+                for master_account in scheduler_config.get('masters'):
+                    await channel.send_friend_message(master_account,
+                                                      Plain(random.choice(masterList)) + Image(path=generated_path))
+                time.sleep(live_interval * 60)
+
+
+@app.broadcast.receiver('FriendMessage')
+async def check_live_key(chain: MessageChain, channel: Ariadne = app, ):
+    live_keyword = 'live'
+    start_keyword = 'start'
+    end_keyword = 'end'
+    start_pattern = f'#{live_keyword} {start_keyword}'
+    end_pattern = f'#{live_keyword} {end_keyword}'
+    live_enabled = None
+    if re.match(start_pattern, str(chain)):
+        live_enabled = True
+    elif re.match(end_pattern, str(chain)):
+        live_enabled = False
+    if live_enabled is not None:
+        print(f"Change [live_enabled] key to [{live_enabled}]")
+        with open("sch_config.json", mode='w+') as f:
+            scheduler_config['live_enabled'] = live_enabled
+            json.dump(scheduler_config, f, indent=4)
 
 
 app.launch_blocking()
