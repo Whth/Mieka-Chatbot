@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import io
+import math
 import os.path
 import re
 import sys
@@ -53,7 +54,7 @@ def deAssembly(message: str, specify_batch_size: bool = False):
 
     if specify_batch_size:
         batch_size_pattern = '(\d+(p|P))?'
-        temp = re.findall(pattern=batch_size_pattern, string=message)[0]
+        temp = re.findall(pattern=batch_size_pattern, string=message)
         for match in temp:
             if match[0] != '':
                 batch_size = int(match[0].strip(match[1]))
@@ -151,7 +152,7 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
         "width": size[0],
         "height": size[1],
         "styles": [
-            "inte fix",
+            "inte fix", 'ero'
         ]
     }
     print(payload)
@@ -174,11 +175,24 @@ def png_to_base64(file_path):
         return base64.b64encode(data).decode()
 
 
+def get_image_ratio(image_path):
+    """
+    获取图片长宽比
+    :param image_path: 图片路径
+    :return: 图片长宽比
+    """
+    from PIL import Image
+    img = Image.open(image_path)
+    width, height = img.size
+    return width / height
+
+
 def sd_diff(init_file_path: str, positive_prompt: str = '', negative_prompt: str = '', steps: int = 22,
             use_sampler: str or int = "DDIM", denoising_strength: float = 0.7, config_scale: float = 7.5,
-            output_dir: str = './output'):
+            output_dir: str = './output', fit_original_size: bool = True):
     """
     SD Ai drawing img2img sd_api function
+    :param fit_original_size:
     :param output_dir:
     :param init_file_path:
     :param denoising_strength:
@@ -189,6 +203,14 @@ def sd_diff(init_file_path: str, positive_prompt: str = '', negative_prompt: str
     :param config_scale:
     :return:
     """
+
+    max_resolution = 512 * 1020
+    size = [512, 768]
+    if fit_original_size:
+        p = get_image_ratio(init_file_path)
+        size[1] = int(math.sqrt(max_resolution / p))
+        size[0] = int(size[1] * p)
+
     if type(use_sampler) == str and use_sampler in samplers_list:
         usedSampler = use_sampler
     elif type(use_sampler) == int and 0 <= use_sampler < len(samplers_list):
@@ -205,20 +227,11 @@ def sd_diff(init_file_path: str, positive_prompt: str = '', negative_prompt: str
     if type(positive_prompt) != str or not positive_prompt.strip():
         positive_prompt = 'super cute neko,perfect lighting,sfw:1.4'
     if type(negative_prompt) != str or not negative_prompt.strip():
-        negative_prompt = 'lowres, text, error, missing arms, missing legs, missing fingers, extra digit, ' \
-                          'fewer digits, cropped, worst quality, low quality, jpeg artifacts, signature, watermark, ' \
-                          'out of frame, extra fingers, mutated hands, (poorly drawn hands), (poorly drawn face), ' \
-                          '(mutation), (deformed breasts), (ugly), blurry, (bad anatomy), (bad proportions), ' \
-                          '(extra limbs), cloned face, flat color, monochrome, limited palette, skimpy, ' \
-                          'nukige, cleavage, center opening, absolute cleavage, pornographic, erotic, eroge, hentai, ' \
-                          'nsfw:1.2, ecchi, futanari, shota, shotacon loli, lolicon, bad-artist, bad-hands-5, ' \
-                          'bad_quality,(EasyNegative), claws, umbrella, lowres, bad-artist, bad-hands-5,claws, ' \
-                          'zoom out,'
-    b64 = png_to_base64(init_file_path)
+        negative_prompt = 'EasyNegative)'
 
     payload = {
         "init_images": [
-            b64
+
         ],
         "denoising_strength": denoising_strength,
         "prompt": positive_prompt,
@@ -228,11 +241,14 @@ def sd_diff(init_file_path: str, positive_prompt: str = '', negative_prompt: str
         "subseed_strength": 0.90,
         "steps": steps,
         "cfg_scale": config_scale,
-        "width": 512,
-        "height": 768,
+        "width": size[0],
+        "height": size[1],
     }
-    print(f'going with [{init_file_path}]|prompt: {positive_prompt}')
     print(f'{payload}')
+    b64 = png_to_base64(init_file_path)
+    payload['init_images'] = [b64]
+    print(f'going with [{init_file_path}]|prompt: {positive_prompt}')
+
     response = requests.post(url=f'{url}/sdapi/v1/img2img', json=payload)
     r = response.json()
     img_base64_list = r['images']

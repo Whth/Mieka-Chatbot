@@ -198,7 +198,8 @@ async def img_gen_friend(app: Ariadne, friend: Friend, chain: MessageChain):
     :param chain:
     :return:
     """
-
+    MIN_PIXEL = 446
+    MAX_PIXEL = 1020
     use_reward: bool = True
     dear_name = 'mika'
     max_batch_size = 20
@@ -225,14 +226,15 @@ async def img_gen_friend(app: Ariadne, friend: Friend, chain: MessageChain):
         batch_size = max_batch_size if batch_size > max_batch_size else batch_size
         print(f'going with [{batch_size}] pictures')
         for _ in range(batch_size):
+            size = [random.randint(MIN_PIXEL, MAX_PIXEL), random.randint(MIN_PIXEL, MAX_PIXEL)]
             generated_path = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts, safe_mode=False,
-                                     face_restore=use_fr)
+                                     face_restore=use_fr, size=size)
             await app.send_message(friend, Plain(random.choice(finishResponseList)) + Image(
                 path=generated_path))
 
         if random.random() < REWARD_RATE and use_reward:
             print(f'with REWARD_RATE: {REWARD_RATE}|REWARDED')
-            generated_path_reward = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts)
+            generated_path_reward = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts, size=size)
             await app.send_message(friend, Plain(random.choice(rewardResponseList)) + Image(
                 path=generated_path_reward))
 
