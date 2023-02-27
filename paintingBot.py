@@ -57,7 +57,7 @@ def load_parm():
         app = Ariadne(
             config(
                 verify_key=botInfo.get('verify_key'),  # 填入 VerifyKey
-                account=botInfo.get('account'),  # 你的机器人的 qq 号
+                account=botInfo.get('account')[1],  # 你的机器人的 qq 号
             ),
         )
     with open('sch_config.json', mode='r') as f:
@@ -309,12 +309,14 @@ async def live(channel: Ariadne = app):
                 scheduler_config = json.load(f)
             if scheduler_config.get('live_enabled'):
 
-                prompt = 'huge breast neko girl,nekomimi,cat ears,loli:1.4,complete red hair:1.4,purple eyes:1.4,' \
+                prompt = 'huge breast,gigantic breasts,large breasts,sexy, neko, 1girl,nekomimi,cat ears,loli:1.4,' \
+                         'complete pink hair:1.4,blue eyes:1.4,collar,cleavage,sweaty' \
                          'full body ' \
                          'cloth,tie:1.3,open cloth,standing,grin,happy feeling'
                 if random.random() < 0.3:
                     prompt += 'blush naked,climax,sweaty,wet cloth'
-                generated_path = sd_draw(positive_prompt=prompt, size=[576, 832], safe_mode=False, )
+                generated_path = sd_draw(positive_prompt=prompt, size=[576, 832], safe_mode=False, use_doll_lora=True,
+                                         face_restore=True)
                 for master_account in scheduler_config.get('masters'):
                     await channel.send_friend_message(master_account,
                                                       Plain(random.choice(masterList)) + Image(path=generated_path))

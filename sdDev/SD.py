@@ -3,6 +3,7 @@ import hashlib
 import io
 import math
 import os.path
+import random
 import re
 import sys
 
@@ -92,14 +93,14 @@ def rename_image_with_hash(image_path):
     return new_image_path
 
 
-def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int = 22, size: list = [512, 768],
-            use_sampler: str or int = 'DPM++ SDE Karras', config_scale: float = 7.2, output_dir='./output',
-            use_korea_lora: bool = False, safe_mode: bool = True, face_restore: bool = False):
+def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int = 20, size: list = [512, 768],
+            use_sampler: str or int = 'DPM++ 2M Karras', config_scale: float = 7.1, output_dir='./output',
+            use_doll_lora: bool = False, safe_mode: bool = True, face_restore: bool = False):
     """
     SD Ai drawing txt2img sd_api function
     :param safe_mode:
     :param face_restore:
-    :param use_korea_lora:
+    :param use_doll_lora:
     :param size:
     :param output_dir:
     :param positive_prompt:
@@ -109,7 +110,9 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
     :param config_scale:
     :return:
     """
-    korea_cmd = '<lora:koreanDollLikeness_v10:0.90>'
+    doll_lora = f'<lora:japaneseDollLikeness_v10:{random.random()}> <lora:koreanDollLikeness_v10:{random.random()}> ' \
+                f'<lora:taiwanDollLikeness_v10:{random.random()}> <lora:HinaIAmYoung22_zny10:{random.random()}>' \
+                f'<lora:hyperbreasts_v5Lora:{random.random()}>, <lora:hugeAssAndBoobs_v1:{random.random()}>'
 
     if type(use_sampler) == str and use_sampler in samplers_list:
         usedSampler = use_sampler
@@ -125,23 +128,25 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
         config_scale = 7.0
 
     if type(positive_prompt) != str or not positive_prompt.strip():
-        positive_prompt = 'pink hair:1.2,hair pin:1.2,girl,student uniform:1.4,collar:1.3,delicate and ' \
+        positive_prompt = 'pink hair:1.2,hair pin:1.2,girl,student uniform:1.4,uniform,pure,unifom,collar:1.3,' \
+                          'delicate and ' \
                           'shiny skin,white stocking:1.3,tie:1.3,on the street,unhappy,medium breasts,' \
-                          'large breasts:0.3,watery eyes,beautiful eyes,delicate eys, luscious, ,high resolution,  ' \
+                          'large breasts:0.3,watery eyes,ponytails,twintails,hairpin,beautiful eyes,delicate eys, ' \
+                          'luscious ,high resolution,8k,4k,highres,  ' \
                           '( best quality, ultra-detailed), (best illumination, best shadow, an extremely delicate ' \
                           'and beautiful), finely detail, depth of field, (shine), (airbrush), (sketch), ' \
-                          '((three-dimensional)), perfect lighting,sun,sunny,masterpiece:1.4'
+                          '((three-dimensional)), perfect lighting,sun,sunny,masterpiece:1.4,Asian,photorealistic:1.2'
         safe_word = 'sfw:1.5' if safe_mode else ''
 
         positive_prompt = positive_prompt + safe_word
     if type(negative_prompt) != str or not negative_prompt.strip():
-        negative_prompt = 'eyeshadow,eye pouches:1.3'
+        negative_prompt = 'eyeshadow,eye pouches:1.3,nipple'
         safe_word = 'nsfw:1.3' if safe_mode else ''
 
         negative_prompt = negative_prompt + safe_word
 
     payload = {
-        "prompt": positive_prompt + korea_cmd if use_korea_lora else positive_prompt,
+        "prompt": positive_prompt + doll_lora if use_doll_lora else positive_prompt,
         "negative_prompt": negative_prompt,
         "sampler_name": usedSampler,
         "steps": steps,
@@ -292,15 +297,20 @@ def single_task(img_base64_list: list[str], output_dir: str):
     return output_img_path
 
 
-def npl_reformat(natural_sentence: str, split_keyword: str = None, specify_batch_size: bool = False) -> object:
+def npl_reformat(natural_sentence: str, split_keyword: str = None, specify_batch_size: bool = False,
+                 null_check: bool = True) -> object:
     """
 
+    :param null_check:
     :return:
     :param specify_batch_size:
     :param split_keyword:
     :param natural_sentence:
     :return:
     """
+    if null_check and natural_sentence == '':
+        return ''
+
     batch_size = 1  # default
     if natural_sentence == split_keyword:
         return ''
@@ -309,6 +319,8 @@ def npl_reformat(natural_sentence: str, split_keyword: str = None, specify_batch
     else:
         word_pattern = '(要|画个|画一个|来一个|来一碗|来个|给我|画)?'
     prompts = re.split(pattern=word_pattern, string=natural_sentence)
+    if prompts[-1] == '' or prompts[-1] is None:
+        return ''
     if specify_batch_size:
         batch_size_pattern = '(\d+(p|P))?'
         temp = re.findall(pattern=batch_size_pattern, string=natural_sentence)
