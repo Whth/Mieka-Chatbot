@@ -10,7 +10,7 @@ import requests
 from graia.ariadne.app import Ariadne
 from graia.ariadne.entry import config
 from graia.ariadne.message.chain import MessageChain
-from graia.ariadne.message.element import Plain, At, Image
+from graia.ariadne.message.element import Plain, Image
 from graia.ariadne.message.parser.base import MentionMe
 from graia.ariadne.model import Member, Group, Friend
 from graia.scheduler import GraiaScheduler, timers
@@ -108,9 +108,12 @@ def download_image(url: str, save_dir: str):
 
 
 async def groupDiffusion(app: Ariadne, group: Group, member: Member, chain: MessageChain,
-                         neg_prompts: str, pos_prompts: str, use_korea_lora: bool = True, use_reward: bool = True):
+                         neg_prompts: str, pos_prompts: str, use_reward: bool = True,
+                         batch_size: int = 1, use_doll_lora: bool = True):
     """
 
+    :param use_doll_lora:
+    :param batch_size:
     :param app:
     :param member:
     :param group:
@@ -122,24 +125,33 @@ async def groupDiffusion(app: Ariadne, group: Group, member: Member, chain: Mess
     if Image in chain:
         print('using img2img')
         # 如果包含图片则使用img2img
-        img_path = download_image(chain[Image, 1][0].url, save_dir='./group_temp')
+        img_path = download_image(chain[Image, 1][0].url, save_dir='./friend_temp')
         generated_path = sd_diff(init_file_path=img_path, positive_prompt=pos_prompts, negative_prompt=neg_prompts)
-        await app.send_message(group, At(member) + Plain(random.choice(finishResponseList)) + Image(
-            path=generated_path))
+        await app.send_message(group,
+                               Plain(random.choice(finishResponseList)) + Image(path=generated_path))
     else:
         print('using txt2img')
-        generated_path = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts)
-        await app.send_message(group, At(member) + Plain(random.choice(finishResponseList)) + Image(
-            path=generated_path))
+        print(f'going with [{batch_size}] pictures')
+        for _ in range(batch_size):
+            size = [542, 864]
+            if pos_prompts != '':
+                categories = ['hair', 'hand']
+                pos_prompts += await get_random_prompts(categories=categories)
+            generated_path = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts, safe_mode=True,
+                                     size=size, use_doll_lora=use_doll_lora)
+            await app.send_message(group, Plain(random.choice(finishResponseList)) + Image(
+                path=generated_path))
+
         if random.random() < REWARD_RATE and use_reward:
             print(f'with REWARD_RATE: {REWARD_RATE}|REWARDED')
-            generated_path_reward = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts)
-            await app.send_message(group, At(member) + Plain(random.choice(rewardResponseList)) + Image(
+            size = [542, 864]
+            generated_path_reward = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts, size=size)
+            await app.send_message(group, Plain(random.choice(rewardResponseList)) + Image(
                 path=generated_path_reward))
 
 
 @app.broadcast.receiver("GroupMessage", decorators=[MentionMe()])
-async def friend_message_listener(app: Ariadne, member: Member, group: Group, chain: MessageChain = MentionMe(False)):
+async def img_gen_group(app: Ariadne, member: Member, group: Group, chain: MessageChain = MentionMe(False)):
     """
     快速响应群at
     :param app:
@@ -149,51 +161,16 @@ async def friend_message_listener(app: Ariadne, member: Member, group: Group, ch
     :return:
     """
     reFormatted = npl_reformat(str(chain))
+    batch_size = 1
     if reFormatted == '':
 
-        pos_prompts, neg_prompts = deAssembly(str(chain))
+        pos_prompts, neg_prompts, batch_size = deAssembly(str(chain), specify_batch_size=True)
     else:
         # 自然语言只有正向
         pos_prompts, neg_prompts = reFormatted, ''
-    await groupDiffusion(app, group, member, chain, neg_prompts, pos_prompts)
-
-
-@app.broadcast.receiver("GroupMessage")
-async def group_fast_feed(app: Ariadne, group: Group, chain: MessageChain):
-    if random.random() < SILENT_RATE or '+' not in chain:
-        return
-    time.sleep(7)
-
-    await app.send_message(group, Plain(random.choice(fastResponseList)))
-
-
-@app.broadcast.receiver("GroupMessage")
-async def group_I_think(app: Ariadne, group: Group, chain: MessageChain):
-    if "我想" in str(chain) or "我觉得" in str(chain) or "是不是" in str(chain) or "该不该" in str(chain):
-        time.sleep(7)
-        if random.random() < AGREED_RATE:
-            print(f"Agree: {chain}")
-            await app.send_message(group, Plain(random.choice(agreeResponseList)))
-
-        else:
-            print(f"Disagree: {chain}")
-            await app.send_message(group, Plain(random.choice(disagreeResponseList)))
-
-
-@app.broadcast.receiver("GroupMessage")
-async def quiet_listener_group(app: Ariadne, member: Member, group: Group, chain: MessageChain):
-    if '+' not in str(chain):
-        return
-    pos_prompts, neg_prompts = deAssembly(str(chain))
-    await groupDiffusion(app, group, member, chain, neg_prompts, pos_prompts)
-
-
-@app.broadcast.receiver("FriendMessage")
-async def fast_feed_friend(app: Ariadne, friend: Friend, chain: MessageChain):
-    if '+' not in str(chain) and 'mika' not in str(chain):
-        return
-    time.sleep(7)
-    await app.send_message(friend, Plain(random.choice(fastResponseList)))
+    if batch_size > 7:
+        batch_size = 7
+    await groupDiffusion(app, group, member, chain, neg_prompts, pos_prompts, batch_size=batch_size, use_doll_lora=True)
 
 
 @app.broadcast.receiver("FriendMessage")
@@ -245,6 +222,44 @@ async def img_gen_friend(app: Ariadne, friend: Friend, chain: MessageChain):
             generated_path_reward = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts, size=size)
             await app.send_message(friend, Plain(random.choice(rewardResponseList)) + Image(
                 path=generated_path_reward))
+
+
+@app.broadcast.receiver("GroupMessage")
+async def group_fast_feed(app: Ariadne, group: Group, chain: MessageChain):
+    if random.random() < SILENT_RATE or '+' not in chain:
+        return
+    time.sleep(7)
+
+    await app.send_message(group, Plain(random.choice(fastResponseList)))
+
+
+@app.broadcast.receiver("GroupMessage")
+async def group_I_think(app: Ariadne, group: Group, chain: MessageChain):
+    if "我想" in str(chain) or "我觉得" in str(chain) or "是不是" in str(chain) or "该不该" in str(chain):
+        time.sleep(7)
+        if random.random() < AGREED_RATE:
+            print(f"Agree: {chain}")
+            await app.send_message(group, Plain(random.choice(agreeResponseList)))
+
+        else:
+            print(f"Disagree: {chain}")
+            await app.send_message(group, Plain(random.choice(disagreeResponseList)))
+
+
+@app.broadcast.receiver("GroupMessage")
+async def quiet_listener_group(app: Ariadne, member: Member, group: Group, chain: MessageChain):
+    if '+' not in str(chain):
+        return
+    pos_prompts, neg_prompts = deAssembly(str(chain))
+    await groupDiffusion(app, group, member, chain, neg_prompts, pos_prompts)
+
+
+@app.broadcast.receiver("FriendMessage")
+async def fast_feed_friend(app: Ariadne, friend: Friend, chain: MessageChain):
+    if '+' not in str(chain) and 'mika' not in str(chain):
+        return
+    time.sleep(7)
+    await app.send_message(friend, Plain(random.choice(fastResponseList)))
 
 
 # <editor-fold desc="Schedules">
@@ -307,20 +322,45 @@ async def live(channel: Ariadne = app):
 
             with open('sch_config.json', mode='r') as f:
                 scheduler_config = json.load(f)
-            if scheduler_config.get('live_enabled'):
+            if not scheduler_config.get('live_enabled'):
+                break
+            categories = ['hair', 'hand']
+            additional_prompt = await get_random_prompts(categories)
+            prompt = 'huge breast,gigantic breasts,large breasts,sexy, neko, 1girl,nekomimi,cat ears,loli:1.4,' \
+                     f'{additional_prompt},' \
+                     f',blue eyes:1.4,collar,cleavage,sweaty,' \
+                     f',full body ,' \
+                     'cloth,tie:1.3,open cloth,standing,grin:1.4,happy feeling'
+            if random.random() < 0.3:
+                prompt += 'blush naked,climax,sweaty,wet cloth'
+            generated_path = sd_draw(positive_prompt=prompt, size=[576, 832], safe_mode=False, use_doll_lora=True,
+                                     face_restore=False)
+            for master_account in scheduler_config.get('masters'):
+                await channel.send_friend_message(master_account,
+                                                  Plain(random.choice(masterList)) + Image(path=generated_path))
+            time.sleep(live_interval * 60)
 
-                prompt = 'huge breast,gigantic breasts,large breasts,sexy, neko, 1girl,nekomimi,cat ears,loli:1.4,' \
-                         'complete pink hair:1.4,blue eyes:1.4,collar,cleavage,sweaty' \
-                         'full body ' \
-                         'cloth,tie:1.3,open cloth,standing,grin,happy feeling'
-                if random.random() < 0.3:
-                    prompt += 'blush naked,climax,sweaty,wet cloth'
-                generated_path = sd_draw(positive_prompt=prompt, size=[576, 832], safe_mode=False, use_doll_lora=True,
-                                         face_restore=True)
-                for master_account in scheduler_config.get('masters'):
-                    await channel.send_friend_message(master_account,
-                                                      Plain(random.choice(masterList)) + Image(path=generated_path))
-                time.sleep(live_interval * 60)
+        print(f'live end')
+        with open('sch_config.json', mode='w+') as f:
+            scheduler_config = json.load(f)
+            scheduler_config['live_enabled'] = False
+            json.dump(scheduler_config, f)
+
+
+async def get_random_prompts(categories: list[str], emphasize_multiplier: float = 1.4) -> str:
+    prompts = ''
+    with open('prompts_dict.json', mode='r') as f:
+        prompt_dict = json.load(f)
+    for category in categories:
+
+        prompts_set_dict: dict = prompt_dict.get(category)
+
+        for set_name, set_content in prompts_set_dict.items():
+            prompt = random.choice(set_content)
+            print(f'[{set_name}] use [{prompt}]')
+            prompts += f',{prompt}:{emphasize_multiplier}'
+    print(f'result prompts: {prompts}')
+    return prompts
 
 
 @app.broadcast.receiver('FriendMessage')

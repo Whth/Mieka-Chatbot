@@ -14,9 +14,6 @@ from slugify import slugify
 sys.path.append('..')
 from baidu_translater.translater import Translater
 
-# create API client with default sampler, steps.
-
-# sd_api = webuiapi.WebUIApi(host='127.0.0.1', port=7860, sampler='DPM++ 2M Karras', steps=22)
 
 trans = Translater()
 
@@ -110,9 +107,6 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
     :param config_scale:
     :return:
     """
-    doll_lora = f'<lora:japaneseDollLikeness_v10:{random.random()}> <lora:koreanDollLikeness_v10:{random.random()}> ' \
-                f'<lora:taiwanDollLikeness_v10:{random.random()}> <lora:HinaIAmYoung22_zny10:{random.random()}>' \
-                f'<lora:hyperbreasts_v5Lora:{random.random()}>, <lora:hugeAssAndBoobs_v1:{random.random()}>'
 
     if type(use_sampler) == str and use_sampler in samplers_list:
         usedSampler = use_sampler
@@ -128,10 +122,9 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
         config_scale = 7.0
 
     if type(positive_prompt) != str or not positive_prompt.strip():
-        positive_prompt = 'pink hair:1.2,hair pin:1.2,girl,student uniform:1.4,uniform,pure,unifom,collar:1.3,' \
-                          'delicate and ' \
-                          'shiny skin,white stocking:1.3,tie:1.3,on the street,unhappy,medium breasts,' \
-                          'large breasts:0.3,watery eyes,ponytails,twintails,hairpin,beautiful eyes,delicate eys, ' \
+        positive_prompt = 'pink hair:1.2,hair pin:1.2,girl,student uniform:1.4,uniform,pure,uniform,collar:1.3,' \
+                          'delicate and shiny skin,white stocking:1.3,tie:1.3,on the street,unhappy,medium breasts,' \
+                          'upper body,watery eyes,ponytails,twintails,hairpin,beautiful eyes,delicate eys, ' \
                           'luscious ,high resolution,8k,4k,highres,  ' \
                           '( best quality, ultra-detailed), (best illumination, best shadow, an extremely delicate ' \
                           'and beautiful), finely detail, depth of field, (shine), (airbrush), (sketch), ' \
@@ -141,12 +134,18 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
         positive_prompt = positive_prompt + safe_word
     if type(negative_prompt) != str or not negative_prompt.strip():
         negative_prompt = 'eyeshadow,eye pouches:1.3,nipple'
-        safe_word = 'nsfw:1.3' if safe_mode else ''
+        safe_word = ',nsfw:1.3' if safe_mode else ''
 
         negative_prompt = negative_prompt + safe_word
-
+    if use_doll_lora:
+        doll_lora = f'<lora:japaneseDollLikeness_v10:{random.random()}> <lora:koreanDollLikeness_v10:{random.random()}> ' \
+                    f'<lora:taiwanDollLikeness_v10:{random.random()}> <lora:HinaIAmYoung22_zny10:0.1>' \
+                    f'<lora:hyperbreasts_v5Lora:{random.uniform(0.2, 0.43) if not safe_mode else random.uniform(0.1, 0.2)}>, ' \
+                    f'<lora:hugeAssAndBoobs_v1:{random.random() if not safe_mode else random.uniform(0.1, 0.2)}>'
+        print(f'use doll lora')
+        positive_prompt += doll_lora
     payload = {
-        "prompt": positive_prompt + doll_lora if use_doll_lora else positive_prompt,
+        "prompt": positive_prompt,
         "negative_prompt": negative_prompt,
         "sampler_name": usedSampler,
         "steps": steps,
