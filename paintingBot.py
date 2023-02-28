@@ -132,11 +132,11 @@ async def groupDiffusion(app: Ariadne, group: Group, member: Member, chain: Mess
     else:
         print('using txt2img')
         print(f'going with [{batch_size}] pictures')
+        size = [542, 864]
+        if pos_prompts != '':
+            categories = ['hair', 'hand']
+            pos_prompts += await get_random_prompts(categories=categories)
         for _ in range(batch_size):
-            size = [542, 864]
-            if pos_prompts != '':
-                categories = ['hair', 'hand']
-                pos_prompts += await get_random_prompts(categories=categories)
             generated_path = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts, safe_mode=True,
                                      size=size, use_doll_lora=use_doll_lora)
             await app.send_message(group, Plain(random.choice(finishResponseList)) + Image(
@@ -151,7 +151,7 @@ async def groupDiffusion(app: Ariadne, group: Group, member: Member, chain: Mess
 
 
 @app.broadcast.receiver("GroupMessage", decorators=[MentionMe()])
-async def img_gen_group(app: Ariadne, member: Member, group: Group, chain: MessageChain = MentionMe(False)):
+async def img_gen_group_atme(app: Ariadne, member: Member, group: Group, chain: MessageChain = MentionMe(False)):
     """
     快速响应群at
     :param app:
@@ -160,14 +160,28 @@ async def img_gen_group(app: Ariadne, member: Member, group: Group, chain: Messa
     :param chain:
     :return:
     """
-    reFormatted = npl_reformat(str(chain))
-    batch_size = 1
-    if reFormatted == '':
+    reFormatted, batch_size = npl_reformat(str(chain), specify_batch_size=True)
+    print(f'npl decrypt{reFormatted}')
 
-        pos_prompts, neg_prompts, batch_size = deAssembly(str(chain), specify_batch_size=True)
-    else:
-        # 自然语言只有正向
-        pos_prompts, neg_prompts = reFormatted, ''
+    pos_prompts, neg_prompts = reFormatted, ''
+    if batch_size > 7:
+        batch_size = 7
+    await groupDiffusion(app, group, member, chain, neg_prompts, pos_prompts, batch_size=batch_size, use_doll_lora=True)
+
+
+@app.broadcast.receiver("GroupMessage")
+async def img_gen_group_quiet(app: Ariadne, member: Member, group: Group, chain: MessageChain):
+    """
+
+    :param app:
+    :param member:
+    :param group:
+    :param chain:
+    :return:
+    """
+    if '+' not in str(chain):
+        return
+    pos_prompts, neg_prompts, batch_size = deAssembly(str(chain), specify_batch_size=True)
     if batch_size > 7:
         batch_size = 7
     await groupDiffusion(app, group, member, chain, neg_prompts, pos_prompts, batch_size=batch_size, use_doll_lora=True)
@@ -244,14 +258,6 @@ async def group_I_think(app: Ariadne, group: Group, chain: MessageChain):
         else:
             print(f"Disagree: {chain}")
             await app.send_message(group, Plain(random.choice(disagreeResponseList)))
-
-
-@app.broadcast.receiver("GroupMessage")
-async def quiet_listener_group(app: Ariadne, member: Member, group: Group, chain: MessageChain):
-    if '+' not in str(chain):
-        return
-    pos_prompts, neg_prompts = deAssembly(str(chain))
-    await groupDiffusion(app, group, member, chain, neg_prompts, pos_prompts)
 
 
 @app.broadcast.receiver("FriendMessage")
