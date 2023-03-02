@@ -115,8 +115,8 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
     else:
         usedSampler = 'DPM++ SDE Karras'
 
-    if steps is not int or steps > 30 or steps < 0:
-        steps = 22
+    if steps > 30 or steps < 0:
+        steps = 20
 
     if config_scale > 11 or config_scale < 5:
         config_scale = 7.0
@@ -125,23 +125,20 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
         positive_prompt = 'pink hair:1.2,hair pin:1.2,girl,student uniform:1.4,uniform,pure,uniform,collar:1.3,' \
                           'delicate and shiny skin,white stocking:1.3,tie:1.3,on the street,unhappy,medium breasts,' \
                           'upper body,watery eyes,ponytails,twintails,hairpin,beautiful eyes,delicate eys, ' \
-                          'luscious ,high resolution,8k,4k,highres,  ' \
-                          '( best quality, ultra-detailed), (best illumination, best shadow, an extremely delicate ' \
-                          'and beautiful), finely detail, depth of field, (shine), (airbrush), (sketch), ' \
-                          '((three-dimensional)), perfect lighting,sun,sunny,masterpiece:1.4,Asian,photorealistic:1.2'
-        safe_word = 'sfw:1.5' if safe_mode else ''
+                          'luscious ,close up'
+        safe_word = ',sfw:1.1' if safe_mode else ''
 
         positive_prompt = positive_prompt + safe_word
     if type(negative_prompt) != str or not negative_prompt.strip():
-        negative_prompt = 'eyeshadow,eye pouches:1.3,nipple'
+        negative_prompt = 'eyeshadow,eye pouches:1.3,nipple,zoom out:1.4'
         safe_word = ',nsfw:1.3' if safe_mode else ''
 
         negative_prompt = negative_prompt + safe_word
     if use_doll_lora:
-        doll_lora = f'<lora:japaneseDollLikeness_v10:{random.random()}> <lora:koreanDollLikeness_v10:{random.random()}> ' \
-                    f'<lora:taiwanDollLikeness_v10:{random.random()}> <lora:HinaIAmYoung22_zny10:0.1>' \
+        doll_lora = f'<lora:japaneseDollLikeness_v10:{random.uniform(0.1, 0.35)}> <lora:koreanDollLikeness_v10:{random.uniform(0.4, 0.8)}> ' \
+                    f'<lora:taiwanDollLikeness_v10:{random.uniform(0.1, 0.35)}> <lora:HinaIAmYoung22_zny10:0.06>' \
                     f'<lora:hyperbreasts_v5Lora:{random.uniform(0.2, 0.43) if not safe_mode else random.uniform(0.1, 0.2)}>, ' \
-                    f'<lora:hugeAssAndBoobs_v1:{random.random() if not safe_mode else random.uniform(0.1, 0.2)}>'
+                    f'<lora:hugeAssAndBoobs_v1:{random.uniform(0.4, 0.8) if not safe_mode else random.uniform(0.1, 0.2)}>'
         print(f'use doll lora')
         positive_prompt += doll_lora
     payload = {
@@ -156,7 +153,7 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
         "width": size[0],
         "height": size[1],
         "styles": [
-            "inte fix", 'ero'
+            "inte fix"
         ]
     }
     print(payload)
@@ -191,9 +188,9 @@ def get_image_ratio(image_path):
     return width / height
 
 
-def sd_diff(init_file_path: str, positive_prompt: str = '', negative_prompt: str = '', steps: int = 22,
-            use_sampler: str or int = "DDIM", denoising_strength: float = 0.7, config_scale: float = 7.5,
-            output_dir: str = './output', fit_original_size: bool = True):
+def sd_diff(init_file_path: str, positive_prompt: str = '', negative_prompt: str = '', steps: int = 20,
+            use_sampler: str or int = "DPM++ 2M Karras", denoising_strength: float = 0.7, config_scale: float = 6.9,
+            output_dir: str = './output', fit_original_size: bool = True, use_doll_lora: bool = True):
     """
     SD Ai drawing img2img sd_api function
     :param fit_original_size:
@@ -233,6 +230,13 @@ def sd_diff(init_file_path: str, positive_prompt: str = '', negative_prompt: str
     if type(negative_prompt) != str or not negative_prompt.strip():
         negative_prompt = 'EasyNegative)'
 
+    if use_doll_lora:
+        doll_lora = f'<lora:japaneseDollLikeness_v10:{random.uniform(0.1, 0.35)}> <lora:koreanDollLikeness_v10:{random.uniform(0.4, 0.8)}> ' \
+                    f'<lora:taiwanDollLikeness_v10:{random.uniform(0.1, 0.35)}> <lora:HinaIAmYoung22_zny10:0.06>' \
+                    f'<lora:hyperbreasts_v5Lora:{random.uniform(0.2, 0.43)}>, ' \
+                    f'<lora:hugeAssAndBoobs_v1:{random.uniform(0.3, 0.55)}>'
+        print(f'use doll lora')
+        positive_prompt += doll_lora
     payload = {
         "init_images": [
 
@@ -319,7 +323,7 @@ def npl_reformat(natural_sentence: str, split_keyword: str = None, specify_batch
         word_pattern = '(要|画个|画一个|来一个|来一碗|来个|给我|画)?'
     prompts = re.split(pattern=word_pattern, string=natural_sentence)
     if prompts[-1] == '' or prompts[-1] is None:
-        return ''
+        return '', (batch_size if specify_batch_size else None)
     if specify_batch_size:
         batch_size_pattern = '(\d+(p|P))?'
         temp = re.findall(pattern=batch_size_pattern, string=natural_sentence)

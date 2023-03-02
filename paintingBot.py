@@ -109,7 +109,7 @@ def download_image(url: str, save_dir: str):
 
 async def groupDiffusion(app: Ariadne, group: Group, member: Member, chain: MessageChain,
                          neg_prompts: str, pos_prompts: str, use_reward: bool = True,
-                         batch_size: int = 1, use_doll_lora: bool = True):
+                         batch_size: int = 1, use_doll_lora: bool = True, safe_mode: bool = True):
     """
 
     :param use_doll_lora:
@@ -134,10 +134,10 @@ async def groupDiffusion(app: Ariadne, group: Group, member: Member, chain: Mess
         print(f'going with [{batch_size}] pictures')
         size = [542, 864]
         if pos_prompts != '':
-            categories = ['hair', 'hand']
+            categories = ['hair']
             pos_prompts += await get_random_prompts(categories=categories)
         for _ in range(batch_size):
-            generated_path = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts, safe_mode=True,
+            generated_path = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts, safe_mode=safe_mode,
                                      size=size, use_doll_lora=use_doll_lora)
             await app.send_message(group, Plain(random.choice(finishResponseList)) + Image(
                 path=generated_path))
@@ -166,7 +166,8 @@ async def img_gen_group_atme(app: Ariadne, member: Member, group: Group, chain: 
     pos_prompts, neg_prompts = reFormatted, ''
     if batch_size > 7:
         batch_size = 7
-    await groupDiffusion(app, group, member, chain, neg_prompts, pos_prompts, batch_size=batch_size, use_doll_lora=True)
+    await groupDiffusion(app, group, member, chain, neg_prompts, pos_prompts, batch_size=batch_size, use_doll_lora=True,
+                         safe_mode=False)
 
 
 @app.broadcast.receiver("GroupMessage")
@@ -184,7 +185,8 @@ async def img_gen_group_quiet(app: Ariadne, member: Member, group: Group, chain:
     pos_prompts, neg_prompts, batch_size = deAssembly(str(chain), specify_batch_size=True)
     if batch_size > 7:
         batch_size = 7
-    await groupDiffusion(app, group, member, chain, neg_prompts, pos_prompts, batch_size=batch_size, use_doll_lora=True)
+    await groupDiffusion(app, group, member, chain, neg_prompts, pos_prompts, batch_size=batch_size, use_doll_lora=True,
+                         safe_mode=False)
 
 
 @app.broadcast.receiver("FriendMessage")
@@ -242,7 +244,7 @@ async def img_gen_friend(app: Ariadne, friend: Friend, chain: MessageChain):
 async def group_fast_feed(app: Ariadne, group: Group, chain: MessageChain):
     if random.random() < SILENT_RATE or '+' not in chain:
         return
-    time.sleep(7)
+    time.sleep(4)
 
     await app.send_message(group, Plain(random.choice(fastResponseList)))
 
@@ -264,7 +266,7 @@ async def group_I_think(app: Ariadne, group: Group, chain: MessageChain):
 async def fast_feed_friend(app: Ariadne, friend: Friend, chain: MessageChain):
     if '+' not in str(chain) and 'mika' not in str(chain):
         return
-    time.sleep(7)
+    time.sleep(2)
     await app.send_message(friend, Plain(random.choice(fastResponseList)))
 
 
@@ -328,15 +330,16 @@ async def live(channel: Ariadne = app):
 
             with open('sch_config.json', mode='r') as f:
                 scheduler_config = json.load(f)
+                f.close()
             if not scheduler_config.get('live_enabled'):
                 break
-            categories = ['hair', 'hand']
+            categories = ['hair']
             additional_prompt = await get_random_prompts(categories)
-            prompt = 'huge breast,gigantic breasts,large breasts,sexy, neko, 1girl,nekomimi,cat ears,loli:1.4,' \
+            prompt = 'huge breast,gigantic breasts,large breasts,sexy, neko, 1girl,nekomimi,cat ears,loli:1.3,' \
                      f'{additional_prompt},' \
                      f',blue eyes:1.4,collar,cleavage,sweaty,' \
-                     f',full body ,' \
-                     'cloth,tie:1.3,open cloth,standing,grin:1.4,happy feeling'
+                     f',upper body ,close up' \
+                     'cloth,tie:1.3,open cloth,standing,feeling'
             if random.random() < 0.3:
                 prompt += 'blush naked,climax,sweaty,wet cloth'
             generated_path = sd_draw(positive_prompt=prompt, size=[576, 832], safe_mode=False, use_doll_lora=True,
@@ -351,7 +354,7 @@ async def live(channel: Ariadne = app):
             scheduler_config = json.load(f)
             scheduler_config['live_enabled'] = False
             json.dump(scheduler_config, f)
-
+            f.close()
 
 async def get_random_prompts(categories: list[str], emphasize_multiplier: float = 1.4) -> str:
     prompts = ''
@@ -386,6 +389,7 @@ async def check_live_key(chain: MessageChain, channel: Ariadne = app, ):
         with open("sch_config.json", mode='w+') as f:
             scheduler_config['live_enabled'] = live_enabled
             json.dump(scheduler_config, f, indent=4)
+            f.close()
 
 
 app.launch_blocking()
