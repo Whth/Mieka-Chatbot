@@ -3,9 +3,9 @@ import hashlib
 import io
 import math
 import os.path
-import random
 import re
 import sys
+from random import uniform
 
 import requests
 from PIL import Image, PngImagePlugin
@@ -13,7 +13,6 @@ from slugify import slugify
 
 sys.path.append('..')
 from baidu_translater.translater import Translater
-
 
 trans = Translater()
 
@@ -92,7 +91,7 @@ def rename_image_with_hash(image_path):
 
 def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int = 20, size: list = [512, 768],
             use_sampler: str or int = 'DPM++ 2M Karras', config_scale: float = 7.1, output_dir='./output',
-            use_doll_lora: bool = False, safe_mode: bool = True, face_restore: bool = False):
+            use_doll_lora: bool = False, safe_mode: bool = True, face_restore: bool = False, use_ero_TI: bool = False):
     """
     SD Ai drawing txt2img sd_api function
     :param safe_mode:
@@ -135,12 +134,28 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
 
         negative_prompt = negative_prompt + safe_word
     if use_doll_lora:
-        doll_lora = f'<lora:japaneseDollLikeness_v10:{random.uniform(0.1, 0.35)}> <lora:koreanDollLikeness_v10:{random.uniform(0.4, 0.8)}> ' \
-                    f'<lora:taiwanDollLikeness_v10:{random.uniform(0.1, 0.35)}> <lora:HinaIAmYoung22_zny10:0.06>' \
-                    f'<lora:hyperbreasts_v5Lora:{random.uniform(0.2, 0.43) if not safe_mode else random.uniform(0.1, 0.2)}>, ' \
-                    f'<lora:hugeAssAndBoobs_v1:{random.uniform(0.4, 0.8) if not safe_mode else random.uniform(0.1, 0.2)}>'
+        doll_lora_min = 0.13
+        doll_lora_normal_max = 0.35
+        doll_lora_emphasis_max = 0.8
+        doll_lora = f'<lora:japaneseDollLikeness_v10:{uniform(doll_lora_min, doll_lora_normal_max)}>' \
+                    f' <lora:koreanDollLikeness_v10:{uniform(doll_lora_min, doll_lora_emphasis_max)}> ' \
+                    f'<lora:taiwanDollLikeness_v10:{uniform(doll_lora_min, doll_lora_normal_max)}> ' \
+                    f'<lora:HinaIAmYoung22_zny10:>'
         print(f'use doll lora')
         positive_prompt += doll_lora
+    if not safe_mode:
+        body_lora_max = 0.3
+        body_lora_min = 0.06
+        body_lora = f'<lora:hyperbreasts_v5Lora:{uniform(body_lora_min, body_lora_max)}>, ' \
+                    f'<lora:hugeAssAndBoobs_v1:{uniform(body_lora_min, body_lora_max)}>'
+        positive_prompt += body_lora
+    styles = [
+        "inte fix"
+
+    ]
+
+    if use_ero_TI:
+        styles.append("ero")
     payload = {
         "prompt": positive_prompt,
         "negative_prompt": negative_prompt,
@@ -152,9 +167,7 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
         "cfg_scale": config_scale,
         "width": size[0],
         "height": size[1],
-        "styles": [
-            "inte fix"
-        ]
+        "styles": styles
     }
     print(payload)
     response = requests.post(url=f'{url}/sdapi/v1/txt2img', json=payload)
@@ -190,9 +203,12 @@ def get_image_ratio(image_path):
 
 def sd_diff(init_file_path: str, positive_prompt: str = '', negative_prompt: str = '', steps: int = 20,
             use_sampler: str or int = "DPM++ 2M Karras", denoising_strength: float = 0.7, config_scale: float = 6.9,
-            output_dir: str = './output', fit_original_size: bool = True, use_doll_lora: bool = True):
+            output_dir: str = './output', fit_original_size: bool = True, use_doll_lora: bool = True,
+            safe_mode: bool = True):
     """
     SD Ai drawing img2img sd_api function
+    :param use_doll_lora:
+    :param safe_mode:
     :param fit_original_size:
     :param output_dir:
     :param init_file_path:
@@ -226,17 +242,26 @@ def sd_diff(init_file_path: str, positive_prompt: str = '', negative_prompt: str
         config_scale = 7.0
 
     if type(positive_prompt) != str or not positive_prompt.strip():
-        positive_prompt = 'super cute neko,perfect lighting,sfw:1.4'
+        positive_prompt = 'super cute,loli girl,sfw:1.4'
     if type(negative_prompt) != str or not negative_prompt.strip():
         negative_prompt = 'EasyNegative)'
 
     if use_doll_lora:
-        doll_lora = f'<lora:japaneseDollLikeness_v10:{random.uniform(0.1, 0.35)}> <lora:koreanDollLikeness_v10:{random.uniform(0.4, 0.8)}> ' \
-                    f'<lora:taiwanDollLikeness_v10:{random.uniform(0.1, 0.35)}> <lora:HinaIAmYoung22_zny10:0.06>' \
-                    f'<lora:hyperbreasts_v5Lora:{random.uniform(0.2, 0.43)}>, ' \
-                    f'<lora:hugeAssAndBoobs_v1:{random.uniform(0.3, 0.55)}>'
+        doll_lora_min = 0.08
+        doll_lora_normal_max = 0.35
+        doll_lora_emphasis_max = 0.8
+        doll_lora = f'<lora:japaneseDollLikeness_v10:{uniform(doll_lora_min, doll_lora_normal_max)}>' \
+                    f' <lora:koreanDollLikeness_v10:{uniform(doll_lora_min, doll_lora_emphasis_max)}> ' \
+                    f'<lora:taiwanDollLikeness_v10:{uniform(doll_lora_min, doll_lora_normal_max)}> ' \
+                    f'<lora:HinaIAmYoung22_zny10:0.06>'
         print(f'use doll lora')
         positive_prompt += doll_lora
+    if not safe_mode:
+        body_lora_max = 0.43
+        body_lora_min = 0.06
+        body_lora = f'<lora:hyperbreasts_v5Lora:{uniform(body_lora_min, body_lora_max)}>, ' \
+                    f'<lora:hugeAssAndBoobs_v1:{uniform(body_lora_min, body_lora_max)}>'
+        positive_prompt += body_lora
     payload = {
         "init_images": [
 
