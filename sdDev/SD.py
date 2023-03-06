@@ -293,20 +293,8 @@ def sd_diff(init_file_path: str, positive_prompt: str = '', negative_prompt: str
         control_net_kwargs = {"controlnet_units":
             [
                 {
-                    "input_image": b64,
-                    "mask": "",
                     "module": "openpose",
                     "model": "control_sd15_openpose [fef5e48e]",
-                    "weight": 1.0,
-                    "resize_mode": "Envelope (Outer Fit)",
-                    "lowvram": False,
-                    "processor_res": 512,
-                    "threshold_a": 64,
-                    "threshold_b": 64,
-                    "guidance": 1.0,
-                    "guidance_start": 0,
-                    "guidance_end": 1.0,
-                    "guessmode": False
                 }
             ]}
 

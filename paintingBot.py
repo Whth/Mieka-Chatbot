@@ -93,7 +93,7 @@ def message_constructor(string: str or list[str], img: str or list[str], random_
     chain = MessageChain('')
     if isinstance(string, list) and random_string:
         chain = Plain(random.choice(string))
-    elif (isinstance(string, list) and random_string == False) or isinstance(string, str):
+    elif (isinstance(string, list) and random_string is False) or isinstance(string, str):
         chain = MessageChain(string)
 
     if isinstance(img, list):
