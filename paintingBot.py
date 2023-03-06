@@ -18,7 +18,7 @@ from graia.scheduler import GraiaScheduler, timers
 from sdDev.SD import sd_draw, sd_diff, deAssembly, npl_reformat
 
 global finishResponseList, fastResponseList, agreeResponseList, disagreeResponseList, goodMorning
-global rewardResponseList, masterList
+global rewardResponseList, masterList, eroList
 global groups_list
 global app, SILENT_RATE, REWARD_RATE, AGREED_RATE
 
@@ -27,7 +27,7 @@ global scheduler_config
 
 def load_parm():
     global finishResponseList, fastResponseList, agreeResponseList, disagreeResponseList, goodMorning
-    global rewardResponseList, masterList
+    global rewardResponseList, masterList, eroList
     global groups_list
     global app, SILENT_RATE, REWARD_RATE, AGREED_RATE
     global scheduler_config
@@ -42,6 +42,7 @@ def load_parm():
         goodMorning = word_dict.get("goodMorning")
         groups_list = word_dict.get("groups")
         masterList = word_dict.get('masterSan')
+        eroList = word_dict.get('erotic')
         print(f'Loaded: \n'
               f'\tfinishResponseList:{len(finishResponseList)}\n'
               f'\tfastResponseList:{len(fastResponseList)}\n'
@@ -49,7 +50,8 @@ def load_parm():
               f'\tdisagreeResponseList:{len(disagreeResponseList)}\n'
               f'\tgoodMorningList:{len(goodMorning)}\n'
               f'\tGroup list: {groups_list}\n'
-              f'\tMaster List: {len(masterList)}\n')
+              f'\tMaster List: {len(masterList)}\n'
+              f'\tErotic list: {len(eroList)}\n')
         # TODO:增加语料的有效判断
 
     with open('Bots.json', mode='r') as f:
@@ -65,6 +67,7 @@ def load_parm():
         scheduler_config = json.loads(f.read())
         f.seek(0)
         scheduler_config['live_enabled'] = False
+        scheduler_config['echi_enabled'] = False
         json.dump(scheduler_config, f, indent=4)
         f.close()
     SILENT_RATE = 0.2
@@ -371,25 +374,76 @@ async def live(channel: Ariadne = app):
                 break
             categories = ['hair']
             additional_prompt = get_random_prompts(categories)
-            prompt = 'large breasts,sexy,headdress,1girl,' \
+            prompt = 'large long breasts,sexy,headdress,1girl,' \
                      f'{additional_prompt},' \
-                     f'collar:1.3,cleavage,' \
-                     f',upper body ,close up' \
-                     'tie:1.3,open cloth,standing,feeling'
+                     f'collar:1.3,cleavage,navel,loose coat,wide hips,exposed shoulder skin' \
+                     f',upper body ,close up,blush,pink' \
+                     'tie:1.3,open cloth,high panties,thigh highs,fat thighs,standing,feeling'
             if random.random() < 0.3:
                 prompt += 'blush, nake,climax,sweaty,wet cloth'
-            generated_path = sd_draw(positive_prompt=prompt, size=[576, 832], safe_mode=False, use_doll_lora=True,
-                                     face_restore=False)
+            generated_path = sd_draw(positive_prompt=prompt, size=[576, 832], safe_mode=False, use_doll_lora=False,
+                                     face_restore=False, use_body_lora=True, use_honey_lora=True)
             for master_account in scheduler_config.get('masters'):
                 await channel.send_friend_message(master_account, message_constructor(masterList, generated_path))
             time.sleep(live_interval * 60)
 
-        print(f'live end')
+        print('live end')
         with open('sch_config.json', mode='r+') as f:
             scheduler_config = json.loads(f.read())
             f.seek(0)
             scheduler_config['live_enabled'] = False
-            json.dump(scheduler_config, f)
+            json.dump(scheduler_config, f, indent=4)
+            f.close()
+
+
+# TODO:简化特定组合prompt包装
+@scheduler.schedule(timers.every_custom_minutes(1))
+async def echi(channel: Ariadne = app):
+    """
+
+    :param channel:
+    :return:
+    """
+    global scheduler_config
+    with open('sch_config.json', mode='r') as f:
+        scheduler_config = json.load(f)
+        f.close()
+    if scheduler_config.get('echi_enabled'):
+
+        live_max_time = scheduler_config.get('max_time')
+        live_interval = scheduler_config.get('interval')
+        live_times = int(live_max_time / live_interval) + 1
+        print(f'echi started interval: [{live_interval}]|max_time: [{live_max_time}]|live_times: [{live_times}]')
+        for _ in range(live_times):
+
+            with open('sch_config.json', mode='r') as f:
+                scheduler_config = json.load(f)
+                f.close()
+            if not scheduler_config.get('echi_enabled'):
+                break
+            categories = ['hair']
+            additional_prompt = get_random_prompts(categories)
+            prompt = '1girl:1.2,huge breasts,wide hips,' \
+                     f'{additional_prompt},' \
+                     f'cleavage,navel' \
+                     f'upper body ,close up,blush' \
+                     'thigh highs,fat thighs,standing,feeling'
+            if random.random() < 0.3:
+                prompt += ',blush, nake:1.3,climax,sweaty:1.2,wet cloth'
+            else:
+                prompt += ',mini coat,shirt,skirt'
+            generated_path = sd_draw(positive_prompt=prompt, size=[576, 832], safe_mode=False, use_doll_lora=True,
+                                     face_restore=False, use_body_lora=True, use_echi_lora=True, use_ero_TI=True)
+            for master_account in scheduler_config.get('masters'):
+                await channel.send_friend_message(master_account, message_constructor(eroList, generated_path))
+            time.sleep(live_interval * 60)
+
+        print('echi end')
+        with open('sch_config.json', mode='r+') as f:
+            scheduler_config = json.loads(f.read())
+            f.seek(0)
+            scheduler_config['echi_enabled'] = False
+            json.dump(scheduler_config, f, indent=4)
             f.close()
 
 
@@ -410,23 +464,28 @@ def get_random_prompts(categories: list[str], emphasize_multiplier: float = 1.4)
 
 
 @app.broadcast.receiver('FriendMessage')
-async def check_live_key(chain: MessageChain, channel: Ariadne = app, ):
-    live_keyword = 'live'
+async def check_key(chain: MessageChain):
+    """
+    receiving cmd from message
+    :param chain:
+    :return:
+    """
+    keywords = ['live', 'echi']
+    enabled_regfix = '_enabled'
     start_keyword = 'start'
     end_keyword = 'end'
-    start_pattern = f'#{live_keyword} {start_keyword}'
-    end_pattern = f'#{live_keyword} {end_keyword}'
-    live_enabled = None
-    if re.match(start_pattern, str(chain)):
-        live_enabled = True
-    elif re.match(end_pattern, str(chain)):
-        live_enabled = False
-    if live_enabled is not None:
-        print(f"Change [live_enabled] key to [{live_enabled}]")
-        with open("sch_config.json", mode='w+') as f:
-            scheduler_config['live_enabled'] = live_enabled
-            json.dump(scheduler_config, f, indent=4)
-            f.close()
+    if '#' in chain:
+        print('received cmd: ' + chain)
+    for keyword in keywords:
+        enabled = True if re.match(f'#{keyword} {start_keyword}', str(chain)) else None
+        if enabled is None:
+            enabled = False if re.match(f'#{keyword} {end_keyword}', str(chain)) else None
+        if enabled is not None:
+            print(f"Change [{keyword}{enabled_regfix}] key to [{enabled}]")
+            with open("sch_config.json", mode='w+') as f:
+                scheduler_config[f'{keyword}{enabled_regfix}'] = enabled
+                json.dump(scheduler_config, f, indent=4)
+                f.close()
 
 
 app.launch_blocking()

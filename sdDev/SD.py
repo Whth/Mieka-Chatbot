@@ -3,6 +3,7 @@ import hashlib
 import io
 import math
 import os.path
+import random
 import re
 import sys
 from random import uniform
@@ -92,9 +93,11 @@ def rename_image_with_hash(image_path):
 def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int = 20, size: list = [512, 768],
             use_sampler: str or int = 'DPM++ 2M Karras', config_scale: float = 7.1, output_dir='./output',
             use_doll_lora: bool = False, safe_mode: bool = True, face_restore: bool = False,
-            use_body_lora: bool = False, use_ero_TI: bool = False) -> list[str]:
+            use_body_lora: bool = False, use_ero_TI: bool = False, use_honey_lora: bool = False,
+            use_echi_lora: bool = False) -> list[str]:
     """
     SD Ai drawing txt2img sd_api function
+    :param use_honey_lora:
     :param use_ero_TI:
     :param use_body_lora:
     :param safe_mode:
@@ -137,21 +140,51 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
 
         negative_prompt = negative_prompt + safe_word
     if use_doll_lora:
-        doll_lora_min = 0.13
-        doll_lora_normal_max = 0.35
-        doll_lora_emphasis_max = 0.8
+        doll_lora_min = 0.06
+        doll_lora_normal_max = 0.22
+        doll_lora_emphasis_max = 0.86
         doll_lora = f'<lora:japaneseDollLikeness_v10:{uniform(doll_lora_min, doll_lora_normal_max)}>' \
                     f' <lora:koreanDollLikeness_v10:{uniform(doll_lora_min, doll_lora_emphasis_max)}> ' \
-                    f'<lora:taiwanDollLikeness_v10:{uniform(doll_lora_min, doll_lora_normal_max)}> ' \
-                    f'<lora:HinaIAmYoung22_zny10:>'
-        print(f'use doll lora')
+                    f'<lora:taiwanDollLikeness_v10:{uniform(doll_lora_min, doll_lora_normal_max)}> '
+        print('use doll lora')
         positive_prompt += doll_lora
+    if use_honey_lora:
+        honey_lora_max = 0.9
+        honey_lora_min = 0.65
+        honey_lora_list = [f'<lora:HinaIAmYoung22_zny10:{uniform(honey_lora_min, honey_lora_max)}>',
+                           f' <lora:saikaKawakita_saikaV20:{uniform(honey_lora_min, honey_lora_max)}>',
+                           f'<lora:momo_V10:{uniform(honey_lora_min, honey_lora_max)}>',
+                           f'<lora:irene_60:{uniform(honey_lora_min, honey_lora_max)}>']
+        print('use honey lora')
+        positive_prompt += random.choice(honey_lora_list)
     if use_body_lora:
-        body_lora_max = 0.3
+        body_lora_max = 0.5
         body_lora_min = 0.06
         body_lora = f'<lora:hyperbreasts_v5Lora:{uniform(body_lora_min, body_lora_max)}>, ' \
                     f'<lora:hugeAssAndBoobs_v1:{uniform(body_lora_min, body_lora_max)}>'
         positive_prompt += body_lora
+        print(f'using body lora {body_lora}')
+    if use_echi_lora:
+        echi_lora_min = 0.75
+        echi_lora_max = 0.92
+        echi_lora_list = ['<lora:Anus_Peek:0.87>',
+                          '<lora:breastfeedingHandjob_v10:0.87>',
+                          '<lora:breastsOnGlass_v10:0.87>',
+                          '<lora:closed_Pussy:0.87>',
+                          '<lora:grabbingOwnAss_v1Pruned:0.87>',
+                          '<lora:ing_trembling:0.87>',
+                          '<lora:jackopose:0.87>',
+                          '<lora:kirt_in_mouth_32r32d1e:0.87>',
+                          '<lora:lMissionary:0.87>',
+                          '<lora:mez:0.87>',
+                          '<lora:povImminentPenetration_ipv1:0.87>',
+                          '<lora:self_Breast_Suck:0.87>',
+                          '<lora:shirtliftALORAFor_shirtliftv1:0.87>',
+                          '<lora:skirtliftTheAstonishing_skirtliftv1:0.87>']
+        echi_lora: str = random.choice(echi_lora_list)
+        echi_lora.replace('0.87', f'{uniform(echi_lora_min, echi_lora_max)}')
+        positive_prompt += echi_lora
+        print(f'using echi lora {echi_lora}')
     styles = [
         "inte fix"
 
