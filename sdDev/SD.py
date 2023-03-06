@@ -91,9 +91,12 @@ def rename_image_with_hash(image_path):
 
 def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int = 20, size: list = [512, 768],
             use_sampler: str or int = 'DPM++ 2M Karras', config_scale: float = 7.1, output_dir='./output',
-            use_doll_lora: bool = False, safe_mode: bool = True, face_restore: bool = False, use_ero_TI: bool = False):
+            use_doll_lora: bool = False, safe_mode: bool = True, face_restore: bool = False,
+            use_body_lora: bool = False, use_ero_TI: bool = False) -> list[str]:
     """
     SD Ai drawing txt2img sd_api function
+    :param use_ero_TI:
+    :param use_body_lora:
     :param safe_mode:
     :param face_restore:
     :param use_doll_lora:
@@ -121,8 +124,8 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
         config_scale = 7.0
 
     if type(positive_prompt) != str or not positive_prompt.strip():
-        positive_prompt = 'pink hair:1.2,hair pin:1.2,girl,student uniform:1.4,uniform,pure,uniform,collar:1.3,' \
-                          'delicate and shiny skin,white stocking:1.3,tie:1.3,on the street,unhappy,medium breasts,' \
+        positive_prompt = 'pink hair:1.2,hair pin:1.2,girl,student uniform:1.4,uniform,uniform,collar:1.3,' \
+                          'white stocking:1.3,tie:1.3,on the street,unhappy,medium breasts,' \
                           'upper body,watery eyes,ponytails,twintails,hairpin,beautiful eyes,delicate eys, ' \
                           'luscious ,close up'
         safe_word = ',sfw:1.1' if safe_mode else ''
@@ -143,7 +146,7 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
                     f'<lora:HinaIAmYoung22_zny10:>'
         print(f'use doll lora')
         positive_prompt += doll_lora
-    if not safe_mode:
+    if use_body_lora:
         body_lora_max = 0.3
         body_lora_min = 0.06
         body_lora = f'<lora:hyperbreasts_v5Lora:{uniform(body_lora_min, body_lora_max)}>, ' \
@@ -202,11 +205,12 @@ def get_image_ratio(image_path):
 
 
 def sd_diff(init_file_path: str, positive_prompt: str = '', negative_prompt: str = '', steps: int = 20,
-            use_sampler: str or int = "DPM++ 2M Karras", denoising_strength: float = 0.7, config_scale: float = 6.9,
+            use_sampler: str or int = "DPM++ 2M Karras", denoising_strength: float = 0.74, config_scale: float = 7.5,
             output_dir: str = './output', fit_original_size: bool = True, use_doll_lora: bool = True,
-            safe_mode: bool = True):
+            safe_mode: bool = False, use_control_net: bool = False) -> list[str]:
     """
     SD Ai drawing img2img sd_api function
+    :param use_control_net:
     :param use_doll_lora:
     :param safe_mode:
     :param fit_original_size:
@@ -220,7 +224,7 @@ def sd_diff(init_file_path: str, positive_prompt: str = '', negative_prompt: str
     :param config_scale:
     :return:
     """
-
+    request_socket = f'{url}/controlnet/img2img' if use_control_net else f'{url}/sdapi/v1/img2img'
     max_resolution = 512 * 1020
     size = [512, 768]
     if fit_original_size:
@@ -262,6 +266,7 @@ def sd_diff(init_file_path: str, positive_prompt: str = '', negative_prompt: str
         body_lora = f'<lora:hyperbreasts_v5Lora:{uniform(body_lora_min, body_lora_max)}>, ' \
                     f'<lora:hugeAssAndBoobs_v1:{uniform(body_lora_min, body_lora_max)}>'
         positive_prompt += body_lora
+
     payload = {
         "init_images": [
 
@@ -277,19 +282,45 @@ def sd_diff(init_file_path: str, positive_prompt: str = '', negative_prompt: str
         "width": size[0],
         "height": size[1],
     }
-    print(f'{payload}')
     b64 = png_to_base64(init_file_path)
+    print(f'{payload}')
     payload['init_images'] = [b64]
     print(f'going with [{init_file_path}]|prompt: {positive_prompt}')
 
-    response = requests.post(url=f'{url}/sdapi/v1/img2img', json=payload)
+    if use_control_net:
+        # well, fixed using openpose
+        print('using control net')
+        control_net_kwargs = {"controlnet_units":
+            [
+                {
+                    "input_image": b64,
+                    "mask": "",
+                    "module": "openpose",
+                    "model": "control_sd15_openpose [fef5e48e]",
+                    "weight": 1.0,
+                    "resize_mode": "Envelope (Outer Fit)",
+                    "lowvram": False,
+                    "processor_res": 512,
+                    "threshold_a": 64,
+                    "threshold_b": 64,
+                    "guidance": 1.0,
+                    "guidance_start": 0,
+                    "guidance_end": 1.0,
+                    "guessmode": False
+                }
+            ]}
+
+        # merge to payload
+        payload.update(control_net_kwargs)
+
+    response = requests.post(url=request_socket, json=payload)
     r = response.json()
     img_base64_list = r['images']
     saved_path_with_hash = single_task(img_base64_list, output_dir)
     return saved_path_with_hash
 
 
-def single_task(img_base64_list: list[str], output_dir: str):
+def single_task(img_base64_list: list[str], output_dir: str) -> list[str]:
     """
 
     :param img_base64_list:
@@ -297,6 +328,8 @@ def single_task(img_base64_list: list[str], output_dir: str):
     :return:
     """
     output_img_path = []
+    # TODO: there is a problem dealing with multiple images delivery
+    print(f'receiving: [{len(img_base64_list)}] pics')
     for i in img_base64_list:
         image = Image.open(io.BytesIO(base64.b64decode(i.split(",", 1)[0])))
 
@@ -319,9 +352,6 @@ def single_task(img_base64_list: list[str], output_dir: str):
         saved_path_with_hash = rename_image_with_hash(saved_path)
         print(f'Saved at {saved_path_with_hash}')
         output_img_path.append(saved_path_with_hash)
-    if len(output_img_path) == 1:
-        return output_img_path[0]
-
     return output_img_path
 
 

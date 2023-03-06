@@ -60,11 +60,13 @@ def load_parm():
                 account=botInfo.get('account')[1],  # 你的机器人的 qq 号
             ),
         )
-    with open('sch_config.json', mode='r') as f:
-        scheduler_config = json.load(f)
-    with open('sch_config.json', mode='w+') as f:
+
+    with open('sch_config.json', mode='r+') as f:
+        scheduler_config = json.loads(f.read())
+        f.seek(0)
         scheduler_config['live_enabled'] = False
         json.dump(scheduler_config, f, indent=4)
+        f.close()
     SILENT_RATE = 0.2
     REWARD_RATE = 0.1
     AGREED_RATE = 0.65
@@ -78,6 +80,29 @@ def check_mcl_online(auto=True):
         mcl_dir = "D:\mirai-cli"
 
         subprocess.Popen("cmd.exe /c" + mcl_name, cwd=mcl_dir)
+
+
+def message_constructor(string: str or list[str], img: str or list[str], random_string: bool = True) -> MessageChain:
+    """
+
+    :param random_string:
+    :param string:
+    :param img:
+    :return:
+    """
+    chain = MessageChain('')
+    if isinstance(string, list) and random_string:
+        chain = Plain(random.choice(string))
+    elif (isinstance(string, list) and random_string == False) or isinstance(string, str):
+        chain = MessageChain(string)
+
+    if isinstance(img, list):
+        for i in img:
+            chain += Image(path=i)
+    elif isinstance(img, str):
+        chain += Image(path=img)
+
+    return chain
 
 
 load_parm()
@@ -109,9 +134,13 @@ def download_image(url: str, save_dir: str):
 
 async def groupDiffusion(app: Ariadne, group: Group, member: Member, chain: MessageChain,
                          neg_prompts: str, pos_prompts: str, use_reward: bool = True,
-                         batch_size: int = 1, use_doll_lora: bool = True, safe_mode: bool = True):
+                         batch_size: int = 1, use_doll_lora: bool = True, safe_mode: bool = True,
+                         use_body_lora: bool = False):
     """
 
+    :param safe_mode:
+    :param use_reward:
+    :param use_body_lora:
     :param use_doll_lora:
     :param batch_size:
     :param app:
@@ -126,28 +155,30 @@ async def groupDiffusion(app: Ariadne, group: Group, member: Member, chain: Mess
         print('using img2img')
         # 如果包含图片则使用img2img
         img_path = download_image(chain[Image, 1][0].url, save_dir='./friend_temp')
-        generated_path = sd_diff(init_file_path=img_path, positive_prompt=pos_prompts, negative_prompt=neg_prompts)
-        await app.send_message(group,
-                               Plain(random.choice(finishResponseList)) + Image(path=generated_path))
+        generated_path = sd_diff(init_file_path=img_path, positive_prompt=pos_prompts, negative_prompt=neg_prompts,
+                                 use_control_net=True)
+
+        await app.send_message(group, message_constructor(finishResponseList, generated_path))
     else:
         print('using txt2img')
         print(f'going with [{batch_size}] pictures')
         size = [542, 864]
-        if pos_prompts != '':
+        if pos_prompts != '' and 'hair' not in pos_prompts:
             categories = ['hair']
             pos_prompts += get_random_prompts(categories=categories)
         for _ in range(batch_size):
             generated_path = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts, safe_mode=safe_mode,
-                                     size=size, use_doll_lora=use_doll_lora)
-            await app.send_message(group, Plain(random.choice(finishResponseList)) + Image(
-                path=generated_path))
+                                     size=size, use_doll_lora=use_doll_lora, use_body_lora=use_body_lora)
+
+            await app.send_message(group, message_constructor(finishResponseList, generated_path))
 
         if random.random() < REWARD_RATE and use_reward:
             print(f'with REWARD_RATE: {REWARD_RATE}|REWARDED')
             size = [542, 864]
-            generated_path_reward = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts, size=size)
-            await app.send_message(group, Plain(random.choice(rewardResponseList)) + Image(
-                path=generated_path_reward))
+            generated_path_reward = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts,
+                                            safe_mode=safe_mode,
+                                            size=size, use_doll_lora=use_doll_lora, use_body_lora=use_body_lora)
+            await app.send_message(group, message_constructor(rewardResponseList, generated_path_reward))
 
 
 @app.broadcast.receiver("GroupMessage", decorators=[MentionMe()])
@@ -167,7 +198,7 @@ async def img_gen_group_atme(app: Ariadne, member: Member, group: Group, chain: 
     if batch_size > 7:
         batch_size = 7
     await groupDiffusion(app, group, member, chain, neg_prompts, pos_prompts, batch_size=batch_size, use_doll_lora=True,
-                         safe_mode=False)
+                         safe_mode=False, use_body_lora=True)
 
 
 @app.broadcast.receiver("GroupMessage")
@@ -186,7 +217,7 @@ async def img_gen_group_quiet(app: Ariadne, member: Member, group: Group, chain:
     if batch_size > 7:
         batch_size = 7
     await groupDiffusion(app, group, member, chain, neg_prompts, pos_prompts, batch_size=batch_size, use_doll_lora=True,
-                         safe_mode=False)
+                         safe_mode=False, use_body_lora=True)
 
 
 @app.broadcast.receiver("FriendMessage")
@@ -202,7 +233,7 @@ async def img_gen_friend(app: Ariadne, friend: Friend, chain: MessageChain):
     MAX_PIXEL = 1020
     use_reward: bool = True
     dear_name = 'mika'
-    max_batch_size = 20
+    max_batch_size = 100
     pos_prompts, neg_prompts, batch_size = '', '', 1
     use_fr = False
     use_doll_lora = True if '*' in str(chain) else False
@@ -220,27 +251,28 @@ async def img_gen_friend(app: Ariadne, friend: Friend, chain: MessageChain):
         # 如果包含图片则使用img2img
         img_path = download_image(chain[Image, 1][0].url, save_dir='./friend_temp')
         generated_path = sd_diff(init_file_path=img_path, positive_prompt=pos_prompts, negative_prompt=neg_prompts,
-                                 use_doll_lora=use_doll_lora)
-        await app.send_message(friend,
-                               Plain(random.choice(finishResponseList)) + Image(path=generated_path))
+                                 use_doll_lora=use_doll_lora, use_control_net=True)
+
+        await app.send_message(friend, message_constructor(finishResponseList, generated_path))
     else:
         print('using txt2img')
         batch_size = max_batch_size if batch_size > max_batch_size else batch_size
         print(f'going with [{batch_size}] pictures')
         for _ in range(batch_size):
-            size = [random.randint(MIN_PIXEL, MAX_PIXEL), random.randint(MIN_PIXEL, MAX_PIXEL)]
+            while True:
+                size = [random.randint(MIN_PIXEL, MAX_PIXEL), random.randint(MIN_PIXEL, MAX_PIXEL)]
+                if (size[0] / size[1]) < 1:
+                    break
             generated_path = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts, safe_mode=False,
                                      face_restore=use_fr, size=size, use_doll_lora=use_doll_lora)
-            await app.send_message(friend, Plain(random.choice(finishResponseList)) + Image(
-                path=generated_path))
+            await app.send_message(friend, message_constructor(finishResponseList, generated_path))
 
         if random.random() < REWARD_RATE and use_reward:
             print(f'with REWARD_RATE: {REWARD_RATE}|REWARDED')
             size = [random.randint(MIN_PIXEL, MAX_PIXEL), random.randint(MIN_PIXEL, MAX_PIXEL)]
             generated_path_reward = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts, size=size,
                                             use_doll_lora=use_doll_lora)
-            await app.send_message(friend, Plain(random.choice(rewardResponseList)) + Image(
-                path=generated_path_reward))
+            await app.send_message(friend, message_constructor(rewardResponseList, generated_path_reward))
 
 
 @app.broadcast.receiver("GroupMessage")
@@ -289,8 +321,8 @@ async def good_morning(channel: Ariadne = app):
              'on the street:1.2,hello!,hi,wave hands,greeting,good morning,tie,collar'
     time.sleep(random.randint(0, max_delay_seconds))
     generated_path = sd_draw(positive_prompt=prompt, size=[576, 768])
-    await channel.send_group_message(groups_list[1],
-                                     Plain(random.choice(goodMorning)) + Image(path=generated_path))
+
+    await channel.send_group_message(groups_list[1], message_constructor(goodMorning, generated_path))
 
 
 def get_random_file(folder):
@@ -323,6 +355,7 @@ async def live(channel: Ariadne = app):
     global scheduler_config
     with open('sch_config.json', mode='r') as f:
         scheduler_config = json.load(f)
+        f.close()
     if scheduler_config.get('live_enabled'):
 
         live_max_time = scheduler_config.get('live_max_time')
@@ -348,13 +381,13 @@ async def live(channel: Ariadne = app):
             generated_path = sd_draw(positive_prompt=prompt, size=[576, 832], safe_mode=False, use_doll_lora=True,
                                      face_restore=False)
             for master_account in scheduler_config.get('masters'):
-                await channel.send_friend_message(master_account,
-                                                  Plain(random.choice(masterList)) + Image(path=generated_path))
+                await channel.send_friend_message(master_account, message_constructor(masterList, generated_path))
             time.sleep(live_interval * 60)
 
         print(f'live end')
-        with open('sch_config.json', mode='w+') as f:
-            scheduler_config = json.load(f)
+        with open('sch_config.json', mode='r+') as f:
+            scheduler_config = json.loads(f.read())
+            f.seek(0)
             scheduler_config['live_enabled'] = False
             json.dump(scheduler_config, f)
             f.close()
