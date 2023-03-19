@@ -5,3 +5,4 @@
 /sdDev/test.py
 *.json
 
+/gpt/models/

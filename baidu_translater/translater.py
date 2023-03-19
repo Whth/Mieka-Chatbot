@@ -7,7 +7,7 @@ import requests
 
 class Translater:
     appid, appkey, url = None, None, None
-    # configPath = f'{os.path.dirname(os.getcwd())}/baidu_translater/chat_dict.json'
+    # configPath = f'{os.root_path.dirname(os.getcwd())}/baidu_translater/chat_dict.json'
     configPath='L:\pycharm projects\chatBotComponents\\baidu_translater\config.json'
     def __init__(self):
         assert self.load_secret() == 1

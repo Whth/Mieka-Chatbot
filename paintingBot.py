@@ -11,7 +11,7 @@ from graia.ariadne.app import Ariadne
 from graia.ariadne.entry import config
 from graia.ariadne.message.chain import MessageChain
 from graia.ariadne.message.element import Plain, Image
-from graia.ariadne.message.parser.base import MentionMe
+from graia.ariadne.message.parser.base import MentionMe, ContainKeyword
 from graia.ariadne.model import Member, Group, Friend
 from graia.scheduler import GraiaScheduler, timers
 
@@ -194,14 +194,18 @@ async def img_gen_group_atme(app: Ariadne, member: Member, group: Group, chain: 
     :param chain:
     :return:
     """
+
     reFormatted, batch_size = npl_reformat(str(chain), specify_batch_size=True)
+    if reFormatted == '':
+        return reFormatted
     print(f'npl decrypt{reFormatted}')
 
     pos_prompts, neg_prompts = reFormatted, ''
     if batch_size > 7:
         batch_size = 7
-    await groupDiffusion(app, group, member, chain, neg_prompts, pos_prompts, batch_size=batch_size, use_doll_lora=True,
-                         safe_mode=False, use_body_lora=True)
+    await groupDiffusion(app, group, member, chain, neg_prompts, pos_prompts, batch_size=batch_size,
+                         use_doll_lora=False,
+                         safe_mode=False, use_body_lora=False, )
 
 
 @app.broadcast.receiver("GroupMessage")
@@ -219,8 +223,9 @@ async def img_gen_group_quiet(app: Ariadne, member: Member, group: Group, chain:
     pos_prompts, neg_prompts, batch_size = deAssembly(str(chain), specify_batch_size=True)
     if batch_size > 7:
         batch_size = 7
-    await groupDiffusion(app, group, member, chain, neg_prompts, pos_prompts, batch_size=batch_size, use_doll_lora=True,
-                         safe_mode=False, use_body_lora=True)
+    await groupDiffusion(app, group, member, chain, neg_prompts, pos_prompts, batch_size=batch_size,
+                         use_doll_lora=False,
+                         safe_mode=False, use_body_lora=False)
 
 
 @app.broadcast.receiver("FriendMessage")
@@ -264,7 +269,7 @@ async def img_gen_friend(app: Ariadne, friend: Friend, chain: MessageChain):
         for _ in range(batch_size):
             while True:
                 size = [random.randint(MIN_PIXEL, MAX_PIXEL), random.randint(MIN_PIXEL, MAX_PIXEL)]
-                if (size[0] / size[1]) < 1:
+                if (size[0] / size[1]) < 0.8:
                     break
             generated_path = sd_draw(positive_prompt=pos_prompts, negative_prompt=neg_prompts, safe_mode=False,
                                      face_restore=use_fr, size=size, use_doll_lora=use_doll_lora)
@@ -282,8 +287,6 @@ async def img_gen_friend(app: Ariadne, friend: Friend, chain: MessageChain):
 async def group_fast_feed(app: Ariadne, group: Group, chain: MessageChain):
     if random.random() < SILENT_RATE or '+' not in chain:
         return
-    time.sleep(2)
-
     await app.send_message(group, Plain(random.choice(fastResponseList)))
 
 
@@ -304,7 +307,6 @@ async def group_I_think(app: Ariadne, group: Group, chain: MessageChain):
 async def fast_feed_friend(app: Ariadne, friend: Friend, chain: MessageChain):
     if '+' not in str(chain) and 'mika' not in str(chain):
         return
-    time.sleep(2)
     await app.send_message(friend, Plain(random.choice(fastResponseList)))
 
 
@@ -325,7 +327,7 @@ async def good_morning(channel: Ariadne = app):
     time.sleep(random.randint(0, max_delay_seconds))
     generated_path = sd_draw(positive_prompt=prompt, size=[576, 768])
 
-    await channel.send_group_message(groups_list[1], message_constructor(goodMorning, generated_path))
+    await channel.send_group_message(groups_list[0], message_constructor(goodMorning, generated_path))
 
 
 def get_random_file(folder):
@@ -334,22 +336,23 @@ def get_random_file(folder):
     :param folder:
     :return:
     """
-    files = os.listdir(folder)
-    index = random.randint(0, len(files) - 1)
-    return os.path.join(folder, files[index])
+    from file_mannager.fileMannager import explore_folder
+    files_list = explore_folder(folder)
+    return random.choice(files_list)
 
 
-@scheduler.schedule(timers.crontabify('0 6 * * * *'))
-async def random_emoji(channel: Ariadne = app):
+@app.broadcast.receiver("GroupMessage", decorators=[ContainKeyword(keyword='mk')])
+async def random_emoji(group: Group, chain: MessageChain, channel: Ariadne = app, ):
     """
     random send a gif  in a day
+    :param group:
+    :param chain:
     :param channel:
     :return:
     """
-    max_delay = 12 * 60 * 60
-    time.sleep(random.randint(1, max_delay))
-    gif_dir_path = './gifs'
-    await channel.send_group_message(groups_list[1], Image(path=get_random_file(gif_dir_path)))
+
+    gif_dir_path = r'N:\CloudDownloaded\01 GIF格式4700个'
+    await channel.send_message(group, Image(path=get_random_file(gif_dir_path)))
 
 
 # </editor-fold>
@@ -361,8 +364,8 @@ async def live(channel: Ariadne = app):
         f.close()
     if scheduler_config.get('live_enabled'):
 
-        live_max_time = scheduler_config.get('live_max_time')
-        live_interval = scheduler_config.get('live_interval')
+        live_max_time = scheduler_config.get('max_time')
+        live_interval = scheduler_config.get('interval')
         live_times = int(live_max_time / live_interval) + 1
         print(f'live started interval: [{live_interval}]|max_time: [{live_max_time}]|live_times: [{live_times}]')
         for _ in range(live_times):
@@ -372,7 +375,7 @@ async def live(channel: Ariadne = app):
                 f.close()
             if not scheduler_config.get('live_enabled'):
                 break
-            categories = ['hair']
+            categories = ['hair', 'expression']
             additional_prompt = get_random_prompts(categories)
             prompt = 'large long breasts,sexy,headdress,1girl,' \
                      f'{additional_prompt},' \
@@ -421,19 +424,15 @@ async def echi(channel: Ariadne = app):
                 f.close()
             if not scheduler_config.get('echi_enabled'):
                 break
-            categories = ['hair']
+            categories = ['body-1', 'body-2', 'expression', 'gesture', 'pose', 'clothes', 'background']
             additional_prompt = get_random_prompts(categories)
-            prompt = '1girl:1.2,huge breasts,wide hips,' \
+            prompt = '1girl:1.2,solo' \
                      f'{additional_prompt},' \
-                     f'cleavage,navel' \
-                     f'upper body ,close up,blush' \
-                     'thigh highs,fat thighs,standing,feeling'
-            if random.random() < 0.3:
-                prompt += ',blush, nake:1.3,climax,sweaty:1.2,wet cloth'
-            else:
-                prompt += ',mini coat,shirt,skirt'
-            generated_path = sd_draw(positive_prompt=prompt, size=[576, 832], safe_mode=False, use_doll_lora=True,
-                                     face_restore=False, use_body_lora=True, use_echi_lora=True, use_ero_TI=True)
+ \
+                    if random.random() < 0.3:
+                        prompt += 'nake:1.3,climax,sweaty:1.2,steam'
+            generated_path = sd_draw(positive_prompt=prompt, size=[576, 832], safe_mode=False, use_doll_lora=False,
+                                     face_restore=False, use_body_lora=False, use_echi_lora=True, use_ero_TI=True)
             for master_account in scheduler_config.get('masters'):
                 await channel.send_friend_message(master_account, message_constructor(eroList, generated_path))
             time.sleep(live_interval * 60)

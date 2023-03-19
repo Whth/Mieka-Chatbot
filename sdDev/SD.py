@@ -91,7 +91,7 @@ def rename_image_with_hash(image_path):
 
 
 def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int = 20, size: list = [512, 768],
-            use_sampler: str or int = 'DPM++ 2M Karras', config_scale: float = 7.1, output_dir='./output',
+            use_sampler: str or int = 'DPM++ 2M Karras', config_scale: float = 9.0, output_dir='./output',
             use_doll_lora: bool = False, safe_mode: bool = True, face_restore: bool = False,
             use_body_lora: bool = False, use_ero_TI: bool = False, use_honey_lora: bool = False,
             use_echi_lora: bool = False) -> list[str]:
