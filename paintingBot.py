@@ -425,12 +425,12 @@ async def echi(channel: Ariadne = app):
             if not scheduler_config.get('echi_enabled'):
                 break
             categories = ['body-1', 'body-2', 'expression', 'gesture', 'pose', 'clothes', 'background']
-            additional_prompt = get_random_prompts(categories)
+            additional_prompt = get_random_prompts(categories, emphasize_multiplier=0.9)
             prompt = '1girl:1.2,solo' \
-                     f'{additional_prompt},' \
- \
-                    if random.random() < 0.3:
-                        prompt += 'nake:1.3,climax,sweaty:1.2,steam'
+                     f'{additional_prompt},'
+
+            if random.random() < 0.3:
+                prompt += 'nake:1.3,climax,sweaty:1.2,steam'
             generated_path = sd_draw(positive_prompt=prompt, size=[576, 832], safe_mode=False, use_doll_lora=False,
                                      face_restore=False, use_body_lora=False, use_echi_lora=True, use_ero_TI=True)
             for master_account in scheduler_config.get('masters'):

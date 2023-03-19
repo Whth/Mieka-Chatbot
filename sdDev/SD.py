@@ -203,7 +203,8 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
         "cfg_scale": config_scale,
         "width": size[0],
         "height": size[1],
-        "styles": styles
+        "styles": styles,
+
     }
     print(payload)
     response = requests.post(url=f'{url}/sdapi/v1/txt2img', json=payload)
