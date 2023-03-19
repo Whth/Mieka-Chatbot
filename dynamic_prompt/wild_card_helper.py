@@ -5,6 +5,7 @@ import random
 import re
 
 from dynamic_prompt.config import wd_dir
+from dynamic_prompt.config import wd_presets
 
 
 def extract_wild_card_fname(root_path: str = './', suffix: str = '.txt', grammar_style: bool = False,
@@ -109,11 +110,11 @@ def random_return_card_content(card_path: str, strength: float = 1.0, append_com
     return result
 
 
-test_str = '__hi__,__size__ breasts'
-test_str2 = '__ hi__,__f__ __f__'
-print(wd_interpreter(test_str))
-print(wd_interpreter(test_str2))
-print(wd_convertor(test_str))
+# test_str = '__hi__,__size__ breasts'
+# test_str2 = '__ hi__,__f__ __f__'
+# print(wd_interpreter(test_str))
+# print(wd_interpreter(test_str2))
+# print(wd_convertor(test_str))
 
 
 def compute_hash(lst: list):
@@ -134,9 +135,8 @@ def compute_hash(lst: list):
 
 
 def make_wd_preset(card_dirs: list[str], save_dir: str):
-    wd_dict = {
-    }
-    for wd in wd_dir_list:
+    wd_dict = {}
+    for wd in card_dirs:
         wd_dict[re.split(pattern=r'\\|/', string=wd)[-1]] = extract_wild_card_fname(wd, grammar_style=True)
     if not os.path.exists(save_dir):
         os.mkdir(save_dir)
@@ -145,7 +145,7 @@ def make_wd_preset(card_dirs: list[str], save_dir: str):
 
 
 if __name__ == '__main__':
-    save_dir = './wd_presets'
+    save_dir = wd_presets
 
     wd_dir_list = [
         rf"{wd_dir}/devilkkw\body-1",
@@ -156,6 +156,12 @@ if __name__ == '__main__':
         rf"{wd_dir}/devilkkw\gesture",
         rf"{wd_dir}/devilkkw\pose",
         rf"{wd_dir}/devilkkw\background",
-        rf'{wd_dir}/jumbo\appearance'
+        rf'{wd_dir}/jumbo\appearance',
+        rf'{wd_dir}/nai',
+        rf'{wd_dir}/nsp/nsp-adj',
+        rf'{wd_dir}/nsp/nsp-body',
+        rf'{wd_dir}/nsp/nsp-fantasy',
+        rf'{wd_dir}/nsp/nsp-noun',
+        rf'{wd_dir}/devilkkw/attire',
     ]
     make_wd_preset(wd_dir_list, save_dir)
