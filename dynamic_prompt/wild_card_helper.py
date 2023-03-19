@@ -51,7 +51,7 @@ def wd_interpreter(string: str, sign: str = '__', deduplicate: bool = True, matc
     :param sign:
     :return:
     """
-    pattern_str = f'({sign}.*?{sign}?)'
+    pattern_str = f'({sign}.*?{sign})'
     pattern = re.compile(pattern=pattern_str)
     all_matched = re.findall(pattern, string)
     if match_strength:
@@ -66,6 +66,7 @@ def wd_interpreter(string: str, sign: str = '__', deduplicate: bool = True, matc
 def wd_convertor(string: str, wd_root: str = wd_dir, sign: str = '__', bad_wd_remove: bool = True) -> str:
     """
 
+    :param bad_wd_remove:
     :param sign:
     :param string:
     :param wd_root:
@@ -74,36 +75,37 @@ def wd_convertor(string: str, wd_root: str = wd_dir, sign: str = '__', bad_wd_re
 
     wd_dict: dict = extract_wild_card_fname(wd_root, make_card_path_dict=True, grammar_style=True)
     cards = wd_interpreter(string=string, sign=sign)
-
     for card in cards:
         if card in wd_dict:
-
             string = string.replace(card, random_return_card_content(wd_dict.get(card)))
         else:
 
             if bad_wd_remove:
                 string = string.replace(card, '')
+
     return string
 
 
-def random_return_card_content(card_path: str, strength: float = 1.0) -> str:
+def random_return_card_content(card_path: str, strength: float = 1.0, append_comma: bool = False) -> str:
     """
+    :param append_comma:
     :param card_path:
     :param strength:
     :return:
     """
     result = ''
     assert os.path.exists(card_path), 'card not exists'
-    with open(card_path, mode='r') as card:
+    spliter = ',' if append_comma else ''
+    with open(card_path, mode='r', encoding='utf-8') as card:
         lines = card.readlines()
         selected_line: str = random.choice(lines)
         selected_line = selected_line.rstrip()
         if strength == 1:
-            result = selected_line
+            result = selected_line + spliter
         else:
             prompt_tuples = selected_line.split(',')
             for prompt in prompt_tuples:
-                result += f'{prompt}:{strength}'
+                result += f'{prompt}:{strength}{spliter}'
     return result
 
 

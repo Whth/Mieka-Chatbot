@@ -12,6 +12,8 @@ import requests
 from PIL import Image, PngImagePlugin
 from slugify import slugify
 
+from dynamic_prompt.wild_card_helper import wd_convertor
+
 sys.path.append('..')
 from baidu_translater.translater import Translater
 
@@ -91,10 +93,11 @@ def rename_image_with_hash(image_path):
 
 
 def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int = 20, size: list = [512, 768],
-            use_sampler: str or int = 'DPM++ 2M Karras', config_scale: float = 9.0, output_dir='./output',
+            use_sampler: str or int = 'DPM++ 2M Karras', config_scale: float = 7.0 + random.random() * 2,
+            output_dir='./output',
             use_doll_lora: bool = False, safe_mode: bool = True, face_restore: bool = False,
             use_body_lora: bool = False, use_ero_TI: bool = False, use_honey_lora: bool = False,
-            use_echi_lora: bool = False) -> list[str]:
+            use_echi_lora: bool = False, use_wd: bool = True) -> list[str]:
     """
     SD Ai drawing txt2img sd_api function
     :param use_honey_lora:
@@ -192,6 +195,9 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
 
     if use_ero_TI:
         styles.append("ero")
+    if use_wd:
+        print('using wd')
+        positive_prompt = wd_convertor(positive_prompt)
     payload = {
         "prompt": positive_prompt,
         "negative_prompt": negative_prompt,
@@ -206,6 +212,7 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
         "styles": styles,
 
     }
+
     print(payload)
     response = requests.post(url=f'{url}/sdapi/v1/txt2img', json=payload)
     r = response.json()

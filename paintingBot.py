@@ -424,7 +424,7 @@ async def echi(channel: Ariadne = app):
                 f.close()
             if not scheduler_config.get('echi_enabled'):
                 break
-            categories = ['body-1', 'body-2', 'expression', 'gesture', 'pose', 'clothes', 'background']
+            categories = ['hair', 'sex_wd']
             additional_prompt = get_random_prompts(categories, emphasize_multiplier=0.9)
             prompt = '1girl:1.2,solo' \
                      f'{additional_prompt},'
@@ -446,10 +446,11 @@ async def echi(channel: Ariadne = app):
             f.close()
 
 
-def get_random_prompts(categories: list[str], emphasize_multiplier: float = 1.4) -> str:
+def get_random_prompts(categories: list[str], emphasize_multiplier: float = 1.4, append_comma: bool = True) -> str:
     prompts = ''
     with open('prompts_dict.json', mode='r') as f:
         prompt_dict = json.load(f)
+    spliter = ',' if append_comma else ''
     for category in categories:
 
         prompts_set_dict: dict = prompt_dict.get(category)
@@ -457,7 +458,7 @@ def get_random_prompts(categories: list[str], emphasize_multiplier: float = 1.4)
         for set_name, set_content in prompts_set_dict.items():
             prompt = random.choice(set_content)
             print(f'[{set_name}] use [{prompt}]')
-            prompts += f',{prompt}:{emphasize_multiplier}'
+            prompts += f'{prompt}:{emphasize_multiplier}{spliter}'
     print(f'result prompts: {prompts}')
     return prompts
 
