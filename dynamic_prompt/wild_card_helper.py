@@ -3,6 +3,8 @@ import os
 import random
 import re
 
+from dynamic_prompt.config import wd_dir
+
 
 def extract_wild_card_fname(root_path: str = './', suffix: str = '.txt', grammar_style: bool = False,
                             make_card_path_dict: bool = False):
@@ -16,7 +18,7 @@ def extract_wild_card_fname(root_path: str = './', suffix: str = '.txt', grammar
     """
     card_list = []
     card_path_list = []
-
+    sign = '__'
     search_stack = [root_path]
     while len(search_stack) > 0:
         search_dir = search_stack.pop()
@@ -29,7 +31,7 @@ def extract_wild_card_fname(root_path: str = './', suffix: str = '.txt', grammar
                 card_list.append(f.rstrip(suffix))
     if grammar_style:
         for i, card in enumerate(card_list):
-            card_list[i] = f'__{card}__'
+            card_list[i] = f'{sign}{card}{sign}'
     if make_card_path_dict:
         # use card_list and card_path_list as key and value
         card_path_dict = {}
@@ -39,16 +41,45 @@ def extract_wild_card_fname(root_path: str = './', suffix: str = '.txt', grammar
     return card_list
 
 
-def wd_interpreter(string: str, sign: str = '__'):
-    pattern_str = f'{sign}(.*?){sign}'
+def remove_duplicates(lst):
+    """
+    Remove duplicates from a given list.
+
+    Args:
+        lst (list): A list to remove duplicates from.
+
+    Returns:
+        list: A new list with duplicates removed.
+    """
+    return list(set(lst))
+
+
+def wd_interpreter(string: str, sign: str = '__', deduplicate: bool = True):
+    """
+
+    :param deduplicate:
+    :param string:
+    :param sign:
+    :return:
+    """
+    pattern_str = f'({sign}.*?{sign}?)'
     pattern = re.compile(pattern=pattern_str)
     all_matched = re.findall(pattern, string)
-    print(all_matched)
+    if deduplicate:
+        all_matched = remove_duplicates(all_matched)
+    return all_matched
+
+
+def wd_convertor(string: str, wd_root: str = wd_dir):
+    result = ''
+    wd_dict = extract_wild_card_fname(wd_root, make_card_path_dict=True, grammar_style=True)
+    temp = string
+    for key, value in wd_dict.items():
+        pass
 
 
 def random_return_card_content(card_path: str, strength: float = 1.0) -> str:
     """
-
     :param card_path:
     :param strength:
     :return:
@@ -69,19 +100,10 @@ def random_return_card_content(card_path: str, strength: float = 1.0) -> str:
 
 
 test_str = '__hi__'
-test_str2 = '__ hi__,__f__'
-wd_interpreter(test_str)
-wd_interpreter(test_str2)
+test_str2 = '__ hi__,__f__ __f__'
+print(wd_interpreter(test_str))
+print(wd_interpreter(test_str2))
 
-print()
-for _ in range(5):
-    print(random_return_card_content(
-        r'L:\pycharm projects\chatBotComponents\dynamic_prompt\wildcard\devilkkw\body-2\neck_and_neckwear_anatomy.txt',
-        strength=1.2))
-    print('_______')
-    print(random_return_card_content(
-        r'L:\pycharm projects\chatBotComponents\dynamic_prompt\wildcard\devilkkw\body-2\neck_and_neckwear_anatomy.txt',
-        strength=1.0))
 if __name__ == '__main__':
     wd_root = 'G:\Games\StableDiffusion-WebUI\extensions\sd-dynamic-prompts\wildcards'
     save_dir = '../../Conversations_Extraction/wd_extracted'
