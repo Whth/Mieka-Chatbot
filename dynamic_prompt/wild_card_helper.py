@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import random
@@ -7,7 +8,7 @@ from dynamic_prompt.config import wd_dir
 
 
 def extract_wild_card_fname(root_path: str = './', suffix: str = '.txt', grammar_style: bool = False,
-                            make_card_path_dict: bool = False):
+                            make_card_path_dict: bool = False) -> list[str] or dict[str:str]:
     """
     search the wildcard in root path
     :param make_card_path_dict:
@@ -41,22 +42,10 @@ def extract_wild_card_fname(root_path: str = './', suffix: str = '.txt', grammar
     return card_list
 
 
-def remove_duplicates(lst):
-    """
-    Remove duplicates from a given list.
-
-    Args:
-        lst (list): A list to remove duplicates from.
-
-    Returns:
-        list: A new list with duplicates removed.
-    """
-    return list(set(lst))
-
-
-def wd_interpreter(string: str, sign: str = '__', deduplicate: bool = True):
+def wd_interpreter(string: str, sign: str = '__', deduplicate: bool = True, match_strength: bool = False) -> list:
     """
 
+    :param match_strength:
     :param deduplicate:
     :param string:
     :param sign:
@@ -65,17 +54,36 @@ def wd_interpreter(string: str, sign: str = '__', deduplicate: bool = True):
     pattern_str = f'({sign}.*?{sign}?)'
     pattern = re.compile(pattern=pattern_str)
     all_matched = re.findall(pattern, string)
+    if match_strength:
+        # TODO: seems if multiple same wd with different strength,latter one will be overwritten by the first one
+        pass
     if deduplicate:
-        all_matched = remove_duplicates(all_matched)
+        return list(set(all_matched))
+
     return all_matched
 
 
-def wd_convertor(string: str, wd_root: str = wd_dir):
-    result = ''
-    wd_dict = extract_wild_card_fname(wd_root, make_card_path_dict=True, grammar_style=True)
-    temp = string
-    for key, value in wd_dict.items():
-        pass
+def wd_convertor(string: str, wd_root: str = wd_dir, sign: str = '__', bad_wd_remove: bool = True) -> str:
+    """
+
+    :param sign:
+    :param string:
+    :param wd_root:
+    :return:
+    """
+
+    wd_dict: dict = extract_wild_card_fname(wd_root, make_card_path_dict=True, grammar_style=True)
+    cards = wd_interpreter(string=string, sign=sign)
+
+    for card in cards:
+        if card in wd_dict:
+
+            string = string.replace(card, random_return_card_content(wd_dict.get(card)))
+        else:
+
+            if bad_wd_remove:
+                string = string.replace(card, '')
+    return string
 
 
 def random_return_card_content(card_path: str, strength: float = 1.0) -> str:
@@ -99,34 +107,53 @@ def random_return_card_content(card_path: str, strength: float = 1.0) -> str:
     return result
 
 
-test_str = '__hi__'
+test_str = '__hi__,__size__ breasts'
 test_str2 = '__ hi__,__f__ __f__'
 print(wd_interpreter(test_str))
 print(wd_interpreter(test_str2))
+print(wd_convertor(test_str))
 
-if __name__ == '__main__':
-    wd_root = 'G:\Games\StableDiffusion-WebUI\extensions\sd-dynamic-prompts\wildcards'
-    save_dir = '../../Conversations_Extraction/wd_extracted'
 
-    wd_dir_list = [
-        rf"{wd_root}/devilkkw\body-1",
-        rf"{wd_root}/devilkkw\body-2",
-        rf"{wd_root}/devilkkw\clothes",
-        rf"{wd_root}/devilkkw\colors",
-        rf"{wd_root}/devilkkw\emoji",
-        rf"{wd_root}/devilkkw\gesture",
-        rf"{wd_root}/devilkkw\pose",
-        rf"{wd_root}/devilkkw\background"
-    ]
+def compute_hash(lst: list):
+    """
+    Compute hash of a list of strings.
+
+    Args:
+        lst (list): A list of strings to compute the hash value for.
+
+    Returns:
+        str: A hash value of the given list as a 6-characters-long string.
+    """
+    joined_str = ''.join(lst)
+    hash_obj = hashlib.sha256(joined_str.encode())
+    hex_digest = hash_obj.hexdigest()
+    six_characters_hash = hex_digest[:6]
+    return six_characters_hash
+
+
+def make_wd_preset(card_dirs: list[str], save_dir: str):
     wd_dict = {
-
     }
-
     for wd in wd_dir_list:
-        wd_dict[wd.split('\\')[-1]] = extract_wild_card_fname(wd, grammar_style=True)
-
-    print(wd_dict)
+        wd_dict[re.split(pattern=r'\\|/', string=wd)[-1]] = extract_wild_card_fname(wd, grammar_style=True)
     if not os.path.exists(save_dir):
         os.mkdir(save_dir)
-    with open(f'{save_dir}/wd.json', 'w+') as f:
+    with open(f'{save_dir}/wd-{compute_hash(list(wd_dict.keys()))}.json', 'w+') as f:
         json.dump(wd_dict, f, indent=4)
+
+
+if __name__ == '__main__':
+    save_dir = './wd_presets'
+
+    wd_dir_list = [
+        rf"{wd_dir}/devilkkw\body-1",
+        rf"{wd_dir}/devilkkw\body-2",
+        rf"{wd_dir}/devilkkw\clothes",
+        rf"{wd_dir}/devilkkw\colors",
+        rf"{wd_dir}/devilkkw\emoji",
+        rf"{wd_dir}/devilkkw\gesture",
+        rf"{wd_dir}/devilkkw\pose",
+        rf"{wd_dir}/devilkkw\background",
+        rf'{wd_dir}/jumbo\appearance'
+    ]
+    make_wd_preset(wd_dir_list, save_dir)
