@@ -163,5 +163,5 @@ if __name__ == '__main__':
         rf'{wd_dir}/nsp/nsp-fantasy',
         rf'{wd_dir}/nsp/nsp-noun',
         rf'{wd_dir}/devilkkw/attire',
-    ]
+                ]
     make_wd_preset(wd_dir_list, save_dir)
