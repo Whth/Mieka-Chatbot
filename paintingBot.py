@@ -375,7 +375,7 @@ async def live(channel: Ariadne = app):
                 f.close()
             if not scheduler_config.get('live_enabled'):
                 break
-            categories = ['hair', 'expression']
+            categories = ['hair', 'sfw_wd']
             additional_prompt = get_random_prompts(categories)
             prompt = 'large long breasts,sexy,headdress,1girl,' \
                      f'{additional_prompt},' \
@@ -425,7 +425,7 @@ async def echi(channel: Ariadne = app):
             if not scheduler_config.get('echi_enabled'):
                 break
             categories = ['hair', 'sex_wd']
-            additional_prompt = get_random_prompts(categories, emphasize_multiplier=0.9)
+            additional_prompt = get_random_prompts(categories, emphasize_multiplier=1.1)
             prompt = '1girl:1.2,solo' \
                      f'{additional_prompt},'
 
