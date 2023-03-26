@@ -159,7 +159,7 @@ async def groupDiffusion(app: Ariadne, group: Group, member: Member, chain: Mess
         # 如果包含图片则使用img2img
         img_path = download_image(chain[Image, 1][0].url, save_dir='./friend_temp')
         generated_path = sd_diff(init_file_path=img_path, positive_prompt=pos_prompts, negative_prompt=neg_prompts,
-                                 use_control_net=True)
+                                 use_control_net=False)
 
         await app.send_message(group, message_constructor(finishResponseList, generated_path))
     else:
@@ -225,7 +225,7 @@ async def img_gen_group_quiet(app: Ariadne, member: Member, group: Group, chain:
         batch_size = 7
     await groupDiffusion(app, group, member, chain, neg_prompts, pos_prompts, batch_size=batch_size,
                          use_doll_lora=False,
-                         safe_mode=False, use_body_lora=False)
+                         safe_mode=True, use_body_lora=False)
 
 
 @app.broadcast.receiver("FriendMessage")

@@ -21,9 +21,9 @@ trans = Translater()
 
 samplers_list = [
     "Euler a", "LMS", "DPM++ SDE", "LMS Karras", "DPM2 a Karras", "DPM++ 2M Karras", "DPM++ SDE Karras", "DDIM",
-    "PLMS"
+    "PLMS", 'UniPC'
 ]
-url = "http://127.0.0.1:7860"
+url = "http://localhost:7860"
 # url = 'http://172.17.32.1:7680'
 start_method_name = "webui-user.bat"
 method_dir = r'G:\Games\StableDiffusion-WebUI'
@@ -92,8 +92,8 @@ def rename_image_with_hash(image_path):
     return new_image_path
 
 
-def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int = 20, size: list = [512, 768],
-            use_sampler: str or int = 'DPM++ 2M Karras', config_scale: float = 7.0 + random.random() * 2,
+def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int = 15, size: list = [512, 768],
+            use_sampler: str or int = 'UniPC', config_scale: float = 7.6 + random.random(),
             output_dir='./output',
             use_doll_lora: bool = False, safe_mode: bool = True, face_restore: bool = False,
             use_body_lora: bool = False, use_ero_TI: bool = False, use_honey_lora: bool = False,
@@ -245,8 +245,8 @@ def get_image_ratio(image_path):
     return width / height
 
 
-def sd_diff(init_file_path: str, positive_prompt: str = '', negative_prompt: str = '', steps: int = 20,
-            use_sampler: str or int = "DPM++ 2M Karras", denoising_strength: float = 0.74, config_scale: float = 7.5,
+def sd_diff(init_file_path: str, positive_prompt: str = '', negative_prompt: str = '', steps: int = 15,
+            use_sampler: str or int = "UniPC", denoising_strength: float = 0.74, config_scale: float = 8.0,
             output_dir: str = './output', fit_original_size: bool = True, use_doll_lora: bool = True,
             safe_mode: bool = False, use_control_net: bool = False) -> list[str]:
     """
@@ -324,8 +324,7 @@ def sd_diff(init_file_path: str, positive_prompt: str = '', negative_prompt: str
         "height": size[1],
     }
     b64 = png_to_base64(init_file_path)
-    print(f'{payload}')
-    payload['init_images'] = [b64]
+
     print(f'going with [{init_file_path}]|prompt: {positive_prompt}')
 
     if use_control_net:
@@ -338,11 +337,23 @@ def sd_diff(init_file_path: str, positive_prompt: str = '', negative_prompt: str
                     "model": "control_sd15_openpose [fef5e48e]",
                 }
             ]}
-
+        control_net_kwargs = {'alwayson_scripts':
+            {'ControlNet':
+                {'args': [
+                    {
+                        "module": "openpose",
+                        "model": "control_sd15_openpose [fef5e48e]",
+                    }]
+                }
+            }
+        }
+        control_net_kwargs = {}
         # merge to payload
         payload.update(control_net_kwargs)
 
     response = requests.post(url=request_socket, json=payload)
+    print(f'{payload}')
+    payload['init_images'] = [b64]
     r = response.json()
     img_base64_list = r['images']
     saved_path_with_hash = single_task(img_base64_list, output_dir)
