@@ -194,12 +194,10 @@ async def img_gen_group_atme(app: Ariadne, member: Member, group: Group, chain: 
     :param chain:
     :return:
     """
-
+    print('Receiving atme message')
     reFormatted, batch_size = npl_reformat(str(chain), specify_batch_size=True)
     if reFormatted == '':
         return reFormatted
-    print(f'npl decrypt{reFormatted}')
-
     pos_prompts, neg_prompts = reFormatted, ''
     if batch_size > 7:
         batch_size = 7
@@ -259,7 +257,7 @@ async def img_gen_friend(app: Ariadne, friend: Friend, chain: MessageChain):
         # 如果包含图片则使用img2img
         img_path = download_image(chain[Image, 1][0].url, save_dir='./friend_temp')
         generated_path = sd_diff(init_file_path=img_path, positive_prompt=pos_prompts, negative_prompt=neg_prompts,
-                                 use_doll_lora=use_doll_lora, use_control_net=True)
+                                 use_doll_lora=use_doll_lora, use_control_net=False)
 
         await app.send_message(friend, message_constructor(finishResponseList, generated_path))
     else:

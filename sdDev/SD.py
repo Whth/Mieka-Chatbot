@@ -92,7 +92,7 @@ def rename_image_with_hash(image_path):
     return new_image_path
 
 
-def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int = 15, size: list = [512, 768],
+def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int = 19, size: list = [512, 768],
             use_sampler: str or int = 'UniPC', config_scale: float = 7.6 + random.random(),
             output_dir='./output',
             use_doll_lora: bool = False, safe_mode: bool = True, face_restore: bool = False,
@@ -100,6 +100,7 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
             use_echi_lora: bool = False, use_wd: bool = True) -> list[str]:
     """
     SD Ai drawing txt2img sd_api function
+    :type positive_prompt: object
     :param use_honey_lora:
     :param use_ero_TI:
     :param use_body_lora:
@@ -221,30 +222,6 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
     return saved_path_with_hash
 
 
-def png_to_base64(file_path):
-    """
-
-    :param file_path:
-    :return:
-    """
-    assert file_path, 'file_path not valid'
-    with open(file_path, 'rb') as f:
-        data = f.read()
-        return base64.b64encode(data).decode()
-
-
-def get_image_ratio(image_path):
-    """
-    获取图片长宽比
-    :param image_path: 图片路径
-    :return: 图片长宽比
-    """
-    from PIL import Image
-    img = Image.open(image_path)
-    width, height = img.size
-    return width / height
-
-
 def sd_diff(init_file_path: str, positive_prompt: str = '', negative_prompt: str = '', steps: int = 15,
             use_sampler: str or int = "UniPC", denoising_strength: float = 0.74, config_scale: float = 8.0,
             output_dir: str = './output', fit_original_size: bool = True, use_doll_lora: bool = True,
@@ -289,7 +266,7 @@ def sd_diff(init_file_path: str, positive_prompt: str = '', negative_prompt: str
     if type(positive_prompt) != str or not positive_prompt.strip():
         positive_prompt = 'super cute,loli girl,sfw:1.4'
     if type(negative_prompt) != str or not negative_prompt.strip():
-        negative_prompt = 'EasyNegative)'
+        negative_prompt = 'EasyNegative,'
 
     if use_doll_lora:
         doll_lora_min = 0.08
@@ -350,14 +327,39 @@ def sd_diff(init_file_path: str, positive_prompt: str = '', negative_prompt: str
         control_net_kwargs = {}
         # merge to payload
         payload.update(control_net_kwargs)
-
-    response = requests.post(url=request_socket, json=payload)
     print(f'{payload}')
     payload['init_images'] = [b64]
+    response = requests.post(url=request_socket, json=payload)
+
     r = response.json()
+
     img_base64_list = r['images']
     saved_path_with_hash = single_task(img_base64_list, output_dir)
     return saved_path_with_hash
+
+
+def png_to_base64(file_path):
+    """
+
+    :param file_path:
+    :return:
+    """
+    assert file_path, 'file_path not valid'
+    with open(file_path, 'rb') as f:
+        data = f.read()
+        return base64.b64encode(data).decode()
+
+
+def get_image_ratio(image_path):
+    """
+    获取图片长宽比
+    :param image_path: 图片路径
+    :return: 图片长宽比
+    """
+    from PIL import Image
+    img = Image.open(image_path)
+    width, height = img.size
+    return width / height
 
 
 def single_task(img_base64_list: list[str], output_dir: str) -> list[str]:
@@ -416,7 +418,8 @@ def npl_reformat(natural_sentence: str, split_keyword: str = None, specify_batch
         word_pattern = split_keyword
     else:
         word_pattern = '(要|画个|画一个|来一个|来一碗|来个|给我|画)?'
-    prompts = re.split(pattern=word_pattern, string=natural_sentence)
+    prompts = re.split(pattern=word_pattern, string=natural_sentence, maxsplit=1)
+
     if prompts[-1] == '' or prompts[-1] is None:
         return '', (batch_size if specify_batch_size else None)
     if specify_batch_size:
@@ -425,8 +428,7 @@ def npl_reformat(natural_sentence: str, split_keyword: str = None, specify_batch
         for match in temp:
             if match[0] != '':
                 batch_size = int(match[0].strip(match[1]))
-
-    print(f'using NPL')
+    print(f'splits: {prompts}')
     print(f'batch size: [{batch_size}]')
     print(prompts)
     if len(prompts) < 2:
