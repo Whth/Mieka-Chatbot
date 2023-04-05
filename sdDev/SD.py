@@ -420,7 +420,7 @@ def npl_reformat(natural_sentence: str, split_keyword: str = None, specify_batch
         word_pattern = '(要|画个|画一个|来一个|来一碗|来个|给我|画)?'
     prompts = re.split(pattern=word_pattern, string=natural_sentence, maxsplit=1)
 
-    if prompts[-1] == '' or prompts[-1] is None:
+    if prompts[1] is None:
         return '', (batch_size if specify_batch_size else None)
     if specify_batch_size:
         batch_size_pattern = '(\d+(p|P))?'
