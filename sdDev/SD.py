@@ -93,7 +93,7 @@ def rename_image_with_hash(image_path):
 
 
 def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int = 19, size: list = [512, 768],
-            use_sampler: str or int = 'UniPC', config_scale: float = 7.6 + random.random(),
+            use_sampler: str or int = 'UniPC', config_scale: float = 7 + random.random(),
             output_dir='./output',
             use_doll_lora: bool = False, safe_mode: bool = True, face_restore: bool = False,
             use_body_lora: bool = False, use_ero_TI: bool = False, use_honey_lora: bool = False,
@@ -200,6 +200,9 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
         print('using wd')
         positive_prompt = wd_convertor(positive_prompt)
     payload = {
+        "enable_hr": True,
+        "denoising_strength": 0.53,
+        "hr_scale": 1.2,
         "prompt": positive_prompt,
         "negative_prompt": negative_prompt,
         "sampler_name": usedSampler,
@@ -223,7 +226,7 @@ def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int
 
 
 def sd_diff(init_file_path: str, positive_prompt: str = '', negative_prompt: str = '', steps: int = 15,
-            use_sampler: str or int = "UniPC", denoising_strength: float = 0.74, config_scale: float = 8.0,
+            use_sampler: str or int = "UniPC", denoising_strength: float = 0.74, config_scale: float = 7,
             output_dir: str = './output', fit_original_size: bool = True, use_doll_lora: bool = True,
             safe_mode: bool = False, use_control_net: bool = False) -> list[str]:
     """
@@ -242,7 +245,7 @@ def sd_diff(init_file_path: str, positive_prompt: str = '', negative_prompt: str
     :param config_scale:
     :return:
     """
-    request_socket = f'{url}/controlnet/img2img' if use_control_net else f'{url}/sdapi/v1/img2img'
+    request_socket = f'{url}/sdapi/v1/img2img'
     max_resolution = 512 * 1020
     size = [512, 768]
     if fit_original_size:
