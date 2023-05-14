@@ -92,7 +92,7 @@ def rename_image_with_hash(image_path):
     return new_image_path
 
 
-def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int = 19, size: list = [512, 768],
+def sd_draw(positive_prompt: str = None, negative_prompt: str = None, steps: int = 16, size: list = [512, 768],
             use_sampler: str or int = 'UniPC', config_scale: float = 7 + random.random(),
             output_dir='./output',
             use_doll_lora: bool = False, safe_mode: bool = True, face_restore: bool = False,
