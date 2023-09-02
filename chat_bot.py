@@ -75,7 +75,12 @@ class ChatBot(object):
 
         detected_plugins = self._detect_plugins(extension_dir)
         string_buffer = "\n".join(
-            [f"{plugin.get_plugin_name():<20}" for plugin in detected_plugins]
+            [
+                f"|{plugin.get_plugin_name():<16}|"
+                f"{plugin.get_plugin_version():<8}|"
+                f"{plugin.get_plugin_author():<10}|"
+                for plugin in detected_plugins
+            ]
         )
         print(
             Fore.GREEN
