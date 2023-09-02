@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod
+from types import MappingProxyType
 from typing import final
 
 from graia.ariadne import Ariadne
-
-from chat_bot import PluginsView
 
 
 class AbstractPlugin(ABC):
@@ -12,9 +11,13 @@ class AbstractPlugin(ABC):
     """
 
     @final
-    def __init__(self, ariadne_app: Ariadne, plugins_viewer: PluginsView):
+    def __init__(
+        self,
+        ariadne_app: Ariadne,
+        plugins_viewer: MappingProxyType[str, "AbstractPlugin"],
+    ):
         self._ariadne_app: Ariadne = ariadne_app
-        self._plugin_view: PluginsView = plugins_viewer
+        self._plugin_view: MappingProxyType[str, AbstractPlugin] = plugins_viewer
 
     @classmethod
     @abstractmethod

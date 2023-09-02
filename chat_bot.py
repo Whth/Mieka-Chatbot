@@ -3,14 +3,13 @@ from importlib import import_module
 from types import MappingProxyType
 from typing import Optional, Dict, Type, Sequence, List
 
+from colorama import Fore, Back, Style
 from graia.ariadne.app import Ariadne
 from graia.ariadne.connection.config import WebsocketClientConfig
 from graia.ariadne.entry import config
 
-from constant import MAIN, EXTENSION_DIR
+from constant import MAIN, EXTENSION_DIR, PluginsView
 from modules.plugin_base import AbstractPlugin
-
-PluginsView = MappingProxyType[str, AbstractPlugin]
 
 
 def get_all_sub_dirs(directory: str) -> List[str]:
@@ -37,13 +36,13 @@ class ChatBot(object):
 
     def __init__(
         self,
-        account_id: Optional[int] = None,
+        account_id: int,
+        verify_key: str,
         bot_name: Optional[str] = None,
-        verify_key: Optional[str] = None,
         websocket_config: WebsocketClientConfig = WebsocketClientConfig(),
     ):
         self._ariadne_app: Ariadne = Ariadne(
-            config(account=account_id, verify_key=verify_key, *websocket_config)
+            config(account_id, verify_key, websocket_config)
         )
 
         self._bot_name: str = bot_name
@@ -54,6 +53,8 @@ class ChatBot(object):
             self._installed_plugins
         )
 
+        self._install_all_extensions(EXTENSION_DIR)
+
     @property
     def get_installed_plugins(self) -> PluginsView:
         """
@@ -63,13 +64,26 @@ class ChatBot(object):
         """
         return self._installed_plugins_proxy
 
-    def _install_all_extensions(self):
+    def _install_all_extensions(self, extension_dir: str) -> None:
         """
         Install all extensions
         Returns:
 
         """
-        detected_plugins = self._detect_plugins(EXTENSION_DIR)
+        if not os.path.exists(extension_dir):
+            os.makedirs(extension_dir)
+
+        detected_plugins = self._detect_plugins(extension_dir)
+        string_buffer = "\n".join(
+            [f"{plugin.get_plugin_name():<20}" for plugin in detected_plugins]
+        )
+        print(
+            Fore.GREEN
+            + Back.RED
+            + f"Detected {len(detected_plugins)} plugins: "
+            + Style.RESET_ALL
+        )
+        print(Fore.YELLOW + Back.BLACK + string_buffer + Style.RESET_ALL)
         for plugin in detected_plugins:
             self._install_plugin(plugin)
 
@@ -110,7 +124,11 @@ class ChatBot(object):
         """
         Run the bot
         """
-        self._ariadne_app.launch_blocking()
+        try:
+            self._ariadne_app.launch_blocking()
+
+        except KeyboardInterrupt:
+            self.stop()
 
     def stop(self) -> None:
         """
@@ -148,3 +166,14 @@ def import_plugin(extension_attr_chain: str) -> Sequence[Type[AbstractPlugin]]:
             plugins.append(plugin)
 
     return plugins
+
+
+if __name__ == "__main__":
+    bot = ChatBot(
+        account_id=1801719211,
+        bot_name="Mieka",
+        verify_key="INITKEYXBVCdNG0",
+        websocket_config=WebsocketClientConfig(host="http://127.0.0.1:8080"),
+    )
+
+    bot.run()
