@@ -88,6 +88,13 @@ class ChatBot(object):
             + f"Detected {len(detected_plugins)} plugins: "
             + Style.RESET_ALL
         )
+        labels = ["Extension", "Version", "Author"]
+        print(
+            Fore.CYAN
+            + Back.BLACK
+            + f"|{labels[0]:<16}|{labels[1]:<8}|{labels[2]:<10}|"
+            + Style.RESET_ALL
+        )
         print(Fore.YELLOW + Back.BLACK + string_buffer + Style.RESET_ALL)
         for plugin in detected_plugins:
             self._install_plugin(plugin)
