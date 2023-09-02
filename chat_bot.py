@@ -160,8 +160,10 @@ def import_plugin(extension_attr_chain: str) -> Sequence[Type[AbstractPlugin]]:
     notes:
         one extension is allowed to contain multiple extensions
     """
-
-    module = import_module(MAIN, extension_attr_chain)  # load extension
+    try:
+        module = import_module(MAIN, extension_attr_chain)  # load extension
+    except ModuleNotFoundError:
+        return []
     plugins: List[Type[AbstractPlugin]] = []  # init yield list
 
     for plugin_name in module.__all__:
