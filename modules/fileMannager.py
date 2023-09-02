@@ -1,7 +1,16 @@
 import os
+from typing import List
 
 
-def explore_folder(root_path):
+def explore_folder(root_path:str)->List[str]:
+    """
+
+    Args:
+        root_path (str):
+
+    Returns:
+
+    """
     # 存储所有文件的路径
     file_paths = []
 
