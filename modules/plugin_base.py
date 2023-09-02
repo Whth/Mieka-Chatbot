@@ -3,6 +3,8 @@ from typing import final
 
 from graia.ariadne import Ariadne
 
+from chat_bot import PluginsView
+
 
 class AbstractPlugin(ABC):
     """
@@ -10,9 +12,9 @@ class AbstractPlugin(ABC):
     """
 
     @final
-    def __init__(self,
-                 ariadne_app: Ariadne):
+    def __init__(self, ariadne_app: Ariadne, plugins_viewer: PluginsView):
         self._ariadne_app: Ariadne = ariadne_app
+        self._plugin_view: PluginsView = plugins_viewer
 
     @classmethod
     @abstractmethod
