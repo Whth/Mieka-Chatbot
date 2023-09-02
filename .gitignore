@@ -2,7 +2,8 @@
 /output/
 /group_temp/
 /friend_temp/
-/sdDev/test.py
+/extensions/sdDev/test.py
 *.json
 
 /gpt/models/
+*/asset/*
