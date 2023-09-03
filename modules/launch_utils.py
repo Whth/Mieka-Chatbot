@@ -1,18 +1,24 @@
+import importlib.metadata
 import os
 import re
 import subprocess
 
+from packaging import version
+
 re_requirement = re.compile(r"\s*([-_a-zA-Z0-9]+)\s*(?:==\s*([-+_.a-zA-Z0-9]+))?\s*")
 
 
-def requirements_met(requirements_file):
+def requirements_met(requirements_file: str) -> bool:
     """
-    Does a simple parse of a requirements.txt file to determine if all requirements in it
-    are already installed. Returns True if so, False if not installed or parsing fails.
-    """
+    Parses a requirements.txt file to determine if all requirements in it
+    are already installed.
 
-    import importlib.metadata
-    import packaging.version
+    Args:
+        requirements_file (str): The path to the requirements.txt file.
+
+    Returns:
+        bool: True if all requirements are installed, False otherwise.
+    """
 
     with open(requirements_file, "r", encoding="utf8") as file:
         for line in file:
@@ -26,15 +32,13 @@ def requirements_met(requirements_file):
             package = m.group(1).strip()
             version_required = (m.group(2) or "").strip()
 
-            if version_required == "":
-                continue
-
             try:
                 version_installed = importlib.metadata.version(package)
-            except Exception:
+            except ImportError:
                 return False
-
-            if packaging.version.parse(version_required) != packaging.version.parse(version_installed):
+            if version_required == "":
+                continue
+            if version.parse(version_required) != version.parse(version_installed):
                 return False
 
     return True
@@ -43,7 +47,23 @@ def requirements_met(requirements_file):
 # Whether to default to printing command output
 
 
-def run(command, desc=None, errdesc=None, custom_env=None, live: bool = True) -> str:
+def run(command: str, desc: str = None, err_desc: str = None, custom_env: dict = None, live: bool = True) -> str:
+    """
+    Run a command and return the output.
+
+    Args:
+        command (str): The command to run.
+        desc (str, optional): Description of the command. Defaults to None.
+        err_desc (str, optional): Description of the error. Defaults to None.
+        custom_env (dict, optional): Custom environment variables. Defaults to None.
+        live (bool, optional): Whether to print the command output. Defaults to True.
+
+    Returns:
+        str: The command output.
+
+    Raises:
+        RuntimeError: If the command returns a non-zero exit code.
+    """
     if desc is not None:
         print(desc)
 
@@ -62,7 +82,7 @@ def run(command, desc=None, errdesc=None, custom_env=None, live: bool = True) ->
 
     if result.returncode != 0:
         error_bits = [
-            f"{errdesc or 'Error running command'}.",
+            f"{err_desc or 'Error running command'}.",
             f"Command: {command}",
             f"Error code: {result.returncode}",
         ]
@@ -89,6 +109,6 @@ def run_pip_install(command: str, desc: str, live: bool = True) -> str:
     return run(
         f"python -m pip {command} --prefer-binary",
         desc=f"Installing {desc}",
-        errdesc=f"Couldn't install {desc}",
+        err_desc=f"Couldn't install {desc}",
         live=live,
     )
