@@ -1,13 +1,9 @@
 /.idea/
-/output/
-/group_temp/
-/friend_temp/
-/extensions/sdDev/test.py
-*.json
-
-/gpt/models/
+*output*
+*temp*
 *asset*
 
+*config*
 
 ### Python template
 # Byte-compiled / optimized / DLL files

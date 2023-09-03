@@ -2,7 +2,7 @@ import os
 from typing import List
 
 
-def explore_folder(root_path:str)->List[str]:
+def explore_folder(root_path: str) -> List[str]:
     """
 
     Args:
@@ -32,6 +32,23 @@ def explore_folder(root_path:str)->List[str]:
     return file_paths
 
 
-if __name__ == '__main__':
-    path = r'N:\CloudDownloaded\01 GIF格式4700个'
+if __name__ == "__main__":
+    path = r"N:\CloudDownloaded\01 GIF格式4700个"
     print(explore_folder(path))
+
+
+def get_all_sub_dirs(directory: str) -> List[str]:
+    """
+
+    Args:
+        directory (str):
+
+    Returns:
+
+    """
+    subdirectories = [
+        name
+        for name in os.listdir(directory)
+        if os.path.isdir(os.path.join(directory, name))
+    ]
+    return subdirectories

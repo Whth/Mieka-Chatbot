@@ -9,24 +9,8 @@ from graia.ariadne.connection.config import WebsocketClientConfig
 from graia.ariadne.entry import config
 
 from constant import MAIN, EXTENSION_DIR, PluginsView
+from modules.file_manager import get_all_sub_dirs
 from modules.plugin_base import AbstractPlugin
-
-
-def get_all_sub_dirs(directory: str) -> List[str]:
-    """
-
-    Args:
-        directory (str):
-
-    Returns:
-
-    """
-    subdirectories = [
-        name
-        for name in os.listdir(directory)
-        if os.path.isdir(os.path.join(directory, name))
-    ]
-    return subdirectories
 
 
 class ChatBot(object):
@@ -180,14 +164,3 @@ def import_plugin(extension_attr_chain: str) -> Sequence[Type[AbstractPlugin]]:
             plugins.append(plugin)
 
     return plugins
-
-
-if __name__ == "__main__":
-    bot = ChatBot(
-        account_id=1801719211,
-        bot_name="Mieka",
-        verify_key="INITKEYXBVCdNG0",
-        websocket_config=WebsocketClientConfig(host="http://127.0.0.1:8080"),
-    )
-
-    bot.run()

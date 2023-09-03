@@ -53,7 +53,7 @@ def get_random_file(folder):
     :param folder:
     :return:
     """
-    from modules.fileMannager import explore_folder
+    from modules.file_manager import explore_folder
 
     files_list = explore_folder(folder)
     return random.choice(files_list)

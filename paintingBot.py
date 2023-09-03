@@ -33,7 +33,7 @@ def load_parm():
     global groups_list
     global app, SILENT_RATE, REWARD_RATE, AGREED_RATE
     global scheduler_config
-    with open("chat_dict.json", encoding="utf-8", mode="r") as f:
+    with open("config/chat_dict.json", encoding="utf-8", mode="r") as f:
         # TODO:增加更多有趣的语料
         word_dict = json.load(f)
         finishResponseList = word_dict.get("cute")
@@ -58,7 +58,7 @@ def load_parm():
         )
         # TODO:增加语料的有效判断
 
-    with open("Bots.json", mode="r") as f:
+    with open("config/Bots.json", mode="r") as f:
         botInfo = json.load(f)
         app = Ariadne(
             config(
@@ -67,7 +67,7 @@ def load_parm():
             ),
         )
 
-    with open("sch_config.json", mode="r+") as f:
+    with open("config/sch_config.json", mode="r+") as f:
         scheduler_config = json.loads(f.read())
         f.seek(0)
         scheduler_config["live_enabled"] = False
@@ -436,7 +436,7 @@ def get_random_file(folder):
     :param folder:
     :return:
     """
-    from modules.fileMannager import explore_folder
+    from modules.file_manager import explore_folder
 
     files_list = explore_folder(folder)
     return random.choice(files_list)
@@ -464,7 +464,7 @@ async def random_emoji(
 @scheduler.schedule(timers.every_custom_minutes(1))
 async def live(channel: Ariadne = app):
     global scheduler_config
-    with open("sch_config.json", mode="r") as f:
+    with open("config/sch_config.json", mode="r") as f:
         scheduler_config = json.load(f)
         f.close()
     if scheduler_config.get("live_enabled"):
@@ -475,7 +475,7 @@ async def live(channel: Ariadne = app):
             f"live started interval: [{live_interval}]|max_time: [{live_max_time}]|live_times: [{live_times}]"
         )
         for _ in range(live_times):
-            with open("sch_config.json", mode="r") as f:
+            with open("config/sch_config.json", mode="r") as f:
                 scheduler_config = json.load(f)
                 f.close()
             if not scheduler_config.get("live_enabled"):
@@ -507,7 +507,7 @@ async def live(channel: Ariadne = app):
             time.sleep(live_interval * 60)
 
         print("live end")
-        with open("sch_config.json", mode="r+") as f:
+        with open("config/sch_config.json", mode="r+") as f:
             scheduler_config = json.loads(f.read())
             f.seek(0)
             scheduler_config["live_enabled"] = False
@@ -524,7 +524,7 @@ async def echi(channel: Ariadne = app):
     :return:
     """
     global scheduler_config
-    with open("sch_config.json", mode="r") as f:
+    with open("config/sch_config.json", mode="r") as f:
         scheduler_config = json.load(f)
         f.close()
     if scheduler_config.get("echi_enabled"):
@@ -535,7 +535,7 @@ async def echi(channel: Ariadne = app):
             f"echi started interval: [{live_interval}]|max_time: [{live_max_time}]|live_times: [{live_times}]"
         )
         for _ in range(live_times):
-            with open("sch_config.json", mode="r") as f:
+            with open("config/sch_config.json", mode="r") as f:
                 scheduler_config = json.load(f)
                 f.close()
             if not scheduler_config.get("echi_enabled"):
@@ -563,7 +563,7 @@ async def echi(channel: Ariadne = app):
             time.sleep(live_interval * 60)
 
         print("echi end")
-        with open("sch_config.json", mode="r+") as f:
+        with open("config/sch_config.json", mode="r+") as f:
             scheduler_config = json.loads(f.read())
             f.seek(0)
             scheduler_config["echi_enabled"] = False
@@ -575,7 +575,7 @@ def get_random_prompts(
     categories: list[str], emphasize_multiplier: float = 1.4, append_comma: bool = True
 ) -> str:
     prompts = ""
-    with open("prompts_dict.json", mode="r") as f:
+    with open("config/prompts_dict.json", mode="r") as f:
         prompt_dict = json.load(f)
     spliter = "," if append_comma else ""
     for category in categories:
@@ -610,7 +610,7 @@ async def check_key(chain: MessageChain):
             )
         if enabled is not None:
             print(f"Change [{keyword}{enabled_regfix}] key to [{enabled}]")
-            with open("sch_config.json", mode="w+") as f:
+            with open("config/sch_config.json", mode="w+") as f:
                 scheduler_config[f"{keyword}{enabled_regfix}"] = enabled
                 json.dump(scheduler_config, f, indent=4)
                 f.close()
