@@ -19,9 +19,7 @@ def registry_path_to_chain(config_registry_path) -> List[str]:
     Returns:
 
     """
-    config_registry_path_chain: List[str] = re.split(
-        pattern=CONFIG_PATH_PATTERN, string=config_registry_path
-    )
+    config_registry_path_chain: List[str] = re.split(pattern=CONFIG_PATH_PATTERN, string=config_registry_path)
     return config_registry_path_chain
 
 
@@ -140,21 +138,13 @@ class ConfigRegistry(object):
 
         """
         config_count = len(cls.__config_registry_instance)
-        print(
-            Back.BLACK
-            + Fore.GREEN
-            + "Saving ConfigRegistry to json file..."
-            + Style.RESET_ALL
-        )
+        print(Back.BLACK + Fore.GREEN + "Saving ConfigRegistry to json file..." + Style.RESET_ALL)
         for config_registry in cls.__config_registry_instance:
+            if not config_registry.config_file_path:
+                continue
             config_registry.save_config()
 
-            print(
-                Back.CYAN
-                + Fore.RED
-                + f"\rRemaining {config_count} configs to save..."
-                + Style.RESET_ALL
-            )
+            print(Back.CYAN + Fore.RED + f"\rRemaining {config_count} configs to save..." + Style.RESET_ALL)
             config_count -= 1
         print(Back.BLACK + Fore.GREEN + "Done" + Style.RESET_ALL)
 
@@ -166,9 +156,7 @@ class ConfigRegistry(object):
         """
         self._config_file_path: str = config_path if config_path else ""
         self._config_registry_table: Dict[str, Value] = {}
-        self._config_registry_table_proxy: MappingProxyType[
-            str, Value
-        ] = MappingProxyType(self._config_registry_table)
+        self._config_registry_table_proxy: MappingProxyType[str, Value] = MappingProxyType(self._config_registry_table)
 
         self.__config_registry_instance.append(self)
 
@@ -194,6 +182,14 @@ class ConfigRegistry(object):
             os.makedirs(os.path.dirname(config_path))
         self._config_file_path = config_path
 
+    def load_config(self):
+        """
+        load config
+        Returns:
+
+        """
+        self._load_config(self._config_file_path)
+
     def _load_config(self, config_path: str):
         """
         Load the configuration from the given config file path.
@@ -210,9 +206,7 @@ class ConfigRegistry(object):
         with open(config_path, mode="r") as f:
             temp = load(f)
         for key in self._config_registry_table.keys():
-            self._config_registry_table[key] = get_config(
-                temp, registry_path_to_chain(key)
-            )
+            self._config_registry_table[key] = get_config(temp, registry_path_to_chain(key))
 
     def save_config(self):
         """
@@ -224,7 +218,7 @@ class ConfigRegistry(object):
             raise ValueError("config file path is not set!")
         temp = {}
         for k, v in self._config_registry_table_proxy.items():
-            make_config(temp, k, v)
+            make_config(temp, registry_path_to_chain(k), v)
         with open(self._config_file_path, mode="w+") as f:
             dump(temp, f)
 

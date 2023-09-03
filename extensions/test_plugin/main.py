@@ -1,3 +1,4 @@
+import os
 import random
 
 from graia.ariadne.message.element import Image
@@ -10,6 +11,12 @@ __all__ = ["TestPlugin"]
 
 
 class TestPlugin(AbstractPlugin):
+    GIF_ASSET_PATH = "gif_asset_path"
+    DETECTED_KEYWORD = "mk"
+
+    def _get_config_parent_dir(self) -> str:
+        return os.path.abspath(os.path.dirname(__file__))
+
     @classmethod
     def get_plugin_name(cls) -> str:
         return "test"
@@ -26,15 +33,21 @@ class TestPlugin(AbstractPlugin):
     def get_plugin_author(cls) -> str:
         return "whth"
 
+    def __register_all_config(self):
+        self._config_registry.register_config(self.GIF_ASSET_PATH, f"{self._get_config_parent_dir()}/asset")
+        self._config_registry.register_config(self.DETECTED_KEYWORD, "mk")
+
     def install(self):
-        # TODO decouple this call as plugin
+        self.__register_all_config()
 
         ariadne_app = self._ariadne_app
         bord_cast = ariadne_app.broadcast
 
-        gif_dir_path = r"N:\CloudDownloaded\01 GIF格式4700个"
+        gif_dir_path = self._config_registry.get_config(self.GIF_ASSET_PATH)
 
-        @bord_cast.receiver("GroupMessage", decorators=[ContainKeyword(keyword="mk")])
+        @bord_cast.receiver(
+            "GroupMessage", decorators=[ContainKeyword(keyword=self._config_registry.get_config(self.DETECTED_KEYWORD))]
+        )
         async def random_emoji(group: Group):
             """
             random send a gif in a day
@@ -42,9 +55,7 @@ class TestPlugin(AbstractPlugin):
             :return:
             """
 
-            await ariadne_app.send_message(
-                group, Image(path=get_random_file(gif_dir_path))
-            )
+            await ariadne_app.send_message(group, Image(path=get_random_file(gif_dir_path)))
 
 
 def get_random_file(folder):

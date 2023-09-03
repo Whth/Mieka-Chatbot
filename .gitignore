@@ -2,7 +2,7 @@
 *output/
 *temp/
 *asset/
-
+*config.json
 *config/
 
 ### Python template

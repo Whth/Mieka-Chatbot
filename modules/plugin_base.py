@@ -7,6 +7,7 @@ from typing import final
 
 from graia.ariadne import Ariadne
 
+from constant import CONFIG_FILE_NAME
 from modules.config_utils import ConfigRegistry
 
 
@@ -23,7 +24,16 @@ class AbstractPlugin(ABC):
     ):
         self._ariadne_app: Ariadne = ariadne_app
         self._plugin_view: MappingProxyType[str, "AbstractPlugin"] = plugins_viewer
-        self._config_registry: ConfigRegistry = ConfigRegistry()
+        self._config_registry: ConfigRegistry = ConfigRegistry(f"{self._get_config_parent_dir()}/{CONFIG_FILE_NAME}")
+
+    @abstractmethod
+    def _get_config_parent_dir(self) -> str:
+        """
+        Get the config parent dir, absolute path
+        :return:
+        :rtype:
+        """
+        pass
 
     @classmethod
     @abstractmethod
