@@ -5,6 +5,8 @@ from json import load, dump
 from types import MappingProxyType
 from typing import List, Any, Dict, Sequence, Tuple
 
+from colorama import Back, Fore, Style
+
 from constant import CONFIG_PATH_PATTERN, Value
 
 
@@ -128,6 +130,34 @@ class ConfigRegistry(object):
     a config registry class using json
     """
 
+    __config_registry_instance: List["ConfigRegistry"] = []
+
+    @classmethod
+    def save_all_configs(cls):
+        """
+        save all ConfigRegistry instance
+        Returns:
+
+        """
+        config_count = len(cls.__config_registry_instance)
+        print(
+            Back.BLACK
+            + Fore.GREEN
+            + "Saving ConfigRegistry to json file..."
+            + Style.RESET_ALL
+        )
+        for config_registry in cls.__config_registry_instance:
+            config_registry.save_config()
+
+            print(
+                Back.CYAN
+                + Fore.RED
+                + f"\rRemaining {config_count} configs to save..."
+                + Style.RESET_ALL
+            )
+            config_count -= 1
+        print(Back.BLACK + Fore.GREEN + "Done" + Style.RESET_ALL)
+
     def __init__(self, config_path: str):
         """
 
@@ -139,6 +169,8 @@ class ConfigRegistry(object):
         self._config_registry_table_proxy: MappingProxyType[
             str, Value
         ] = MappingProxyType(self._config_registry_table)
+
+        self.__config_registry_instance.append(self)
 
     def _load_config(self, config_path: str):
         """
