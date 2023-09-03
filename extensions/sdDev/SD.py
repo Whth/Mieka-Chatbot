@@ -33,73 +33,80 @@ samplers_list = [
 ]
 url = "http://localhost:7860"
 # url = 'http://172.17.32.1:7680'
-start_method_name = "webui-user.bat"
-method_dir = r"G:\Games\StableDiffusion-WebUI"
 
 
-def deAssembly(message: str, specify_batch_size: bool = False):
+def de_assembly(message: str, specify_batch_size: bool = False):
     """
 
-    :param specify_batch_size:
-    :param message:
-    :return:
-    """
+    Args:
+        message ():
+        specify_batch_size ():
 
+    Returns:
+
+    """
     if message == "":
         return "", ""
+
     pos_pattern = "(\+(.*?)\+)?"
     pos_prompt = re.findall(pattern=pos_pattern, string=message)
-    for i in pos_prompt:
-        if i[0] != "":
-            pos_prompt = i[1]
+    pos_prompt = [i[1] for i in pos_prompt if i[0] != ""]
     print(f"pos: {pos_prompt}")
+
     neg_pattern = "(\-(.*?)\-)?"
     neg_prompt = re.findall(pattern=neg_pattern, string=message)
-    for i in neg_prompt:
-        if i[0] != "":
-            neg_prompt = i[1]
+    neg_prompt = [i[1] for i in neg_prompt if i[0] != ""]
     print(f"neg: {neg_prompt}")
 
     if specify_batch_size:
         batch_size_pattern = "(\d+(p|P))?"
         temp = re.findall(pattern=batch_size_pattern, string=message)
-        for match in temp:
-            if match[0] != "":
-                batch_size = int(match[0].strip(match[1]))
-                return pos_prompt, neg_prompt, batch_size
-        return pos_prompt, neg_prompt, 1  # default
+        batch_sizes = [int(match[0].strip(match[1])) for match in temp if match[0] != ""]
+        if batch_sizes:
+            return pos_prompt, neg_prompt, batch_sizes[0]
+        return pos_prompt, neg_prompt, 1
 
-    return (
-        pos_prompt,
-        neg_prompt,
-    )
+    return pos_prompt, neg_prompt
 
 
 def rename_image_with_hash(image_path):
     """
-    对指定路径的图片文件名后面加一串长度为6的图片内容的哈希值，重命名文件并返回重命名后的图片路径
-    :param image_path: 图片路径
-    :return: 重命名后的图片路径
+    Renames the image file at the specified path by appending a 6-character hash value
+    derived from the image content. Returns the renamed image path.
+
+    Args:
+        image_path (str): The path to the image file.
+
+    Returns:
+        str: The renamed image path.
     """
-    # 获取图片文件名
+    # Get the image file name
     image_name = os.path.basename(image_path)
-    # 获取图片文件名前缀
+
+    # Get the image file name prefix
     image_name_prefix = os.path.splitext(image_name)[0]
-    # 获取图片文件名后缀
+
+    # Get the image file name suffix
     image_name_suffix = os.path.splitext(image_name)[1]
-    # 读取图片文件
+
+    # Read the image file
     with open(image_path, "rb") as f:
         image_content = f.read()
-    # 计算图片文件内容的哈希值
+
+    # Calculate the hash value of the image file content
     image_hash = hashlib.md5(image_content).hexdigest()[:6]
-    # 重命名图片文件
+
+    # Rename the image file
     new_image_name = image_name_prefix + "_" + image_hash + image_name_suffix
-    # 获取图片文件所在目录
+
+    # Get the directory of the image file
     image_dir = os.path.dirname(image_path)
-    # 生成重命名后的路径并重命名
+
+    # Generate the new path for the renamed image file and rename it
     new_image_path = os.path.join(image_dir, new_image_name)
     os.rename(image_path, new_image_path)
-    # 返回重命名后的图片路径
+
+    # Return the renamed image path
     return new_image_path
 
 
@@ -483,9 +490,7 @@ def npl_reformat(
     if len(prompts) < 2:
         return "", (batch_size if specify_batch_size else None)
     else:
-        return trans.translate("en", prompts[-1]), (
-            batch_size if specify_batch_size else None
-        )
+        return trans.translate("en", prompts[-1]), (batch_size if specify_batch_size else None)
 
 
 if __name__ == "__main__":
