@@ -12,7 +12,7 @@ __all__ = ["TestPlugin"]
 
 class TestPlugin(AbstractPlugin):
     GIF_ASSET_PATH = "gif_asset_path"
-    DETECTED_KEYWORD = "mk"
+    DETECTED_KEYWORD = "detected_keyword"
 
     def _get_config_parent_dir(self) -> str:
         return os.path.abspath(os.path.dirname(__file__))
