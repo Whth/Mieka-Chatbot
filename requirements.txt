@@ -1,3 +1,4 @@
 graia-ariadne
-
-colorama~=0.4.6
+colorama
+packaging
+requests
