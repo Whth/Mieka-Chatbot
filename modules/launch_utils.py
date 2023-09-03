@@ -7,7 +7,7 @@ re_requirement = re.compile(r"\s*([-_a-zA-Z0-9]+)\s*(?:==\s*([-+_.a-zA-Z0-9]+))?
 
 def requirements_met(requirements_file):
     """
-    Does a simple parse of a requirements.txt file to determine if all rerqirements in it
+    Does a simple parse of a requirements.txt file to determine if all requirements in it
     are already installed. Returns True if so, False if not installed or parsing fails.
     """
 
@@ -34,9 +34,7 @@ def requirements_met(requirements_file):
             except Exception:
                 return False
 
-            if packaging.version.parse(version_required) != packaging.version.parse(
-                version_installed
-            ):
+            if packaging.version.parse(version_required) != packaging.version.parse(version_installed):
                 return False
 
     return True
@@ -77,7 +75,17 @@ def run(command, desc=None, errdesc=None, custom_env=None, live: bool = True) ->
     return result.stdout or ""
 
 
-def run_pip(command, desc=None, live=True):
+def run_pip_install(command: str, desc: str, live: bool = True) -> str:
+    """
+
+    Args:
+        command ():
+        desc ():
+        live ():
+
+    Returns:
+
+    """
     return run(
         f"python -m pip {command} --prefer-binary",
         desc=f"Installing {desc}",

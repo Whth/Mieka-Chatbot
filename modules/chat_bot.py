@@ -8,8 +8,9 @@ from graia.ariadne.app import Ariadne
 from graia.ariadne.connection.config import WebsocketClientConfig
 from graia.ariadne.entry import config
 
-from constant import MAIN, EXTENSION_DIR, PluginsView
+from constant import MAIN, EXTENSION_DIR, PluginsView, REQUIREMENTS_FILE_NAME
 from modules.file_manager import get_all_sub_dirs
+from modules.launch_utils import run_pip_install, requirements_met
 from modules.plugin_base import AbstractPlugin
 
 
@@ -25,18 +26,15 @@ class ChatBot(object):
         bot_name: Optional[str] = None,
         websocket_config: WebsocketClientConfig = WebsocketClientConfig(),
     ):
-        self._ariadne_app: Ariadne = Ariadne(
-            config(account_id, verify_key, websocket_config)
-        )
+        self._ariadne_app: Ariadne = Ariadne(config(account_id, verify_key, websocket_config))
 
         self._bot_name: str = bot_name
 
         # init plugin installation registry dict and proxy
         self._installed_plugins: Dict[str, AbstractPlugin] = {}
-        self._installed_plugins_proxy: PluginsView = MappingProxyType(
-            self._installed_plugins
-        )
+        self._installed_plugins_proxy: PluginsView = MappingProxyType(self._installed_plugins)
 
+        self._install_all_requirements(EXTENSION_DIR)
         self._install_all_extensions(EXTENSION_DIR)
 
     @property
@@ -66,19 +64,9 @@ class ChatBot(object):
                 for plugin in detected_plugins
             ]
         )
-        print(
-            Fore.GREEN
-            + Back.RED
-            + f"Detected {len(detected_plugins)} plugins: "
-            + Style.RESET_ALL
-        )
+        print(Fore.GREEN + Back.RED + f"Detected {len(detected_plugins)} plugins: " + Style.RESET_ALL)
         labels = ["Extension", "Version", "Author"]
-        print(
-            Fore.CYAN
-            + Back.BLACK
-            + f"|{labels[0]:<16}|{labels[1]:<8}|{labels[2]:<10}|"
-            + Style.RESET_ALL
-        )
+        print(Fore.CYAN + Back.BLACK + f"|{labels[0]:<16}|{labels[1]:<8}|{labels[2]:<10}|" + Style.RESET_ALL)
         print(Fore.YELLOW + Back.BLACK + string_buffer + Style.RESET_ALL)
         for plugin in detected_plugins:
             self._install_plugin(plugin)
@@ -115,6 +103,45 @@ class ChatBot(object):
         plugin_instance = plugin(self._ariadne_app, self.get_installed_plugins)
         plugin_instance.install()
         self._installed_plugins[plugin.get_plugin_name()] = plugin_instance
+
+    @staticmethod
+    def _detect_requirements(extensions_path: str) -> List[str]:
+        """
+        Detect requirements of the extensions
+        Args:
+            extensions_path ():
+
+        Returns:
+
+        """
+        sub_dirs: List[str] = get_all_sub_dirs(extensions_path)
+        detected_requirements: List[str] = []
+        for sub_dir in sub_dirs:
+            requirement_file_path = f"{extensions_path}/{sub_dir}/{REQUIREMENTS_FILE_NAME}"
+            if not os.path.exists(requirement_file_path):
+                continue
+            detected_requirements.append(requirement_file_path)
+        return detected_requirements
+
+    @staticmethod
+    def _install_requirements(
+        requirement_file_path: str,
+    ):
+        dirname = os.path.dirname(requirement_file_path)
+        if requirements_met(requirement_file_path):
+            print(f"requirements for {dirname} is already satisfied")
+            return
+        print(
+            run_pip_install(
+                command=f"install -r {requirement_file_path}",
+                desc=f"requirements for {dirname}",
+            )
+        )
+
+    def _install_all_requirements(self, extension_dir):
+        detected_requirements = self._detect_requirements(extension_dir)
+        for requirement_file in detected_requirements:
+            self._install_requirements(requirement_file)
 
     def run(self) -> None:
         """
@@ -155,9 +182,7 @@ def import_plugin(extension_attr_chain: str) -> Sequence[Type[AbstractPlugin]]:
         plugin_name: str
         if not hasattr(module, plugin_name):
             # attr check
-            raise ImportError(
-                f"Plugin {plugin_name} not found in {extension_attr_chain}"
-            )
+            raise ImportError(f"Plugin {plugin_name} not found in {extension_attr_chain}")
         plugin: Type = getattr(module, plugin_name)
         if issubclass(plugin, AbstractPlugin):
             # check if plugin is subclass of AbstractPlugin
