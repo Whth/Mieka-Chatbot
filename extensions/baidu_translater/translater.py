@@ -1,17 +1,18 @@
 import hashlib
-import json
 import random
 
 import requests
 
 
 class Translater:
-    appid, appkey, url = None, None, None
-    # configPath = f'{os.root_path.dirname(os.getcwd())}/baidu_translater/chat_dict.json'
-    configPath = "L:\pycharm projects\chatBotComponents\\baidu_translater\config.json"
+    """
+    a simple baidu-based translator plugin for python
+    """
 
-    def __init__(self):
-        assert self.load_secret() == 1
+    def __init__(self, appid, appkey, url):
+        self.appid = appid
+        self.appkey = appkey
+        self.url = url
         print(
             f"Loading as \n"
             f"\tappid: {self.appid}\n"
@@ -48,21 +49,6 @@ class Translater:
         else:
             return m.hexdigest()
 
-    def load_secret(self, path: str = None):
-        if path is None:
-            path = self.configPath
-
-        print(f"congfigPath: {path}")
-        with open(path) as f:
-            dataPack = json.load(f)
-            self.appid, self.appkey, self.url = (
-                dataPack.get("appid"),
-                dataPack.get("appkey"),
-                dataPack.get("url"),
-            )
-            print("loading.....")
-        return 1
-
     def translate(self, to_lang: str, q: str, from_lang: str = "auto"):
         """
 
@@ -72,9 +58,9 @@ class Translater:
         :return:
         """
         try:
-            assert type(to_lang) == str
-            assert type(from_lang) == str
-            assert type(q) == str
+            assert isinstance(to_lang, str)
+            assert isinstance(q, str)
+            assert isinstance(from_lang, str)
         except AssertionError:
             return "......"
         sign, salt = self.generate_sign(q=q)
@@ -95,11 +81,3 @@ class Translater:
         trans_result = result.get("trans_result")[0]
 
         return str(trans_result.get("dst"))
-
-
-if __name__ == "__main__":
-    t = Translater()
-
-    q = "你好"
-    for i in range(10):
-        print(t.translate(to_lang="en", q=input()))
