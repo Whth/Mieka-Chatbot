@@ -8,10 +8,10 @@ from graia.ariadne.app import Ariadne
 from graia.ariadne.connection.config import WebsocketClientConfig
 from graia.ariadne.entry import config
 
-from constant import MAIN, EXTENSION_DIR, PluginsView, REQUIREMENTS_FILE_NAME
+from constant import MAIN, EXTENSION_DIR, REQUIREMENTS_FILE_NAME
 from modules.file_manager import get_all_sub_dirs
 from modules.launch_utils import run_pip_install, requirements_met
-from modules.plugin_base import AbstractPlugin
+from modules.plugin_base import AbstractPlugin, PluginsView
 
 
 class ChatBot(object):

@@ -22,7 +22,7 @@ class AbstractPlugin(ABC):
         plugins_viewer: MappingProxyType[str, "AbstractPlugin"],
     ):
         self._ariadne_app: Ariadne = ariadne_app
-        self._plugin_view: MappingProxyType[str, AbstractPlugin] = plugins_viewer
+        self._plugin_view: MappingProxyType[str, "AbstractPlugin"] = plugins_viewer
         self._config_registry: ConfigRegistry = ConfigRegistry()
 
     @classmethod
@@ -71,3 +71,6 @@ class AbstractPlugin(ABC):
         Install the plugin
         """
         pass
+
+
+PluginsView = MappingProxyType[str, AbstractPlugin]
