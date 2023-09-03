@@ -1,3 +1,6 @@
+"""
+plugin_base that is used in create a standard plugin
+"""
 from abc import ABC, abstractmethod
 from types import MappingProxyType
 from typing import final
