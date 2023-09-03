@@ -3,7 +3,7 @@ import re
 from functools import singledispatch
 from json import load, dump
 from types import MappingProxyType
-from typing import List, Any, Dict, Sequence, Tuple
+from typing import List, Any, Dict, Sequence, Tuple, Optional
 
 from colorama import Back, Fore, Style
 
@@ -158,19 +158,41 @@ class ConfigRegistry(object):
             config_count -= 1
         print(Back.BLACK + Fore.GREEN + "Done" + Style.RESET_ALL)
 
-    def __init__(self, config_path: str):
+    def __init__(self, config_path: Optional[str] = None):
         """
 
         Args:
             config_path ():
         """
-        self._config_file_path: str = config_path
+        self._config_file_path: str = config_path if config_path else ""
         self._config_registry_table: Dict[str, Value] = {}
         self._config_registry_table_proxy: MappingProxyType[
             str, Value
         ] = MappingProxyType(self._config_registry_table)
 
         self.__config_registry_instance.append(self)
+
+    @property
+    def config_file_path(self) -> str:
+        """
+        the path where stores the config file, in json format
+        Returns:
+
+        """
+        return self._config_file_path
+
+    @config_file_path.setter
+    def config_file_path(self, config_path: str) -> None:
+        """
+        set the config file path, with parent directory check
+        Args:
+            config_path ():
+
+
+        """
+        if not os.path.exists(os.path.dirname(config_path)):
+            os.makedirs(os.path.dirname(config_path))
+        self._config_file_path = config_path
 
     def _load_config(self, config_path: str):
         """
@@ -198,6 +220,8 @@ class ConfigRegistry(object):
         Returns:
 
         """
+        if not self._config_file_path:
+            raise ValueError("config file path is not set!")
         temp = {}
         for k, v in self._config_registry_table_proxy.items():
             make_config(temp, k, v)
