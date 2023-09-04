@@ -1,4 +1,11 @@
 import os
+import re
+from typing import Tuple, List, Optional, Callable
+
+from graia.ariadne.message.chain import MessageChain
+from graia.ariadne.message.element import Image
+from graia.ariadne.message.parser.base import ContainKeyword
+from graia.ariadne.model import Group
 
 from modules.plugin_base import AbstractPlugin
 
@@ -6,14 +13,25 @@ __all__ = ["StableDiffusionPlugin"]
 
 
 class StableDiffusionPlugin(AbstractPlugin):
-    OUTPUT_PATH = "output"
-    TXT2IMG_PATH = f"{OUTPUT_PATH}/txt2img"
-    IMG2IMG_PATH = f"{OUTPUT_PATH}/img2img"
-    IMG_TEMP_PATH = "temp"
+    __TRANSLATE_PLUGIN_NAME: str = "BaiduTranslater"
+    __TRANSLATE_METHOD_NAME: str = "translate"
+    __TRANSLATE_METHOD_TYPE = Callable[[str, str, str], str]  # [tolang, query, fromlang] -> str
+    # TODO deal with this super high coupling
 
-    CONFIG_DETECTED_KEYWORD = "detected_keyword"
+    TXT2IMG_DIRNAME = "txt2img"
+    IMG2IMG_DIRNAME = "img2img"
+
+    CONFIG_OUTPUT_DIR_PATH = "output_dir_path"
+    CONFIG_IMG_TEMP_DIR_PATH = "temp"
+
     CONFIG_SD_HOST = "sd_host"
 
+    CONFIG_POS_KEYWORD = "positive_keyword"
+    CONFIG_NEG_KEYWORD = "negative_keyword"
+
+    CONFIG_WILDCARD_DIR_PATH = "wildcard_dir_path"
+
+    # TODO this should be removed, use pos prompt keyword and neg prompt keyword
     def _get_config_parent_dir(self) -> str:
         return os.path.abspath(os.path.dirname(__file__))
 
@@ -34,82 +52,102 @@ class StableDiffusionPlugin(AbstractPlugin):
         return "whth"
 
     def __register_all_config(self):
-        self._config_registry.register_config(self.CONFIG_DETECTED_KEYWORD, "+")
+        self._config_registry.register_config(self.CONFIG_POS_KEYWORD, "+")
+        self._config_registry.register_config(self.CONFIG_NEG_KEYWORD, "-")
+        self._config_registry.register_config(self.CONFIG_OUTPUT_DIR_PATH, f"{self._get_config_parent_dir()}/output")
+        self._config_registry.register_config(self.CONFIG_IMG_TEMP_DIR_PATH, f"{self._get_config_parent_dir()}/temp")
         self._config_registry.register_config(self.CONFIG_SD_HOST, "http://localhost:7860")
+
+        self._config_registry.register_config(
+            self.CONFIG_WILDCARD_DIR_PATH, f"{self._get_config_parent_dir()}/asset/wildcard"
+        )
 
     def install(self):
         self.__register_all_config()
+        self._config_registry.load_config()
+        translater: Optional[AbstractPlugin] = self._plugin_view.get(self.__TRANSLATE_PLUGIN_NAME, None)
+        if translater:
+            translate: StableDiffusionPlugin.__TRANSLATE_METHOD_TYPE = getattr(translater, self.__TRANSLATE_METHOD_NAME)
+        output_dir_path = self._config_registry.get_config(self.CONFIG_OUTPUT_DIR_PATH)
+        ariadne_app = self._ariadne_app
+        bord_cast = ariadne_app.broadcast
+        from dynamicprompts.wildcards import WildcardManager
+        from dynamicprompts.generators import JinjaGenerator
+        from .stable_diffusion import StableDiffusionApp, DiffusionParser
 
-        # from .SD import sd_draw,sd_diff
-        #
-        # async def groupDiffusion(
-        #         app: Ariadne,
-        #         group: Group,
-        #         chain: MessageChain,
-        #         neg_prompts: str,
-        #         pos_prompts: str,
-        #         use_reward: bool = True,
-        #         batch_size: int = 1,
-        #         use_doll_lora: bool = True,
-        #         safe_mode: bool = True,
-        #         use_body_lora: bool = False,
-        # ):
-        #     """
-        #
-        #     :param safe_mode:
-        #     :param use_reward:
-        #     :param use_body_lora:
-        #     :param use_doll_lora:
-        #     :param batch_size:
-        #     :param app:
-        #     :param member:
-        #     :param group:
-        #     :param chain:
-        #     :param neg_prompts:
-        #     :param pos_prompts:
-        #     :return:
-        #     """
-        #
-        #     if Image in chain:
-        #         print("using img2img")
-        #         # 如果包含图片则使用img2img
-        #         img_path = download_image(chain[Image, 1][0].url, save_dir="./friend_temp")
-        #         generated_path = sd_diff(
-        #             init_file_path=img_path,
-        #             positive_prompt=pos_prompts,
-        #             negative_prompt=neg_prompts,
-        #             use_control_net=False,
-        #         )
-        #
-        #         await app.send_message(group, message_constructor(finishResponseList, generated_path))
-        #     else:
-        #         print("using txt2img")
-        #         print(f"going with [{batch_size}] pictures")
-        #         size = [542, 864]
-        #         if pos_prompts != "" and "hair" not in pos_prompts:
-        #             categories = ["hair"]
-        #             pos_prompts += get_random_prompts(categories=categories)
-        #         for _ in range(batch_size):
-        #             generated_path = sd_draw(
-        #                 positive_prompt=pos_prompts,
-        #                 negative_prompt=neg_prompts,
-        #                 safe_mode=safe_mode,
-        #                 size=size,
-        #                 use_doll_lora=use_doll_lora,
-        #                 use_body_lora=use_body_lora,
-        #             )
-        #
-        #             await app.send_message(group, message_constructor(finishResponseList, generated_path))
-        #
-        #         if random.random() < REWARD_RATE and use_reward:
-        #             print(f"with REWARD_RATE: {REWARD_RATE}|REWARDED")
-        #             size = [542, 864]
-        #             generated_path_reward = sd_draw(
-        #                 positive_prompt=pos_prompts,
-        #                 negative_prompt=neg_prompts,
-        #                 safe_mode=safe_mode,
-        #                 size=size,
-        #                 use_doll_lora=use_doll_lora,
-        #                 use_body_lora=use_body_lora,
-        #             )
-        #             await app.send_message(group, message_constructor(rewardResponseList, generated_path_reward))
+        SD_app = StableDiffusionApp(host_url=self._config_registry.get_config(self.CONFIG_SD_HOST))
+        gen = JinjaGenerator(
+            wildcard_manager=WildcardManager(path=self._config_registry.get_config(self.CONFIG_WILDCARD_DIR_PATH))
+        )
+
+        # TODO use dynamicprompts here
+        # TODO add quick async response
+        @bord_cast.receiver(
+            "GroupMessage",
+            decorators=[ContainKeyword(keyword=self._config_registry.get_config(self.CONFIG_POS_KEYWORD))],
+        )
+        async def group_diffusion(group: Group, message: MessageChain):
+            """
+            Generate an image and send it as a message in a group.
+
+            Args:
+                group (Group): The group to send the message to.
+                message (MessageChain): The message chain to process.
+
+            Returns:
+                None
+            """
+            # Extract positive and negative prompts from the message
+            pos_prompt, neg_prompt = de_assembly(str(message))
+
+            # Translate prompts to English if translate a flag is set
+            if translate:
+                pos_prompt = translate("en", "".join(pos_prompt), "auto")
+                neg_prompt = translate("en", "".join(neg_prompt), "auto")
+            else:
+                pos_prompt = "".join(pos_prompt)
+                neg_prompt = "".join(neg_prompt)
+
+            # Create a diffusion parser with the prompts
+            diffusion_paser = DiffusionParser(prompt=pos_prompt, negative_prompt=neg_prompt)
+
+            # Generate the image using the diffusion parser
+            send_result = await SD_app.txt2img(diffusion_parameters=diffusion_paser, output_dir=output_dir_path)
+
+            # Send the image as a message in the group
+            await ariadne_app.send_message(group, MessageChain("") + Image(path=send_result[0]))
+
+
+def de_assembly(
+    message: str, specify_batch_size: bool = False
+) -> Tuple[List[str], List[str], int] | Tuple[List[str], List[str]]:
+    """
+    Generates the function comment for the given function body.
+
+    Args:
+        message (str): The input message.
+        specify_batch_size (bool, optional): Whether to specify the batch size. Defaults to False.
+
+    Returns:
+        tuple: A tuple containing the positive prompt, negative prompt, and batch size (if specified).
+    """
+    if message == "":
+        return [""], [""]
+    # TODO seems needs a regex format checker to allow the customize split kward
+    pos_pattern = r"(\+(.*?)\+)?"
+    pos_prompt = re.findall(pattern=pos_pattern, string=message)
+    pos_prompt = [i[1] for i in pos_prompt if i[0] != ""]
+
+    neg_pattern = r"(\-(.*?)\-)?"
+    neg_prompt = re.findall(pattern=neg_pattern, string=message)
+    neg_prompt = [i[1] for i in neg_prompt if i[0] != ""]
+
+    if specify_batch_size:
+        batch_size_pattern = r"(\d+[pP])?"
+        temp = re.findall(pattern=batch_size_pattern, string=message)
+        batch_sizes = [int(match[0].strip(match[1])) for match in temp if match[0] != ""]
+        if batch_sizes:
+            return pos_prompt, neg_prompt, batch_sizes[0]
+        return pos_prompt, neg_prompt, 1
+
+    return pos_prompt, neg_prompt
