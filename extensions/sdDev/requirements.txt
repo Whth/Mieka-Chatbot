@@ -1,4 +1,5 @@
 Pillow
 requests
-slugify
-
+python-slugify
+dynamicprompts
+aiohttp
