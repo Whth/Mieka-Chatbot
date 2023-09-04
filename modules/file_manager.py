@@ -103,17 +103,13 @@ def download_image(url: str, save_dir: str) -> str:
         str: The path where the image is saved, or None if the download fails.
     """
     img_name = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-    print(f"Downloading image from: {url}")
-
     response = requests.get(url)
     if response.status_code == 200:
         os.makedirs(save_dir, exist_ok=True)
         path = os.path.join(save_dir, f"{img_name}.png")
         with open(path, "wb") as f:
             f.write(response.content)
-        print(f"Downloaded image successfully. Saved at: {path}")
         return path
-
     return ""
 
 

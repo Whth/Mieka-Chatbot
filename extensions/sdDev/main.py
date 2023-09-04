@@ -2,11 +2,12 @@ import os
 import re
 from typing import Tuple, List, Optional, Callable
 
-from graia.ariadne.message.chain import MessageChain
-from graia.ariadne.message.element import Image
+from colorama import Fore
+from graia.ariadne.message.chain import MessageChain, Image
 from graia.ariadne.message.parser.base import ContainKeyword
 from graia.ariadne.model import Group
 
+from modules.file_manager import download_image
 from modules.plugin_base import AbstractPlugin
 
 __all__ = ["StableDiffusionPlugin"]
@@ -69,6 +70,7 @@ class StableDiffusionPlugin(AbstractPlugin):
         if translater:
             translate: StableDiffusionPlugin.__TRANSLATE_METHOD_TYPE = getattr(translater, self.__TRANSLATE_METHOD_NAME)
         output_dir_path = self._config_registry.get_config(self.CONFIG_OUTPUT_DIR_PATH)
+        temp_dir_path = self._config_registry.get_config(self.CONFIG_IMG_TEMP_DIR_PATH)
         ariadne_app = self._ariadne_app
         bord_cast = ariadne_app.broadcast
         from dynamicprompts.wildcards import WildcardManager
@@ -110,9 +112,28 @@ class StableDiffusionPlugin(AbstractPlugin):
 
             # Create a diffusion parser with the prompts
             diffusion_paser = DiffusionParser(prompt=pos_prompt, negative_prompt=neg_prompt)
-
-            # Generate the image using the diffusion parser
-            send_result = await SD_app.txt2img(diffusion_parameters=diffusion_paser, output_dir=output_dir_path)
+            if Image in message:
+                # Download the first image in the chain
+                print(
+                    Fore.YELLOW + f"IMG TO IMG ORDER"
+                    f"Downloading image from: {message[Image, 1][0].url}\n"
+                    f"{Fore.MAGENTA}___________________________________________\n"
+                    f"{Fore.GREEN}POSITIVE PROMPT: {pos_prompt}\n"
+                    f"{Fore.MAGENTA}___________________________________________\n"
+                    f"{Fore.RED}NEGATIVE PROMPT: {neg_prompt}" + Fore.RESET
+                )
+                img_path = download_image(save_dir=temp_dir_path, url=message[Image, 1][0].url)
+                send_result = await SD_app.img2img(image_path=img_path, output_dir=output_dir_path)
+            else:
+                print(
+                    Fore.YELLOW + f"TXT TO IMG ORDER"
+                    f"{Fore.MAGENTA}___________________________________________\n"
+                    f"{Fore.GREEN}POSITIVE PROMPT: {pos_prompt}\n"
+                    f"{Fore.MAGENTA}___________________________________________\n"
+                    f"{Fore.RED}NEGATIVE PROMPT: {neg_prompt}" + Fore.RESET
+                )
+                # Generate the image using the diffusion parser
+                send_result = await SD_app.txt2img(diffusion_parameters=diffusion_paser, output_dir=output_dir_path)
 
             # Send the image as a message in the group
             await ariadne_app.send_message(group, MessageChain("") + Image(path=send_result[0]))

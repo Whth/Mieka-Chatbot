@@ -101,8 +101,13 @@ class ChatBot(object):
         if plugin.get_plugin_name in self._installed_plugins:
             raise ValueError("Plugin already registered")
         plugin_instance = plugin(self._ariadne_app, self.get_installed_plugins)
+
         plugin_instance.install()
         self._installed_plugins[plugin.get_plugin_name()] = plugin_instance
+        print(
+            f"{Fore.GREEN}Installed {plugin.get_plugin_name()}\n"
+            f"{Fore.MAGENTA}----------------------------------------------\n"
+        )
 
     @staticmethod
     def _detect_requirements(extensions_path: str) -> List[str]:
