@@ -31,6 +31,7 @@ class StableDiffusionPlugin(AbstractPlugin):
     CONFIG_NEG_KEYWORD = "negative_keyword"
 
     CONFIG_WILDCARD_DIR_PATH = "wildcard_dir_path"
+    CONFIG_STYLES = "styles"
 
     # TODO this should be removed, use pos prompt keyword and neg prompt keyword
     def _get_config_parent_dir(self) -> str:
@@ -62,6 +63,7 @@ class StableDiffusionPlugin(AbstractPlugin):
         self._config_registry.register_config(
             self.CONFIG_WILDCARD_DIR_PATH, f"{self._get_config_parent_dir()}/asset/wildcard"
         )
+        self._config_registry.register_config(self.CONFIG_STYLES, [])
 
     def install(self):
         self.__register_all_config()
@@ -111,7 +113,11 @@ class StableDiffusionPlugin(AbstractPlugin):
                 neg_prompt = "".join(neg_prompt)
 
             # Create a diffusion parser with the prompts
-            diffusion_paser = DiffusionParser(prompt=pos_prompt, negative_prompt=neg_prompt)
+            diffusion_paser = DiffusionParser(
+                prompt=pos_prompt,
+                negative_prompt=neg_prompt,
+                styles=self._config_registry.get_config(self.CONFIG_STYLES),
+            )
             if Image in message:
                 # Download the first image in the chain
                 print(
@@ -123,7 +129,9 @@ class StableDiffusionPlugin(AbstractPlugin):
                     f"{Fore.RED}NEGATIVE PROMPT: {neg_prompt}" + Fore.RESET
                 )
                 img_path = download_image(save_dir=temp_dir_path, url=message[Image, 1][0].url)
-                send_result = await SD_app.img2img(image_path=img_path, output_dir=output_dir_path)
+                send_result = await SD_app.img2img(
+                    diffusion_parameters=diffusion_paser, image_path=img_path, output_dir=output_dir_path
+                )
             else:
                 print(
                     Fore.YELLOW + f"TXT TO IMG ORDER"
