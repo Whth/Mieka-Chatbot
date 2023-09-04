@@ -46,6 +46,8 @@ class BaiduTranslater(AbstractPlugin):
             url=self._config_registry.get_config(self.CONFIG_API_URL),
         )
 
+        # TODO mount a translating service
+
     def translate(self, to_lang: str, query: str, from_lang: str = "auto"):
         """
         Wrapper for baidu translates

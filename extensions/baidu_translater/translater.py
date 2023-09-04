@@ -22,9 +22,9 @@ class Translater:
             f"################################\n"
         )
 
-    def generate_sign(self, q, salt=None):
+    def _generate_sign(self, q, salt=None):
         """
-        函数 generate_sign() 是一个用于生成签名的函数，
+        函数 _generate_sign() 是一个用于生成签名的函数，
         它接收4个参数: appid, q, salt, secret_key。
 
         appid: 平台分配的应用ID。
@@ -51,19 +51,26 @@ class Translater:
 
     def translate(self, to_lang: str, q: str, from_lang: str = "auto"):
         """
+        Translates the given text from one language to another using the API.
 
-        :param from_lang:
-        :param to_lang:
-        :param q:
-        :return:
+        Args:
+            to_lang (str): The language code to translate the text into.
+            q (str): The text to be translated.
+            from_lang (str, optional): The language code of the text to be translated. Defaults to "auto".
+
+        Returns:
+            str: The translated text.
         """
         try:
             assert isinstance(to_lang, str)
             assert isinstance(q, str)
             assert isinstance(from_lang, str)
         except AssertionError:
-            return "......"
-        sign, salt = self.generate_sign(q=q)
+            return ""
+        if q == "":
+            return ""
+        # Generate sign and salt for the request
+        sign, salt = self._generate_sign(q=q)
 
         payload = {
             "appid": self.appid,
@@ -74,10 +81,11 @@ class Translater:
             "sign": sign,
         }
 
+        # Send POST request to the translation API
         r = requests.post(self.url, params=payload)
         result = r.json()
 
-        # Show response
+        # Get the translated text from the response
         trans_result = result.get("trans_result")[0]
 
         return str(trans_result.get("dst"))
