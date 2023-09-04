@@ -206,7 +206,10 @@ class ConfigRegistry(object):
         with open(config_path, mode="r") as f:
             temp = load(f)
         for key in self._config_registry_table.keys():
-            self._config_registry_table[key] = get_config(temp, registry_path_to_chain(key))
+            config = get_config(temp, registry_path_to_chain(key))
+            if config is None:
+                continue
+            self._config_registry_table[key] = config
 
     def save_config(self):
         """
