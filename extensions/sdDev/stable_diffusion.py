@@ -12,8 +12,9 @@ from slugify import slugify
 from extensions.sdDev.api import API_PNG_INFO, API_TXT2IMG, API_IMG2IMG
 from modules.file_manager import rename_image_with_hash, img_to_base64
 
-IMAGE_KEY = "image"
-IMAGES_KEY = "images"
+INIT_IMAGES_KEY = "init_images"  # used in img2img payload making
+IMAGE_KEY = "image"  # used in png-info payload making
+IMAGES_KEY = "images"  # used in txt2img payload making
 PNG_INFO_KEY = "info"
 
 
@@ -122,30 +123,15 @@ class StableDiffusionApp(object):
         pay_load: Dict = {}
         pay_load.update(diffusion_parameters._asdict())
 
-        png_pay_load: Dict = png_payload_maker(png_base64=img_to_base64(image_path))
+        png_pay_load: Dict = {INIT_IMAGES_KEY: [img_to_base64(image_path)]}
         pay_load.update(png_pay_load)
 
         async with aiohttp.ClientSession() as session:
             response = await session.post(f"{self._host_url}/{API_IMG2IMG}", json=pay_load)
             response_payload: Dict = await response.json()
-
         img_base64: List[str] = extract_png_from_payload(response_payload)
 
         return save_base64_img_with_hash(img_base64_list=img_base64, output_dir=output_dir, host_url=self._host_url)
-
-
-def png_payload_maker(
-    png_base64: str,
-) -> Dict:
-    """
-    make a png payload in sdapi syntax
-    Args:
-        png_base64 ():
-
-    Returns:
-
-    """
-    return {IMAGE_KEY: png_base64}
 
 
 def extract_png_from_payload(payload: Dict) -> List[str]:
@@ -184,7 +170,7 @@ def save_base64_img_with_hash(
         # Decode the base64-encoded image
 
         # Make a POST request to get PNG info
-        response = requests.post(url=f"{host_url}/{API_PNG_INFO}", json=png_payload_maker(img_base64))
+        response = requests.post(url=f"{host_url}/{API_PNG_INFO}", json={IMAGE_KEY: img_base64})
 
         req_png_info = response.json().get(PNG_INFO_KEY)
 
