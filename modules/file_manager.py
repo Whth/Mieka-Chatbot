@@ -1,6 +1,9 @@
+import base64
 import datetime
+import hashlib
 import os
 import time
+from datetime import datetime
 from typing import List
 
 import requests
@@ -99,27 +102,85 @@ def download_image(url: str, save_dir: str) -> str:
     Returns:
         str: The path where the image is saved, or None if the download fails.
     """
-    # Generate a unique image name based on the current timestamp
-    img_name = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-
+    img_name = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     print(f"Downloading image from: {url}")
 
-    # Send a GET request to download the image
     response = requests.get(url)
-
     if response.status_code == 200:
-        # Create the save directory if it doesn't exist
-        if not os.path.exists(save_dir):
-            os.makedirs(save_dir)
-
-        # Construct the path where the image will be saved
+        os.makedirs(save_dir, exist_ok=True)
         path = os.path.join(save_dir, f"{img_name}.png")
-
-        # Write the image content to a file
         with open(path, "wb") as f:
             f.write(response.content)
-
         print(f"Downloaded image successfully. Saved at: {path}")
         return path
 
-    return None
+    return ""
+
+
+def img_to_base64(file_path: str) -> str:
+    """
+    Convert an image file to base64 encoding.
+
+    :param file_path: The path to the image file.
+    :return: The base64 encoded string.
+    :raises FileNotFoundError: If the file does not exist.
+    """
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"{file_path} does not exist")
+
+    with open(file_path, "rb") as f:
+        data = f.read()
+
+    return base64.b64encode(data).decode()
+
+
+def base64_to_img(base64_string: str, output_path: str) -> None:
+    """
+    Convert a base64 encoded string back to an image file and save it to the specified output path.
+
+    :param base64_string: The base64 encoded string.
+    :param output_path: The path to save the image file.
+    :raises FileExistsError: If the output path already exists as a file.
+    """
+    if not os.path.exists(os.path.dirname(output_path)):
+        raise FileNotFoundError(f"{os.path.dirname(output_path)} does not exist")
+
+    # Decode the base64 string
+    image_data = base64.b64decode(base64_string)
+
+    # Write the image data to the output path
+    with open(output_path, "wb") as f:
+        f.write(image_data)
+
+
+def rename_image_with_hash(image_path: str) -> str:
+    """
+    Renames the image file at the specified path by appending a 6-character hash value
+    derived from the image content.
+    Returns the renamed image path.
+    """
+    # Check if the image file exists
+    if not os.path.exists(image_path):
+        raise FileNotFoundError(f"{image_path} does not exist")
+
+    # Get the image file name
+    image_name = os.path.basename(image_path)
+
+    # Get the image file name prefix and suffix
+    image_name_prefix, image_name_suffix = os.path.splitext(image_name)
+
+    # Read the image file
+    with open(image_path, "rb") as f:
+        image_content = f.read()
+
+    # Calculate the hash value of the image file content
+    image_hash = hashlib.md5(image_content).hexdigest()[:6]
+
+    # Rename the image file
+    new_image_name = f"{image_name_prefix}_{image_hash}{image_name_suffix}"
+    image_dir = os.path.dirname(image_path)
+    new_image_path = os.path.join(image_dir, new_image_name)
+    os.rename(image_path, new_image_path)
+
+    # Return the renamed image path
+    return new_image_path
