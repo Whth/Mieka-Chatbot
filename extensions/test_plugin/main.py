@@ -7,8 +7,8 @@ __all__ = ["TestPlugin"]
 
 
 class TestPlugin(AbstractPlugin):
-    GIF_ASSET_PATH = "gif_asset_path"
-    DETECTED_KEYWORD = "detected_keyword"
+    CONFIG_GIF_ASSET_PATH = "gif_asset_path"
+    CONFIG_DETECTED_KEYWORD = "detected_keyword"
 
     def _get_config_parent_dir(self) -> str:
         return os.path.abspath(os.path.dirname(__file__))
@@ -30,8 +30,8 @@ class TestPlugin(AbstractPlugin):
         return "whth"
 
     def __register_all_config(self):
-        self._config_registry.register_config(self.GIF_ASSET_PATH, f"{self._get_config_parent_dir()}/asset")
-        self._config_registry.register_config(self.DETECTED_KEYWORD, "mk")
+        self._config_registry.register_config(self.CONFIG_GIF_ASSET_PATH, f"{self._get_config_parent_dir()}/asset")
+        self._config_registry.register_config(self.CONFIG_DETECTED_KEYWORD, "mk")
 
     def install(self):
         from graia.ariadne.message.element import Image
@@ -40,14 +40,15 @@ class TestPlugin(AbstractPlugin):
         from colorama import Back
 
         self.__register_all_config()
-
+        self._config_registry.load_config()
         ariadne_app = self._ariadne_app
         bord_cast = ariadne_app.broadcast
 
-        gif_dir_path = self._config_registry.get_config(self.GIF_ASSET_PATH)
+        gif_dir_path = self._config_registry.get_config(self.CONFIG_GIF_ASSET_PATH)
 
         @bord_cast.receiver(
-            "GroupMessage", decorators=[ContainKeyword(keyword=self._config_registry.get_config(self.DETECTED_KEYWORD))]
+            "GroupMessage",
+            decorators=[ContainKeyword(keyword=self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD))],
         )
         async def random_emoji(group: Group):
             """
