@@ -96,11 +96,17 @@ class StableDiffusionPlugin(AbstractPlugin):
                 result_string += f"{option} = {self._config_registry.get_config(option)}\n"
             return result_string
 
+        def set_bool_config(key: str, value: int) -> str:
+            result_string = f"setting [{key}] to [{value}]"
+
+            self._config_registry.set_config(key, value)
+            return result_string
+
         cmd_syntax_tree: Dict = {
             self._config_registry.get_config(self.CONFIG_CONFIG_CLIENT_KEYWORD): {
                 self.__CONFIG_CMD: {
                     self.__CONFIG_LIST_CMD: list_out_configs,
-                    self.__CONFIG_SET_CMD: self._config_registry.set_config,
+                    self.__CONFIG_SET_CMD: set_bool_config,
                 }
             }
         }
