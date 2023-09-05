@@ -3,7 +3,7 @@ import re
 from functools import singledispatch
 from json import load, dump
 from types import MappingProxyType
-from typing import List, Any, Dict, Sequence, Tuple, Optional
+from typing import List, Any, Dict, Sequence, Tuple, Optional, Callable, get_type_hints, Union
 
 from colorama import Back, Fore, Style
 
@@ -278,3 +278,63 @@ class ConfigRegistry(object):
         if registry_path not in self._config_registry_table.keys():
             raise KeyError(f"{registry_path} not exists!")
         self._config_registry_table[registry_path] = new_config_value
+
+
+Setter = Callable[[Any], None]
+Void = Callable[[], None]
+
+
+class ConfigClient(object):
+    """
+    a config client that allows simple cli-liked operation on config
+    """
+
+    def __init__(self, syntax_tree: Dict):
+        self._syntax_tree = syntax_tree
+
+    def interpret(self, cmd: str) -> Any:
+        """
+        Interprets a command and executes it.
+
+        Args:
+            cmd (str): The command to interpret.
+
+        Returns:
+            Any: The result of executing the command.
+
+        Raises:
+            KeyError: If the command is not supported or has an incorrect number
+                of arguments.
+        """
+        # Split the command into tokens
+        cmd_tokens: List[str] = re.split(r"\s+", cmd)
+        tokens_count = len(cmd_tokens)
+        temp: Union[Dict, Setter, Void] = self._syntax_tree
+
+        for token in cmd_tokens:
+            if token not in temp:
+                return
+
+            temp = temp[token]
+            tokens_count -= 1
+
+            if callable(temp):
+                if tokens_count > 1:
+                    raise KeyError("Too many arguments")
+
+                if tokens_count == 1:
+                    # Get the type hint for the argument
+                    hints = get_type_hints(temp)
+                    if len(hints) > 1:
+                        raise KeyError("The operation can only have one argument")
+                    hint = hints.get(list(hints.keys())[0])
+
+                    # Execute the callable with the argument
+                    return temp(hint(cmd_tokens[-1]))
+
+                if tokens_count == 0:
+                    # Execute the callable without any argument
+                    return temp()
+
+            elif tokens_count == 0:
+                raise KeyError("Too few arguments")
