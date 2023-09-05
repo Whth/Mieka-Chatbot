@@ -1,5 +1,4 @@
 import os
-import random
 
 from modules.plugin_base import AbstractPlugin
 
@@ -34,10 +33,12 @@ class TestPlugin(AbstractPlugin):
         self._config_registry.register_config(self.CONFIG_DETECTED_KEYWORD, "mk")
 
     def install(self):
+        from random import choice
         from graia.ariadne.message.element import Image
         from graia.ariadne.message.parser.base import ContainKeyword
         from graia.ariadne.model import Group
         from colorama import Back
+        from modules.file_manager import explore_folder
 
         self.__register_all_config()
         self._config_registry.load_config()
@@ -56,18 +57,6 @@ class TestPlugin(AbstractPlugin):
             :param group:
             :return:
             """
-            file = get_random_file(gif_dir_path)
+            file = choice(explore_folder(gif_dir_path))
             print(f"{Back.BLUE}TEST_PLUGIN: Sending file at [{file}]{Back.RESET}")
             await ariadne_app.send_message(group, Image(path=file))
-
-
-def get_random_file(folder):
-    """
-
-    :param folder:
-    :return:
-    """
-    from modules.file_manager import explore_folder
-
-    files_list = explore_folder(folder)
-    return random.choice(files_list)
