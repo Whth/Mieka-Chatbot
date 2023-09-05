@@ -121,12 +121,12 @@ class StableDiffusionPlugin(AbstractPlugin):
             if Image in message:
                 # Download the first image in the chain
                 print(
-                    Fore.YELLOW + f"IMG TO IMG ORDER\n"
+                    f"{Fore.YELLOW}IMG TO IMG ORDER\n"
                     f"Downloading image from: {message[Image, 1][0].url}\n"
                     f"{Fore.MAGENTA}___________________________________________\n"
                     f"{Fore.GREEN}POSITIVE PROMPT: {pos_prompt}\n"
                     f"{Fore.MAGENTA}___________________________________________\n"
-                    f"{Fore.RED}NEGATIVE PROMPT: {neg_prompt}"
+                    f"{Fore.RED}NEGATIVE PROMPT: {neg_prompt}\n"
                     f"{Fore.MAGENTA}___________________________________________\n" + Fore.RESET
                 )
                 img_path = download_image(save_dir=temp_dir_path, url=message[Image, 1][0].url)
@@ -135,11 +135,11 @@ class StableDiffusionPlugin(AbstractPlugin):
                 )
             else:
                 print(
-                    Fore.YELLOW + f"TXT TO IMG ORDER\n"
+                    f"{Fore.YELLOW}TXT TO IMG ORDER\n"
                     f"{Fore.MAGENTA}___________________________________________\n"
                     f"{Fore.GREEN}POSITIVE PROMPT: {pos_prompt}\n"
                     f"{Fore.MAGENTA}___________________________________________\n"
-                    f"{Fore.RED}NEGATIVE PROMPT: {neg_prompt}"
+                    f"{Fore.RED}NEGATIVE PROMPT: {neg_prompt}\n"
                     f"{Fore.MAGENTA}___________________________________________\n" + Fore.RESET
                 )
                 # Generate the image using the diffusion parser
