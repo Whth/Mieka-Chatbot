@@ -1,6 +1,6 @@
 import os
 import re
-from typing import Tuple, List, Optional, Callable
+from typing import Tuple, List, Optional, Callable, Dict
 
 from modules.file_manager import download_image
 from modules.plugin_base import AbstractPlugin
@@ -13,6 +13,11 @@ class StableDiffusionPlugin(AbstractPlugin):
     __TRANSLATE_METHOD_NAME: str = "translate"
     __TRANSLATE_METHOD_TYPE = Callable[[str, str, str], str]  # [tolang, query, fromlang] -> str
     # TODO deal with this super high coupling
+
+    __CONFIG_CMD = "config"
+    __CONFIG_LIST_CMD = "list"
+
+    __CONFIG_SET_CMD = "set"
 
     TXT2IMG_DIRNAME = "txt2img"
     IMG2IMG_DIRNAME = "img2img"
@@ -27,6 +32,11 @@ class StableDiffusionPlugin(AbstractPlugin):
 
     CONFIG_WILDCARD_DIR_PATH = "wildcard_dir_path"
     CONFIG_STYLES = "styles"
+    CONFIG_ENABLE_HR = "enable_hr"
+
+    CONFIG_ENABLE_TRANSLATE = "enable_translate"
+
+    CONFIG_CONFIG_CLIENT_KEYWORD = "config_client_keyword"
 
     # TODO this should be removed, use pos prompt keyword and neg prompt keyword
     def _get_config_parent_dir(self) -> str:
@@ -42,7 +52,7 @@ class StableDiffusionPlugin(AbstractPlugin):
 
     @classmethod
     def get_plugin_version(cls) -> str:
-        return "0.0.1"
+        return "0.0.2"
 
     @classmethod
     def get_plugin_author(cls) -> str:
@@ -59,18 +69,42 @@ class StableDiffusionPlugin(AbstractPlugin):
             self.CONFIG_WILDCARD_DIR_PATH, f"{self._get_config_parent_dir()}/asset/wildcard"
         )
         self._config_registry.register_config(self.CONFIG_STYLES, [])
+        self._config_registry.register_config(self.CONFIG_ENABLE_HR, False)
+        self._config_registry.register_config(self.CONFIG_ENABLE_TRANSLATE, False)
+
+        self._config_registry.register_config(self.CONFIG_CONFIG_CLIENT_KEYWORD, "sd")
 
     def install(self):
         from colorama import Fore
         from graia.ariadne.message.chain import MessageChain, Image
-        from graia.ariadne.message.parser.base import ContainKeyword
+        from graia.ariadne.message.parser.base import ContainKeyword, DetectPrefix
         from graia.ariadne.model import Group
         from dynamicprompts.wildcards import WildcardManager
         from dynamicprompts.generators import JinjaGenerator
         from .stable_diffusion import StableDiffusionApp, DiffusionParser
 
+        from modules.config_utils import ConfigClient
+
         self.__register_all_config()
         self._config_registry.load_config()
+
+        configurable_options: List[str] = [self.CONFIG_ENABLE_HR, self.CONFIG_ENABLE_TRANSLATE]
+
+        def list_out_configs() -> str:
+            result_string = ""
+            for option in configurable_options:
+                result_string += f"{option} = {self._config_registry.get_config(option)}\n"
+            return result_string
+
+        cmd_syntax_tree: Dict = {
+            self._config_registry.get_config(self.CONFIG_CONFIG_CLIENT_KEYWORD): {
+                self.__CONFIG_CMD: {
+                    self.__CONFIG_LIST_CMD: list_out_configs,
+                    self.__CONFIG_SET_CMD: self._config_registry.set_config,
+                }
+            }
+        }
+        config_client = ConfigClient(cmd_syntax_tree)
         translater: Optional[AbstractPlugin] = self._plugin_view.get(self.__TRANSLATE_PLUGIN_NAME, None)
         if translater:
             translate: StableDiffusionPlugin.__TRANSLATE_METHOD_TYPE = getattr(translater, self.__TRANSLATE_METHOD_NAME)
@@ -106,13 +140,13 @@ class StableDiffusionPlugin(AbstractPlugin):
             pos_prompt, neg_prompt = de_assembly(str(message))
 
             # Translate prompts to English if translate a flag is set
-            if translate:
+            if self._config_registry.get_config(self.CONFIG_ENABLE_TRANSLATE) and translate:
                 pos_prompt = translate("en", "".join(pos_prompt), "auto")
                 neg_prompt = translate("en", "".join(neg_prompt), "auto")
             else:
                 pos_prompt = "".join(pos_prompt)
                 neg_prompt = "".join(neg_prompt)
-
+            DiffusionParser.enable_hr = self._config_registry.get_config(self.CONFIG_ENABLE_HR)
             # Create a diffusion parser with the prompts
             diffusion_paser = (
                 DiffusionParser(
@@ -152,6 +186,24 @@ class StableDiffusionPlugin(AbstractPlugin):
 
             # Send the image as a message in the group
             await ariadne_app.send_message(group, MessageChain("") + Image(path=send_result[0]))
+
+        @bord_cast.receiver(
+            "GroupMessage",
+            decorators=[DetectPrefix(prefix=self._config_registry.get_config(self.CONFIG_CONFIG_CLIENT_KEYWORD))],
+        )
+        async def sd_client(group: Group, message: MessageChain):
+            """
+            Allows cli operations
+            Args:
+                group ():
+                message ():
+
+            Returns:
+
+            """
+            out_string = config_client.interpret(str(message))
+            if isinstance(out_string, str):
+                await ariadne_app.send_message(group, message=out_string)
 
 
 def de_assembly(
