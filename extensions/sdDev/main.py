@@ -114,10 +114,14 @@ class StableDiffusionPlugin(AbstractPlugin):
                 neg_prompt = "".join(neg_prompt)
 
             # Create a diffusion parser with the prompts
-            diffusion_paser = DiffusionParser(
-                prompt=pos_prompt,
-                negative_prompt=neg_prompt,
-                styles=self._config_registry.get_config(self.CONFIG_STYLES),
+            diffusion_paser = (
+                DiffusionParser(
+                    prompt=pos_prompt,
+                    negative_prompt=neg_prompt,
+                    styles=self._config_registry.get_config(self.CONFIG_STYLES),
+                )
+                if pos_prompt
+                else DiffusionParser()
             )
             if Image in message:
                 # Download the first image in the chain
