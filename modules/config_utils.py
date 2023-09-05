@@ -203,7 +203,7 @@ class ConfigRegistry(object):
 
         if not os.path.exists(config_path) or os.path.getsize(config_path) == 0:
             return
-        with open(config_path, mode="r") as f:
+        with open(config_path, mode="r", encoding="utf-8") as f:
             temp = load(f)
         for key in self._config_registry_table.keys():
             config = get_config(temp, registry_path_to_chain(key))
@@ -260,3 +260,21 @@ class ConfigRegistry(object):
         if registry_path not in self._config_registry_table.keys():
             raise ValueError(f"{registry_path} not registered")
         return self._config_registry_table.get(registry_path)
+
+    def set_config(self, registry_path: str, new_config_value: Value) -> None:
+        """
+        Sets a new configuration value for the given registry path in the config registry table.
+
+        Parameters:
+            - registry_path (str): The path of the registry to set the new value for.
+            - new_config_value (Value): The new value to set for the registry.
+
+        Returns:
+            None
+
+        Raises:
+            KeyError: If the registry path does not exist in the config registry table.
+        """
+        if registry_path not in self._config_registry_table.keys():
+            raise KeyError(f"{registry_path} not exists!")
+        self._config_registry_table[registry_path] = new_config_value
