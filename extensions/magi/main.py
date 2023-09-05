@@ -1,10 +1,6 @@
 import os
 from random import choice
 
-from graia.ariadne.message.element import Image
-from graia.ariadne.message.parser.base import ContainKeyword
-from graia.ariadne.model import Group
-
 from modules.plugin_base import AbstractPlugin
 
 __all__ = ["Magi"]
@@ -52,6 +48,12 @@ class Magi(AbstractPlugin):
         self._config_registry.register_config(self.CONFIG_DETECTED_KEYWORD, "magi")
 
     def install(self):
+        from graia.ariadne.message.element import Image
+        from graia.ariadne.message.parser.base import ContainKeyword
+        from graia.ariadne.model import Group
+        from modules.file_manager import explore_folder
+        from .gif_factory import GifFactory
+
         self.__register_all_config()
         self._config_registry.load_config()
         ariadne_app = self._ariadne_app
@@ -66,8 +68,6 @@ class Magi(AbstractPlugin):
         gif_count: int = self._config_registry.get_config(self.CONFIG_EVAL_GIF_LOOP_COUNT)
         jpg_count: int = self._config_registry.get_config(self.CONFIG_PASS_FRAME_COUNT)
         duration: int = self._config_registry.get_config(self.CONFIG_RESULT_FRAME_DURATION)
-        from modules.file_manager import explore_folder
-        from .gif_factory import GifFactory
 
         @bord_cast.receiver(
             "GroupMessage",

@@ -1,10 +1,6 @@
 import os
 import random
 
-from graia.ariadne.message.element import Image
-from graia.ariadne.message.parser.base import ContainKeyword
-from graia.ariadne.model import Group
-
 from modules.plugin_base import AbstractPlugin
 
 __all__ = ["RandomMeme"]
@@ -38,9 +34,13 @@ class RandomMeme(AbstractPlugin):
         self._config_registry.register_config(self.DETECTED_KEYWORD, "meme")
 
     def install(self):
+        from modules.file_manager import explore_folder
+        from graia.ariadne.message.element import Image
+        from graia.ariadne.message.parser.base import ContainKeyword
+        from graia.ariadne.model import Group
+
         self.__register_all_config()
         self._config_registry.load_config()
-        from modules.file_manager import explore_folder
 
         ariadne_app = self._ariadne_app
         bord_cast = ariadne_app.broadcast
