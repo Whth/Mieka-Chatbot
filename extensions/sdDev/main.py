@@ -2,11 +2,6 @@ import os
 import re
 from typing import Tuple, List, Optional, Callable
 
-from colorama import Fore
-from graia.ariadne.message.chain import MessageChain, Image
-from graia.ariadne.message.parser.base import ContainKeyword
-from graia.ariadne.model import Group
-
 from modules.file_manager import download_image
 from modules.plugin_base import AbstractPlugin
 
@@ -66,6 +61,14 @@ class StableDiffusionPlugin(AbstractPlugin):
         self._config_registry.register_config(self.CONFIG_STYLES, [])
 
     def install(self):
+        from colorama import Fore
+        from graia.ariadne.message.chain import MessageChain, Image
+        from graia.ariadne.message.parser.base import ContainKeyword
+        from graia.ariadne.model import Group
+        from dynamicprompts.wildcards import WildcardManager
+        from dynamicprompts.generators import JinjaGenerator
+        from .stable_diffusion import StableDiffusionApp, DiffusionParser
+
         self.__register_all_config()
         self._config_registry.load_config()
         translater: Optional[AbstractPlugin] = self._plugin_view.get(self.__TRANSLATE_PLUGIN_NAME, None)
@@ -75,9 +78,6 @@ class StableDiffusionPlugin(AbstractPlugin):
         temp_dir_path = self._config_registry.get_config(self.CONFIG_IMG_TEMP_DIR_PATH)
         ariadne_app = self._ariadne_app
         bord_cast = ariadne_app.broadcast
-        from dynamicprompts.wildcards import WildcardManager
-        from dynamicprompts.generators import JinjaGenerator
-        from .stable_diffusion import StableDiffusionApp, DiffusionParser
 
         SD_app = StableDiffusionApp(host_url=self._config_registry.get_config(self.CONFIG_SD_HOST))
         gen = JinjaGenerator(
@@ -86,6 +86,7 @@ class StableDiffusionPlugin(AbstractPlugin):
 
         # TODO use dynamicprompts here
         # TODO add quick async response
+
         @bord_cast.receiver(
             "GroupMessage",
             decorators=[ContainKeyword(keyword=self._config_registry.get_config(self.CONFIG_POS_KEYWORD))],
