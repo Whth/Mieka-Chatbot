@@ -203,7 +203,7 @@ class ConfigRegistry(object):
 
         if not os.path.exists(config_path) or os.path.getsize(config_path) == 0:
             return
-        with open(config_path, mode="r") as f:
+        with open(config_path, mode="r", encoding="utf-8") as f:
             temp = load(f)
         for key in self._config_registry_table.keys():
             config = get_config(temp, registry_path_to_chain(key))
