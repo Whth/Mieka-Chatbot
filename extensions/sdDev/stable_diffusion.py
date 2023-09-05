@@ -12,6 +12,15 @@ from slugify import slugify
 from extensions.sdDev.api import API_PNG_INFO, API_TXT2IMG, API_IMG2IMG
 from modules.file_manager import rename_image_with_hash, img_to_base64
 
+DEFAULT_NEGATIVE_PROMPT = "loathed,low resolution,porn,NSFW,strange shaped finger,cropped,panties visible"
+
+DEFAULT_POSITIVE_PROMPT = (
+    "modern art,student uniform,white shirt,short blue skirt,white tights,joshi,JK,1girl:1.2,solo,upper body,"
+    "shy,extremely cute,lovely,"
+    "beautiful,expressionless,cool girl,medium breasts,"
+    "thighs,thin torso,masterpiece,wonderful art,high resolution,hair ornament,strips,body curve,hair,SFW:1.3,"
+)
+
 INIT_IMAGES_KEY = "init_images"  # used in img2img payload making
 IMAGE_KEY = "image"  # used in png-info payload making
 IMAGES_KEY = "images"  # used in txt2img payload making
@@ -23,13 +32,13 @@ class DiffusionParser(NamedTuple):
     use to parse config
     """
 
-    prompt: str = "1girl:1.2,solo,standing,shy,hands behind hip"
-    negative_prompt: str = "loathed"
+    prompt: str = DEFAULT_POSITIVE_PROMPT
+    negative_prompt: str = DEFAULT_NEGATIVE_PROMPT
     styles: List[str] = []
     seed: int = -1
     sampler_name: str = "UniPC"
-    steps: int = 17
-    cfg_scale: float = 7.0
+    steps: int = 20
+    cfg_scale: float = 7.6
     width: int = 512
     height: int = 768
 

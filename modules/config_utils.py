@@ -1,9 +1,11 @@
 import os
 import re
 from functools import singledispatch
+from inspect import signature
 from json import load, dump
 from types import MappingProxyType
-from typing import List, Any, Dict, Sequence, Tuple, Optional, Callable, get_type_hints, Union
+from typing import Any, Dict, List, Union
+from typing import Sequence, Tuple, Optional, Callable
 
 from colorama import Back, Fore, Style
 
@@ -297,16 +299,15 @@ class ConfigClient(object):
         Interprets a command and executes it.
 
         Args:
-            cmd (str): The command to interpret.
+            cmd: The command to interpret.
 
         Returns:
-            Any: The result of executing the command.
+            The result of executing the command.
 
         Raises:
             KeyError: If the command is not supported or has an incorrect number
                 of arguments.
         """
-        # Split the command into tokens
         cmd_tokens: List[str] = re.split(r"\s+", cmd)
         tokens_count = len(cmd_tokens)
         temp: Union[Dict, Setter, Void] = self._syntax_tree
@@ -319,22 +320,20 @@ class ConfigClient(object):
             tokens_count -= 1
 
             if callable(temp):
-                if tokens_count > 1:
-                    raise KeyError("Too many arguments")
+                hints = signature(temp).parameters
+                params_name_list: List[str] = list(hints.keys())
+                required_token_count = len(hints)
 
-                if tokens_count == 1:
-                    # Get the type hint for the argument
-                    hints = get_type_hints(temp)
-                    if len(hints) > 1:
-                        raise KeyError("The operation can only have one argument")
-                    hint = hints.get(list(hints.keys())[0])
+                if tokens_count == required_token_count:
+                    raw_params = cmd_tokens[-tokens_count:]
 
-                    # Execute the callable with the argument
-                    return temp(hint(cmd_tokens[-1]))
+                    params_pack = tuple(
+                        hints[param_name].annotation(raw_param)
+                        for param_name, raw_param in zip(params_name_list, raw_params)
+                    )
 
-                if tokens_count == 0:
-                    # Execute the callable without any argument
-                    return temp()
+                    return temp(*params_pack)
+                else:
+                    raise ValueError(f"expected {required_token_count} args, got {tokens_count}")
 
-            elif tokens_count == 0:
-                raise KeyError("Too few arguments")
+        raise KeyError("Bad syntax tree, please check")
