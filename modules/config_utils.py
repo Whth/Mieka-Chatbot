@@ -1,9 +1,11 @@
 import os
 import re
 from functools import singledispatch
+from inspect import signature
 from json import load, dump
 from types import MappingProxyType
-from typing import List, Any, Dict, Sequence, Tuple, Optional
+from typing import Any, Dict, List, Union
+from typing import Sequence, Tuple, Optional, Callable
 
 from colorama import Back, Fore, Style
 
@@ -278,3 +280,76 @@ class ConfigRegistry(object):
         if registry_path not in self._config_registry_table.keys():
             raise KeyError(f"{registry_path} not exists!")
         self._config_registry_table[registry_path] = new_config_value
+
+
+Setter = Callable[[Any], None]
+Void = Callable[[], None]
+
+
+class ConfigClient(object):
+    """
+    a config client that allows simple cli-liked operation on config
+    """
+
+    __Clients: List["ConfigClient"] = []
+
+    @classmethod
+    def all_available_cmd(cls) -> List[str]:
+        """
+        Returns a list of all available commands.
+
+        :return: A list of strings representing the available commands.
+        :rtype: List[str]
+        """
+        cmds: List[str] = []
+        for client in cls.__Clients:
+            cmds.extend(list(client._syntax_tree.keys()))
+        return cmds
+
+    def __init__(self, syntax_tree: Dict[str, Any]):
+        self._syntax_tree = syntax_tree
+        self.__Clients.append(self)
+
+    def interpret(self, cmd: str) -> Any:
+        """
+        Interprets a command and executes it.
+
+        Args:
+            cmd: The command to interpret.
+
+        Returns:
+            The result of executing the command.
+
+        Raises:
+            KeyError: If the command is not supported or has an incorrect number
+                of arguments.
+        """
+        cmd_tokens: List[str] = re.split(r"\s+", cmd)
+        tokens_count = len(cmd_tokens)
+        temp: Union[Dict, Setter, Void] = self._syntax_tree
+
+        for token in cmd_tokens:
+            if token not in temp:
+                return
+
+            temp = temp[token]
+            tokens_count -= 1
+
+            if callable(temp):
+                hints = signature(temp).parameters
+                params_name_list: List[str] = list(hints.keys())
+                required_token_count = len(hints)
+
+                if tokens_count == required_token_count:
+                    raw_params = cmd_tokens[-tokens_count:]
+
+                    params_pack = tuple(
+                        hints[param_name].annotation(raw_param)
+                        for param_name, raw_param in zip(params_name_list, raw_params)
+                    )
+
+                    return temp(*params_pack)
+                else:
+                    raise ValueError(f"expected {required_token_count} args, got {tokens_count}")
+
+        raise KeyError("Bad syntax tree, please check")
