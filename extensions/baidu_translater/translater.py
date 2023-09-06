@@ -1,7 +1,10 @@
 import hashlib
 import random
+from typing import Dict
 
 import requests
+
+RESULT_KEY = "trans_result"
 
 
 class Translater:
@@ -82,10 +85,15 @@ class Translater:
         }
 
         # Send POST request to the translation API
-        r = requests.post(self.url, params=payload)
-        result = r.json()
+        result: Dict = requests.post(self.url, params=payload).json()
 
         # Get the translated text from the response
-        trans_result = result.get("trans_result")[0]
+        if RESULT_KEY not in result:
+            error_string = ""
+            for k, v in result.items():
+                error_string += f"{k}: {v}"
+
+            return error_string
+        trans_result = result.get(RESULT_KEY)[0]
 
         return str(trans_result.get("dst"))
