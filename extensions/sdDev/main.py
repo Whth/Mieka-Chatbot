@@ -36,6 +36,7 @@ class StableDiffusionPlugin(AbstractPlugin):
 
     CONFIG_ENABLE_TRANSLATE = "enable_translate"
 
+    CONFIG_ENABLE_DYNAMIC_PROMPT = "enable_dynamic_prompt"
     CONFIG_CONFIG_CLIENT_KEYWORD = "config_client_keyword"
 
     # TODO this should be removed, use pos prompt keyword and neg prompt keyword
@@ -52,7 +53,7 @@ class StableDiffusionPlugin(AbstractPlugin):
 
     @classmethod
     def get_plugin_version(cls) -> str:
-        return "0.0.2"
+        return "0.0.3"
 
     @classmethod
     def get_plugin_author(cls) -> str:
@@ -69,9 +70,9 @@ class StableDiffusionPlugin(AbstractPlugin):
             self.CONFIG_WILDCARD_DIR_PATH, f"{self._get_config_parent_dir()}/asset/wildcard"
         )
         self._config_registry.register_config(self.CONFIG_STYLES, [])
-        self._config_registry.register_config(self.CONFIG_ENABLE_HR, False)
-        self._config_registry.register_config(self.CONFIG_ENABLE_TRANSLATE, False)
-
+        self._config_registry.register_config(self.CONFIG_ENABLE_HR, 0)
+        self._config_registry.register_config(self.CONFIG_ENABLE_TRANSLATE, 0)
+        self._config_registry.register_config(self.CONFIG_ENABLE_DYNAMIC_PROMPT, 1)
         self._config_registry.register_config(self.CONFIG_CONFIG_CLIENT_KEYWORD, "sd")
 
     def install(self):
@@ -80,7 +81,7 @@ class StableDiffusionPlugin(AbstractPlugin):
         from graia.ariadne.message.parser.base import ContainKeyword, DetectPrefix
         from graia.ariadne.model import Group
         from dynamicprompts.wildcards import WildcardManager
-        from dynamicprompts.generators import JinjaGenerator
+        from dynamicprompts.generators import RandomPromptGenerator
         from .stable_diffusion import StableDiffusionApp, DiffusionParser
 
         from modules.config_utils import ConfigClient
@@ -88,15 +89,35 @@ class StableDiffusionPlugin(AbstractPlugin):
         self.__register_all_config()
         self._config_registry.load_config()
 
-        configurable_options: List[str] = [self.CONFIG_ENABLE_HR, self.CONFIG_ENABLE_TRANSLATE]
+        configurable_options: List[str] = [
+            self.CONFIG_ENABLE_HR,
+            self.CONFIG_ENABLE_TRANSLATE,
+            self.CONFIG_ENABLE_DYNAMIC_PROMPT,
+        ]
 
         def list_out_configs() -> str:
+            """
+            Returns a string that lists out the configurations.
+
+            Returns:
+                str: The string that lists out the configurations.
+            """
             result_string = ""
             for option in configurable_options:
                 result_string += f"{option} = {self._config_registry.get_config(option)}\n"
             return result_string
 
         def set_bool_config(key: str, value: int) -> str:
+            """
+            Set a boolean configuration value.
+
+            Args:
+                key (str): The key of the configuration value.
+                value (int): The value to be set.
+
+            Returns:
+                str: A string indicating the result of the operation.
+            """
             result_string = f"setting [{key}] to [{value}]"
 
             self._config_registry.set_config(key, value)
@@ -120,11 +141,10 @@ class StableDiffusionPlugin(AbstractPlugin):
         bord_cast = ariadne_app.broadcast
 
         SD_app = StableDiffusionApp(host_url=self._config_registry.get_config(self.CONFIG_SD_HOST))
-        gen = JinjaGenerator(
+        gen = RandomPromptGenerator(
             wildcard_manager=WildcardManager(path=self._config_registry.get_config(self.CONFIG_WILDCARD_DIR_PATH))
         )
 
-        # TODO use dynamicprompts here
         # TODO add quick async response
 
         @bord_cast.receiver(
@@ -144,14 +164,44 @@ class StableDiffusionPlugin(AbstractPlugin):
             """
             # Extract positive and negative prompts from the message
             pos_prompt, neg_prompt = de_assembly(str(message))
-
+            pos_prompt = "".join(pos_prompt)
+            neg_prompt = "".join(neg_prompt)
+            if self._config_registry.get_config(self.CONFIG_ENABLE_DYNAMIC_PROMPT):
+                temp_string = (
+                    f"{Fore.MAGENTA}Interpreting prompts\n"
+                    f"\t{Fore.GREEN}POSITIVE PROMPT: {pos_prompt}\n"
+                    f"\t{Fore.RED}NEGATIVE PROMPT: {neg_prompt}\n"
+                    f"{Fore.MAGENTA}___________________________________________\n"
+                )
+                pos_interpreted = gen.generate(template=pos_prompt)
+                neg_interpreted = gen.generate(template=neg_prompt)
+                pos_prompt = pos_interpreted[0] if pos_interpreted else pos_prompt
+                neg_prompt = neg_interpreted[0] if neg_interpreted else neg_prompt
+                temp_string += (
+                    f"Result:\n"
+                    f"\t{Fore.GREEN}POSITIVE PROMPT: {pos_prompt}\n"
+                    f"\t{Fore.RED}NEGATIVE PROMPT: {neg_prompt}\n"
+                    f"{Fore.MAGENTA}___________________________________________\n"
+                )
+                print(temp_string)
             # Translate prompts to English if translate a flag is set
             if self._config_registry.get_config(self.CONFIG_ENABLE_TRANSLATE) and translate:
-                pos_prompt = translate("en", "".join(pos_prompt), "auto")
-                neg_prompt = translate("en", "".join(neg_prompt), "auto")
-            else:
-                pos_prompt = "".join(pos_prompt)
-                neg_prompt = "".join(neg_prompt)
+                temp_string = (
+                    f"{Fore.MAGENTA}Translating prompts\n"
+                    f"\t{Fore.GREEN}POSITIVE PROMPT: {pos_prompt}\n"
+                    f"\t{Fore.RED}NEGATIVE PROMPT: {neg_prompt}\n"
+                    f"{Fore.MAGENTA}___________________________________________\n"
+                )
+                pos_prompt = translate("en", pos_prompt, "auto")
+                neg_prompt = translate("en", neg_prompt, "auto")
+                temp_string += (
+                    f"Result:\n"
+                    f"\t{Fore.GREEN}POSITIVE PROMPT: {pos_prompt}\n"
+                    f"\t{Fore.RED}NEGATIVE PROMPT: {neg_prompt}\n"
+                    f"{Fore.MAGENTA}___________________________________________\n"
+                )
+                print(temp_string)
+
             DiffusionParser.enable_hr = self._config_registry.get_config(self.CONFIG_ENABLE_HR)
             # Create a diffusion parser with the prompts
             diffusion_paser = (
