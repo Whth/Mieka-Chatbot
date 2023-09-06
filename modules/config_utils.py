@@ -291,8 +291,24 @@ class ConfigClient(object):
     a config client that allows simple cli-liked operation on config
     """
 
-    def __init__(self, syntax_tree: Dict):
+    __Clients: List["ConfigClient"] = []
+
+    @classmethod
+    def all_available_cmd(cls) -> List[str]:
+        """
+        Returns a list of all available commands.
+
+        :return: A list of strings representing the available commands.
+        :rtype: List[str]
+        """
+        cmds: List[str] = []
+        for client in cls.__Clients:
+            cmds.extend(list(client._syntax_tree.keys()))
+        return cmds
+
+    def __init__(self, syntax_tree: Dict[str, Any]):
         self._syntax_tree = syntax_tree
+        self.__Clients.append(self)
 
     def interpret(self, cmd: str) -> Any:
         """
