@@ -30,7 +30,7 @@ class HeartBeat(AbstractPlugin):
         return "whth"
 
     def __register_all_config(self):
-        self._config_registry.register_config(self.CONFIG_HEART_BEAT_INTERVAL, 50)
+        self._config_registry.register_config(self.CONFIG_HEART_BEAT_INTERVAL, 40)
 
     def install(self):
         self.__register_all_config()
