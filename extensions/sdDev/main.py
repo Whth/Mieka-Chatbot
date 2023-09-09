@@ -53,7 +53,7 @@ class StableDiffusionPlugin(AbstractPlugin):
 
     @classmethod
     def get_plugin_version(cls) -> str:
-        return "0.0.3"
+        return "0.0.4"
 
     @classmethod
     def get_plugin_author(cls) -> str:
@@ -209,6 +209,7 @@ class StableDiffusionPlugin(AbstractPlugin):
                     prompt=pos_prompt,
                     negative_prompt=neg_prompt,
                     styles=self._config_registry.get_config(self.CONFIG_STYLES),
+                    enable_hr=self._config_registry.get_config(self.CONFIG_ENABLE_HR),
                 )
                 if pos_prompt
                 else DiffusionParser()
