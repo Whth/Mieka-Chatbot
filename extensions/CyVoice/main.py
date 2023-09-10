@@ -142,7 +142,7 @@ class CyVoice(AbstractPlugin):
             speaker_names = VITS.get_voice_speakers()
             return Voice(
                 path=VITS.voice_vits(
-                    f"{self._config_registry.get_config(self.CONFIG_ANNOTATE_STATEMENT)}{speaker_names[cv_id]}ですわ",
+                    f"{self._config_registry.get_config(self.CONFIG_ANNOTATE_STATEMENT)}{speaker_names[cv_id]}ですわ！",
                     id=cv_id,
                     save_dir=self._config_registry.get_config(self.CONFIG_TEMP_FILE_DIR_PATH),
                 )
