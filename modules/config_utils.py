@@ -250,20 +250,20 @@ class ConfigRegistry(object):
             raise ValueError(f"{registry_path} already registered")
         self._config_registry_table[registry_path] = default_value
 
-    def get_config(self, registry_path: str) -> Value:
+    def get_config(self, config_path: str) -> Value:
         """
 
         Args:
-            registry_path ():
+            config_path ():
 
         Returns:
 
         """
-        if registry_path not in self._config_registry_table.keys():
-            raise ValueError(f"{registry_path} not registered")
-        return self._config_registry_table.get(registry_path)
+        if config_path not in self._config_registry_table.keys():
+            raise KeyError(f"{config_path} not registered")
+        return self._config_registry_table.get(config_path)
 
-    def set_config(self, registry_path: str, new_config_value: Value) -> None:
+    def set_config(self, config_path: str, new_config_value: Value) -> None:
         """
         Sets a new configuration value for the given registry path in the config registry table.
 
@@ -277,9 +277,9 @@ class ConfigRegistry(object):
         Raises:
             KeyError: If the registry path does not exist in the config registry table.
         """
-        if registry_path not in self._config_registry_table.keys():
-            raise KeyError(f"{registry_path} not exists!")
-        self._config_registry_table[registry_path] = new_config_value
+        if config_path not in self._config_registry_table.keys():
+            raise KeyError(f"{config_path} not exists!")
+        self._config_registry_table[config_path] = new_config_value
 
 
 Setter = Callable[[Any], None]
@@ -380,3 +380,67 @@ def setter_builder(cmd_function: Callable[[str, ConfigValue], None], config_type
         return f"Set [{config_path}] to [{new_config}]"
 
     return _setter
+
+
+class CmdSetterBuilder(object):
+    def __init__(self, config_getter: Callable[[str], Value], config_setter: Callable[[str, Value], str]):
+        self._config_setter = config_setter
+        self._config_getter = config_getter
+
+    def build_for(self, config_path: str) -> Callable[[str], str]:
+        """
+        Returns a callable function that can be used to set a configuration value.
+
+        Args:
+            config_path (str): The path to the configuration value.
+
+        Returns:
+            Callable[[str], str]: A callable function that takes in a new configuration value as a string and returns a string message indicating the success or failure of the operation.
+        """
+
+        origin_config = self._config_getter(config_path)
+
+        origin_config_type = type(origin_config)
+
+        def _setter(new_config: str) -> str:
+            try:
+                converted = origin_config_type(new_config)
+            except ValueError as e:
+                return f"Can not set [{config_path}] to [{new_config}]\nERROR:\n\t[{e}]"
+            self._config_setter(config_path, converted)
+            return f"Set [{config_path}]:\nFrom [{origin_config}] to [{new_config}]"
+
+        return _setter
+
+    def build(self) -> Callable[[str, str], str]:
+        """
+        Builds and returns a setter function that can be used to modify configuration values.
+
+
+        Returns:
+            str: A message indicating the result of the configuration modification.
+        """
+
+        def _setter(config_path: str, new_config: str) -> str:
+            """
+            Sets the value of a configuration option.
+
+            Args:
+                config_path (str): The path of the configuration option.
+                new_config (str): The new value to set.
+
+            Returns:
+                str: A message indicating the success or failure of the operation.
+            """
+            origin_config = self._config_getter(config_path)
+
+            origin_config_type: Type = type(origin_config)
+
+            try:
+                converted = origin_config_type(new_config)
+            except ValueError as e:
+                return f"Can not set [{config_path}] to [{new_config}]\nERROR:\n\t[{e}]"
+            self._config_setter(config_path, converted)
+            return f"Set [{config_path}]:\nFrom [{origin_config}] to [{new_config}]"
+
+        return _setter
