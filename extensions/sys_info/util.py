@@ -50,7 +50,7 @@ def get_cpu_info() -> str:
     """
     cpu_info_str = (
         f"CPU信息：\n"
-        f"\t物理核心数：{psutil.cpu_count()}\n"
+        f"\t物理核心数：{psutil.cpu_count(False)}\n"
         f"\t逻辑核心数：{psutil.cpu_count(True)}\n"
         f"\tCPU频率：{psutil.cpu_freq().max} MHz\n"
         f"\t占用率: {psutil.cpu_percent()}%"
