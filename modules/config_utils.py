@@ -358,7 +358,7 @@ class ConfigClient(object):
 ConfigValue = TypeVar("ConfigValue", int, str, float, list, dict)
 
 
-def setter_builder(cmd_function: Callable[[str, ConfigValue], None], config_type: Type):
+def setter_builder(cmd_function: Callable[[str, ConfigValue], None], config_type: Type) -> Callable[[str, str], str]:
     """
     Builds and returns a setter function that can be used to update a specific configuration value.
 
@@ -371,7 +371,12 @@ def setter_builder(cmd_function: Callable[[str, ConfigValue], None], config_type
 
     """
 
-    def _setter(config_path: str, new_config: str) -> None:
-        cmd_function(config_path, config_type(new_config))
+    def _setter(config_path: str, new_config: str) -> str:
+        try:
+            converted = config_type(new_config)
+        except ValueError as e:
+            return f"Can not set [{config_path}] to [{new_config}]\nERROR:\n\t[{e}]"
+        cmd_function(config_path, converted)
+        return f"Set [{config_path}] to [{new_config}]"
 
     return _setter
