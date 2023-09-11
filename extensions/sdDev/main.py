@@ -84,11 +84,13 @@ class StableDiffusionPlugin(AbstractPlugin):
         from dynamicprompts.generators import RandomPromptGenerator
         from .stable_diffusion import StableDiffusionApp, DiffusionParser
 
-        from modules.config_utils import ConfigClient
+        from modules.config_utils import ConfigClient, CmdSetterBuilder
 
         self.__register_all_config()
         self._config_registry.load_config()
-
+        cmd_builder = CmdSetterBuilder(
+            config_setter=self._config_registry.set_config, config_getter=self._config_registry.get_config
+        )
         configurable_options: List[str] = [
             self.CONFIG_ENABLE_HR,
             self.CONFIG_ENABLE_TRANSLATE,
@@ -107,27 +109,11 @@ class StableDiffusionPlugin(AbstractPlugin):
                 result_string += f"{option} = {self._config_registry.get_config(option)}\n"
             return result_string
 
-        def set_bool_config(key: str, value: int) -> str:
-            """
-            Set a boolean configuration value.
-
-            Args:
-                key (str): The key of the configuration value.
-                value (int): The value to be set.
-
-            Returns:
-                str: A string indicating the result of the operation.
-            """
-            result_string = f"setting [{key}] to [{value}]"
-
-            self._config_registry.set_config(key, value)
-            return result_string
-
         cmd_syntax_tree: Dict = {
             self._config_registry.get_config(self.CONFIG_CONFIG_CLIENT_KEYWORD): {
                 self.__CONFIG_CMD: {
                     self.__CONFIG_LIST_CMD: list_out_configs,
-                    self.__CONFIG_SET_CMD: set_bool_config,
+                    self.__CONFIG_SET_CMD: cmd_builder.build(),
                 }
             }
         }
