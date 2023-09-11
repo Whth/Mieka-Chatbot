@@ -383,7 +383,7 @@ def setter_builder(cmd_function: Callable[[str, ConfigValue], None], config_type
 
 
 class CmdSetterBuilder(object):
-    def __init__(self, config_getter: Callable[[str], Value], config_setter: Callable[[str, Value], str]):
+    def __init__(self, config_getter: Callable[[str], Value], config_setter: Callable[[str, Value], None]):
         self._config_setter = config_setter
         self._config_getter = config_getter
 
@@ -399,7 +399,6 @@ class CmdSetterBuilder(object):
         """
 
         origin_config = self._config_getter(config_path)
-
         origin_config_type = type(origin_config)
 
         def _setter(new_config: str) -> str:
