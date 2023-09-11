@@ -7,6 +7,8 @@ from typing import Dict, List
 import requests
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 
+TIMEOUT = 30
+
 
 class VITS(object):
     __API_VOICE_APP_KEY_WORD: str = "voice"
@@ -27,7 +29,7 @@ class VITS(object):
         # Construct the URL for fetching voice speakers data
         temp_string: str = ""
 
-        json: Dict[str, List[Dict[str]]] = requests.get(url=url).json()  # Fetch the JSON response
+        json: Dict[str, List[Dict[str]]] = requests.get(url=url, timeout=TIMEOUT).json()  # Fetch the JSON response
 
         for model_type in json:
             temp_string += f"{model_type}:\n\n"  # Add the model type to the string
@@ -43,7 +45,7 @@ class VITS(object):
     def get_voice_speakers(cls):
         speaker_names: List[str] = []
         url = f"{cls.base}/{cls.__API_VOICE_APP_KEY_WORD}/{cls.__API_REQUEST_SPEAKERS_KEY_WORD}"  # Construct the URL for fetching voice speakers data
-        json: Dict[str, List[Dict[str]]] = requests.get(url=url).json()  # Fetch the JSON response
+        json: Dict[str, List[Dict[str]]] = requests.get(url=url, timeout=TIMEOUT).json()  # Fetch the JSON response
 
         for model_type in json:
             for speakers in json[model_type]:
@@ -101,7 +103,7 @@ class VITS(object):
 
         # Make the API request, response is raw binary
         url = f"{cls.base}/{cls.__API_VOICE_APP_KEY_WORD}"
-        res = requests.post(url=url, data=m, headers=headers)
+        res = requests.post(url=url, data=m, headers=headers, timeout=TIMEOUT)
 
         # Extract the file name from the response headers
         fname = re.findall("filename=(.+)", res.headers["Content-Disposition"])[0]
