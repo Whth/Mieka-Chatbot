@@ -4,7 +4,7 @@ from functools import singledispatch
 from inspect import signature
 from json import load, dump
 from types import MappingProxyType
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Union, TypeVar, Type
 from typing import Sequence, Tuple, Optional, Callable
 
 from colorama import Back, Fore, Style
@@ -353,3 +353,25 @@ class ConfigClient(object):
                     raise ValueError(f"expected {required_token_count} args, got {tokens_count}")
 
         raise KeyError("Bad syntax tree, please check")
+
+
+ConfigValue = TypeVar("ConfigValue", int, str, float, list, dict)
+
+
+def setter_builder(cmd_function: Callable[[str, ConfigValue], None], config_type: Type):
+    """
+    Builds and returns a setter function that can be used to update a specific configuration value.
+
+    Args:
+        cmd_function (Callable[[str, ConfigValue], None]): The command function that will be called to update the configuration value.
+        config_type (Type): The type of the configuration value that will be passed to the command function.
+
+    Returns:
+        None: This function does not return any value.
+
+    """
+
+    def _setter(config_path: str, new_config: str) -> None:
+        cmd_function(config_path, config_type(new_config))
+
+    return _setter
