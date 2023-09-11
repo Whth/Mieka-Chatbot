@@ -53,7 +53,7 @@ class StableDiffusionPlugin(AbstractPlugin):
 
     @classmethod
     def get_plugin_version(cls) -> str:
-        return "0.0.3"
+        return "0.0.5"
 
     @classmethod
     def get_plugin_author(cls) -> str:
@@ -84,11 +84,13 @@ class StableDiffusionPlugin(AbstractPlugin):
         from dynamicprompts.generators import RandomPromptGenerator
         from .stable_diffusion import StableDiffusionApp, DiffusionParser
 
-        from modules.config_utils import ConfigClient
+        from modules.config_utils import ConfigClient, CmdSetterBuilder
 
         self.__register_all_config()
         self._config_registry.load_config()
-
+        cmd_builder = CmdSetterBuilder(
+            config_setter=self._config_registry.set_config, config_getter=self._config_registry.get_config
+        )
         configurable_options: List[str] = [
             self.CONFIG_ENABLE_HR,
             self.CONFIG_ENABLE_TRANSLATE,
@@ -107,27 +109,11 @@ class StableDiffusionPlugin(AbstractPlugin):
                 result_string += f"{option} = {self._config_registry.get_config(option)}\n"
             return result_string
 
-        def set_bool_config(key: str, value: int) -> str:
-            """
-            Set a boolean configuration value.
-
-            Args:
-                key (str): The key of the configuration value.
-                value (int): The value to be set.
-
-            Returns:
-                str: A string indicating the result of the operation.
-            """
-            result_string = f"setting [{key}] to [{value}]"
-
-            self._config_registry.set_config(key, value)
-            return result_string
-
         cmd_syntax_tree: Dict = {
             self._config_registry.get_config(self.CONFIG_CONFIG_CLIENT_KEYWORD): {
                 self.__CONFIG_CMD: {
                     self.__CONFIG_LIST_CMD: list_out_configs,
-                    self.__CONFIG_SET_CMD: set_bool_config,
+                    self.__CONFIG_SET_CMD: cmd_builder.build(),
                 }
             }
         }
@@ -167,39 +153,23 @@ class StableDiffusionPlugin(AbstractPlugin):
             pos_prompt = "".join(pos_prompt)
             neg_prompt = "".join(neg_prompt)
             if self._config_registry.get_config(self.CONFIG_ENABLE_DYNAMIC_PROMPT):
-                temp_string = (
-                    f"{Fore.MAGENTA}Interpreting prompts\n"
-                    f"\t{Fore.GREEN}POSITIVE PROMPT: {pos_prompt}\n"
-                    f"\t{Fore.RED}NEGATIVE PROMPT: {neg_prompt}\n"
-                    f"{Fore.MAGENTA}___________________________________________\n"
+                temp_string = f"{Fore.MAGENTA}Interpreting prompts\n" + prompt_string_construcotr(
+                    pos_prompt, neg_prompt, False
                 )
                 pos_interpreted = gen.generate(template=pos_prompt)
                 neg_interpreted = gen.generate(template=neg_prompt)
                 pos_prompt = pos_interpreted[0] if pos_interpreted else pos_prompt
                 neg_prompt = neg_interpreted[0] if neg_interpreted else neg_prompt
-                temp_string += (
-                    f"Result:\n"
-                    f"\t{Fore.GREEN}POSITIVE PROMPT: {pos_prompt}\n"
-                    f"\t{Fore.RED}NEGATIVE PROMPT: {neg_prompt}\n"
-                    f"{Fore.MAGENTA}___________________________________________\n"
-                )
+                temp_string += f"Result:\n" + prompt_string_construcotr(pos_prompt, neg_prompt, False)
                 print(temp_string)
             # Translate prompts to English if translate a flag is set
             if self._config_registry.get_config(self.CONFIG_ENABLE_TRANSLATE) and translate:
-                temp_string = (
-                    f"{Fore.MAGENTA}Translating prompts\n"
-                    f"\t{Fore.GREEN}POSITIVE PROMPT: {pos_prompt}\n"
-                    f"\t{Fore.RED}NEGATIVE PROMPT: {neg_prompt}\n"
-                    f"{Fore.MAGENTA}___________________________________________\n"
+                temp_string = f"{Fore.MAGENTA}Translating prompts\n" + prompt_string_construcotr(
+                    pos_prompt, neg_prompt, False
                 )
                 pos_prompt = translate("en", pos_prompt, "auto")
                 neg_prompt = translate("en", neg_prompt, "auto")
-                temp_string += (
-                    f"Result:\n"
-                    f"\t{Fore.GREEN}POSITIVE PROMPT: {pos_prompt}\n"
-                    f"\t{Fore.RED}NEGATIVE PROMPT: {neg_prompt}\n"
-                    f"{Fore.MAGENTA}___________________________________________\n"
-                )
+                temp_string += "Result:\n" + prompt_string_construcotr(pos_prompt, neg_prompt, False)
                 print(temp_string)
 
             DiffusionParser.enable_hr = self._config_registry.get_config(self.CONFIG_ENABLE_HR)
@@ -209,6 +179,7 @@ class StableDiffusionPlugin(AbstractPlugin):
                     prompt=pos_prompt,
                     negative_prompt=neg_prompt,
                     styles=self._config_registry.get_config(self.CONFIG_STYLES),
+                    enable_hr=self._config_registry.get_config(self.CONFIG_ENABLE_HR),
                 )
                 if pos_prompt
                 else DiffusionParser()
@@ -218,25 +189,14 @@ class StableDiffusionPlugin(AbstractPlugin):
                 print(
                     f"{Fore.YELLOW}IMG TO IMG ORDER\n"
                     f"Downloading image from: {message[Image, 1][0].url}\n"
-                    f"{Fore.MAGENTA}___________________________________________\n"
-                    f"{Fore.GREEN}POSITIVE PROMPT: {pos_prompt}\n"
-                    f"{Fore.MAGENTA}___________________________________________\n"
-                    f"{Fore.RED}NEGATIVE PROMPT: {neg_prompt}\n"
-                    f"{Fore.MAGENTA}___________________________________________\n" + Fore.RESET
+                    + prompt_string_construcotr(pos_prompt, neg_prompt, True)
                 )
                 img_path = download_image(save_dir=temp_dir_path, url=message[Image, 1][0].url)
                 send_result = await SD_app.img2img(
                     diffusion_parameters=diffusion_paser, image_path=img_path, output_dir=output_dir_path
                 )
             else:
-                print(
-                    f"{Fore.YELLOW}TXT TO IMG ORDER\n"
-                    f"{Fore.MAGENTA}___________________________________________\n"
-                    f"{Fore.GREEN}POSITIVE PROMPT: {pos_prompt}\n"
-                    f"{Fore.MAGENTA}___________________________________________\n"
-                    f"{Fore.RED}NEGATIVE PROMPT: {neg_prompt}\n"
-                    f"{Fore.MAGENTA}___________________________________________\n" + Fore.RESET
-                )
+                print(f"{Fore.YELLOW}TXT TO IMG ORDER\n" + prompt_string_construcotr(pos_prompt, neg_prompt, True))
                 # Generate the image using the diffusion parser
                 send_result = await SD_app.txt2img(diffusion_parameters=diffusion_paser, output_dir=output_dir_path)
 
@@ -295,3 +255,23 @@ def de_assembly(
         return pos_prompt, neg_prompt, 1
 
     return pos_prompt, neg_prompt
+
+
+def prompt_string_construcotr(pos_prompt: str, neg_prompt: str, split: bool) -> str:
+    from colorama import Fore
+
+    if split:
+        return (
+            f"{Fore.MAGENTA}___________________________________________\n"
+            f"{Fore.GREEN}POSITIVE PROMPT:\n\t{pos_prompt}\n"
+            f"{Fore.MAGENTA}___________________________________________\n"
+            f"{Fore.RED}NEGATIVE PROMPT:\n\t{neg_prompt}\n"
+            f"{Fore.MAGENTA}___________________________________________\n{Fore.RESET}"
+        )
+    else:
+        return (
+            f"{Fore.MAGENTA}___________________________________________\n"
+            f"{Fore.GREEN}POSITIVE PROMPT:\n\t{pos_prompt}\n"
+            f"{Fore.RED}NEGATIVE PROMPT:\n\t{neg_prompt}\n"
+            f"{Fore.MAGENTA}___________________________________________\n{Fore.RESET}"
+        )

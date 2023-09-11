@@ -6,6 +6,14 @@ __all__ = ["SysInfo"]
 
 
 class SysInfo(AbstractPlugin):
+    __INFO_CMD = "info"
+    __INFO_CPU_CMD = "cpu"
+    __INFO_GPU_CMD = "gpu"
+    __INFO_MEM_CMD = "mem"
+    __INFO_DISK_CMD = "disk"
+    __INFO_ALL_CMD = "all"
+
+    __SYS_HELP = "help"
     CONFIG_DETECTED_KEYWORD = "detected_keyword"
 
     def _get_config_parent_dir(self) -> str:
@@ -28,67 +36,49 @@ class SysInfo(AbstractPlugin):
         return "whth"
 
     def __register_all_config(self):
-        self._config_registry.register_config(self.CONFIG_DETECTED_KEYWORD, "sys info")
+        self._config_registry.register_config(self.CONFIG_DETECTED_KEYWORD, "sys")
 
     def install(self):
-        from graia.ariadne.message.parser.base import ContainKeyword, MentionMe
+        from graia.ariadne.message.chain import MessageChain
+        from graia.ariadne.message.parser.base import DetectPrefix
         from graia.ariadne.model import Group
-        import psutil
-        from .util import get_gpu_info
+
+        from .util import get_gpu_info, get_mem_info, get_cpu_info, get_all_info, get_disk_info
+        from modules.config_utils import ConfigClient
 
         self.__register_all_config()
         self._config_registry.load_config()
+
+        def get_all_cmd_info() -> str:
+            temp_string = "Available CMD:\n"
+            for cmd in ConfigClient.all_available_cmd():
+                temp_string += f"\t{cmd}\n"
+            return temp_string
+
+        tree = {
+            self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD): {
+                self.__INFO_CMD: {
+                    self.__INFO_CPU_CMD: get_cpu_info,
+                    self.__INFO_MEM_CMD: get_mem_info,
+                    self.__INFO_DISK_CMD: get_disk_info,
+                    self.__INFO_GPU_CMD: get_gpu_info,
+                    self.__INFO_ALL_CMD: get_all_info,
+                },
+                self.__SYS_HELP: get_all_cmd_info,
+            }
+        }
+        client = ConfigClient(tree)
+
         ariadne_app = self._ariadne_app
         bord_cast = ariadne_app.broadcast
 
         @bord_cast.receiver(
             "GroupMessage",
             decorators=[
-                MentionMe(),
-                ContainKeyword(keyword=self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD)),
+                DetectPrefix(prefix=self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD)),
             ],
         )
-        async def get_sys_info(group: Group):
-            """
-            This function is a receiver for the "GroupMessage" event. It retrieves system information including CPU, memory, disk, and GPU information and sends it as a message to the specified group.
+        async def sys_client(group: Group, message: MessageChain):
+            output_string = client.interpret(str(message))
 
-            Parameters:
-                group (Group): The group to send the system information message to.
-
-            Returns:
-                None
-            """
-            # 获取CPU信息
-
-            cpu_info_str = (
-                f"CPU信息：\n"
-                f"\t物理核心数：{psutil.cpu_count()}\n"
-                f"\t逻辑核心数：{psutil.cpu_count(True)}\n"
-                f"\tCPU频率：{psutil.cpu_freq().max} MHz\n"
-                f"\t占用率: {psutil.cpu_percent()}%"
-            )
-
-            # 获取内存信息
-            mem_info = psutil.virtual_memory()
-            mem_info_str = (
-                f"内存信息：\n"
-                f"\t总内存：{mem_info.total / 1024 / 1024 / 1024:.2f} GB\n"
-                f"\t已使用内存：{mem_info.used / 1024 / 1024 / 1024:.2f} GB\n"
-                f"\t可用内存：{mem_info.available / 1024 / 1024 / 1024:.2f} GB\n"
-                f"\t内存使用率：{mem_info.percent}%"
-            )
-
-            # 获取磁盘信息
-            disk_info = psutil.disk_usage("/")
-            disk_info_str = (
-                f"磁盘信息：\n"
-                f"\t总磁盘空间：{disk_info.total / 1024 / 1024 / 1024:.2f} GB\n"
-                f"\t已使用磁盘空间：{disk_info.used / 1024 / 1024 / 1024:.2f} GB\n"
-                f"\t可用磁盘空间：{disk_info.free / 1024 / 1024 / 1024:.2f} GB\n"
-                f"\t磁盘使用率：{disk_info.percent}%"
-            )
-
-            # 合并为一个字符串
-            hardware_info = f"{cpu_info_str}\n\n{mem_info_str}\n\n{disk_info_str}\n\n{get_gpu_info()}"
-
-            await ariadne_app.send_message(group, message=hardware_info)
+            await ariadne_app.send_message(group, message=output_string)

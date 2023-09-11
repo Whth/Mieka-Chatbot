@@ -9,7 +9,15 @@ import requests
 from PIL import Image, PngImagePlugin
 from slugify import slugify
 
-from extensions.sdDev.api import API_PNG_INFO, API_TXT2IMG, API_IMG2IMG
+from extensions.sdDev.api import (
+    API_PNG_INFO,
+    API_TXT2IMG,
+    API_IMG2IMG,
+    INIT_IMAGES_KEY,
+    IMAGE_KEY,
+    IMAGES_KEY,
+    PNG_INFO_KEY,
+)
 from modules.file_manager import rename_image_with_hash, img_to_base64
 
 DEFAULT_NEGATIVE_PROMPT = "loathed,low resolution,porn,NSFW,strange shaped finger,cropped,panties visible"
@@ -20,11 +28,6 @@ DEFAULT_POSITIVE_PROMPT = (
     "beautiful,expressionless,cool girl,medium breasts,"
     "thighs,thin torso,masterpiece,wonderful art,high resolution,hair ornament,strips,body curve,hair,SFW:1.3,"
 )
-
-INIT_IMAGES_KEY = "init_images"  # used in img2img payload making
-IMAGE_KEY = "image"  # used in png-info payload making
-IMAGES_KEY = "images"  # used in txt2img payload making
-PNG_INFO_KEY = "info"
 
 
 class DiffusionParser(NamedTuple):
@@ -52,7 +55,7 @@ class HiResParser(NamedTuple):
 
     denoising_strength: float = 0.61
     hr_scale: float = 1.3
-
+    hr_upscaler: str = "Latent"
     # hr_checkpoint_name: string
     # hr_sampler_name: string
     # hr_prompt:
@@ -103,6 +106,7 @@ class StableDiffusionApp(object):
             List[str]: A list of image filenames that were saved.
 
         """
+
         pay_load: Dict = {}
         pay_load.update(diffusion_parameters._asdict())
         if diffusion_parameters.enable_hr:
@@ -129,6 +133,7 @@ class StableDiffusionApp(object):
         Returns:
 
         """
+
         pay_load: Dict = {}
         pay_load.update(diffusion_parameters._asdict())
 

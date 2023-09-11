@@ -58,18 +58,26 @@ class ChatBot(object):
         detected_plugins = self._detect_plugins(extension_dir)
         string_buffer = "\n".join(
             [
-                f"|{plugin.get_plugin_name():<16}|"
+                f"{Fore.YELLOW}{Back.BLACK}|{plugin.get_plugin_name():<16}|"
                 f"{plugin.get_plugin_version():<8}|"
                 f"{plugin.get_plugin_author():<10}|"
+                f"{plugin.get_plugin_description():<80}|{Style.RESET_ALL}"
                 for plugin in detected_plugins
             ]
         )
         print(Fore.GREEN + Back.RED + f"Detected {len(detected_plugins)} plugins: " + Style.RESET_ALL)
-        labels = ["Extension", "Version", "Author"]
-        print(Fore.CYAN + Back.BLACK + f"|{labels[0]:<16}|{labels[1]:<8}|{labels[2]:<10}|" + Style.RESET_ALL)
-        print(Fore.YELLOW + Back.BLACK + string_buffer + Style.RESET_ALL)
+        labels = ["Extension", "Version", "Author", "Description"]
+        print(
+            Fore.CYAN
+            + Back.BLACK
+            + f"|{labels[0]:^16}|{labels[1]:^8}|{labels[2]:^10}|{labels[3]:^80}|"
+            + Style.RESET_ALL
+        )
+        print(string_buffer)
         for plugin in detected_plugins:
+            print(Fore.LIGHTRED_EX)
             self._install_plugin(plugin)
+            print(Fore.RESET)
 
     @staticmethod
     def _detect_plugins(extensions_path: str):

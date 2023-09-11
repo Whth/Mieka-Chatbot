@@ -11,6 +11,7 @@ REGISTRY_PATH = "bot_name"
 VERIFY_KEY = "verify_key"
 
 ACCOUNT_ID = "account_id"
+__version__ = "v0.3.0"
 
 
 class Mieka(object):

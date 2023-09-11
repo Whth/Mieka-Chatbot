@@ -8,5 +8,5 @@ MAIN = ".main"
 CONFIG_FILE_NAME: str = "config.json"
 REQUIREMENTS_FILE_NAME: str = "requirements.txt"
 
-Value = Union[str, int, float, List, Dict]
+Value = Union[str, int, float, List, Dict, bool]
 CONFIG_PATH_PATTERN = r"[\\/]"
