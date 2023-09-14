@@ -54,7 +54,7 @@ class StableDiffusionPlugin(AbstractPlugin):
 
     @classmethod
     def get_plugin_version(cls) -> str:
-        return "0.0.7"
+        return "0.0.8"
 
     @classmethod
     def get_plugin_author(cls) -> str:
@@ -78,7 +78,6 @@ class StableDiffusionPlugin(AbstractPlugin):
         self._config_registry.register_config(self.CONFIG_CONFIG_CLIENT_KEYWORD, "sd")
 
     def install(self):
-        from colorama import Fore
         from graia.ariadne.message.chain import MessageChain, Image
         from graia.ariadne.message.parser.base import ContainKeyword, DetectPrefix
         from graia.ariadne.model import Group
@@ -182,10 +181,8 @@ class StableDiffusionPlugin(AbstractPlugin):
             """
             # Extract positive and negative prompts from the message
             pos_prompt, neg_prompt = de_assembly(str(message))
-            pos_prompt = "".join(pos_prompt)
-            neg_prompt = "".join(neg_prompt)
 
-            pos_prompt, neg_prompt = processor.process(pos_prompt, neg_prompt)
+            pos_prompt, neg_prompt = processor.process("".join(pos_prompt), "".join(neg_prompt))
             # Create a diffusion parser with the prompts
             diffusion_paser = (
                 DiffusionParser(
@@ -202,17 +199,12 @@ class StableDiffusionPlugin(AbstractPlugin):
             )
             if Image in message:
                 # Download the first image in the chain
-                print(
-                    f"{Fore.YELLOW}IMG TO IMG ORDER\n"
-                    f"Downloading image from: {message[Image, 1][0].url}\n"
-                    + prompt_string_construcotr(pos_prompt, neg_prompt)
-                )
+                print(f"Downloading image from: {message[Image, 1][0].url}\n")
                 img_path = download_image(save_dir=temp_dir_path, url=message[Image, 1][0].url)
                 send_result = await SD_app.img2img(
                     diffusion_parameters=diffusion_paser, image_path=img_path, output_dir=output_dir_path
                 )
             else:
-                print(f"{Fore.YELLOW}TXT TO IMG ORDER\n" + prompt_string_construcotr(pos_prompt, neg_prompt))
                 # Generate the image using the diffusion parser
                 send_result = await SD_app.txt2img(diffusion_parameters=diffusion_paser, output_dir=output_dir_path)
 
@@ -273,23 +265,14 @@ def de_assembly(
     return pos_prompt, neg_prompt
 
 
-def prompt_string_construcotr(pos_prompt: str, neg_prompt: str) -> str:
-    from colorama import Fore
-
-    return (
-        f"{Fore.MAGENTA}___________________________________________\n"
-        f"{Fore.GREEN}POSITIVE PROMPT:\n\t{pos_prompt}\n"
-        f"{Fore.RED}NEGATIVE PROMPT:\n\t{neg_prompt}\n"
-        f"{Fore.MAGENTA}___________________________________________\n{Fore.RESET}"
-    )
-
-
 class PromptProcessorRegistry(object):
     def __init__(self):
         self._registry_list: List[Tuple[Callable[[], Any], Callable[[str, str], Tuple[str, str]]]] = []
         self._process_name: List[str] = []
 
     def process(self, pos_prompt: str, neg_prompt: str) -> Tuple[str, str]:
+        from colorama import Fore
+
         """
         Process the given positive and negative prompts using the registered processors.
 
@@ -303,8 +286,11 @@ class PromptProcessorRegistry(object):
         for processor, name in zip(self._registry_list, self._process_name):
             if processor[0]():
                 pos_prompt, neg_prompt = processor[1](pos_prompt, neg_prompt)
-                print(f"Executing {name}")
-                print(prompt_string_construcotr(pos_prompt=pos_prompt, neg_prompt=neg_prompt))
+                print(
+                    f"\n{Fore.YELLOW}Executing {name}\n"
+                    f"{self.prompt_string_constructor(pos_prompt=pos_prompt, neg_prompt=neg_prompt)}"
+                )
+
         return pos_prompt, neg_prompt
 
     def register(
@@ -326,3 +312,24 @@ class PromptProcessorRegistry(object):
         if not process_name:
             process_name = f"Process-{len(self._registry_list)}"
         self._process_name.append(process_name)
+
+    @staticmethod
+    def prompt_string_constructor(pos_prompt: str, neg_prompt: str) -> str:
+        """
+        Generate a formatted string containing positive and negative prompts.
+
+        Args:
+            pos_prompt (str): The positive prompt.
+            neg_prompt (str): The negative prompt.
+
+        Returns:
+            str: A formatted string containing the positive and negative prompts.
+        """
+        from colorama import Fore
+
+        return (
+            f"{Fore.MAGENTA}___________________________________________\n"
+            f"{Fore.GREEN}POSITIVE PROMPT:\n\t{pos_prompt}\n"
+            f"{Fore.RED}NEGATIVE PROMPT:\n\t{neg_prompt}\n"
+            f"{Fore.MAGENTA}___________________________________________\n{Fore.RESET}"
+        )
