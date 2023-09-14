@@ -1,6 +1,6 @@
 import os
 import re
-from typing import Tuple, List, Optional, Callable, Dict
+from typing import Tuple, List, Optional, Callable, Dict, Any
 
 from modules.file_manager import download_image
 from modules.plugin_base import AbstractPlugin
@@ -146,22 +146,20 @@ class StableDiffusionPlugin(AbstractPlugin):
 
             if self._config_registry.get_config(self.CONFIG_ENABLE_DYNAMIC_PROMPT):
                 temp_string = f"{Fore.MAGENTA}Interpreting prompts\n" + prompt_string_construcotr(
-                    pos_prompt, neg_prompt, False
+                    pos_prompt, neg_prompt
                 )
                 pos_interpreted = gen.generate(template=pos_prompt)
                 neg_interpreted = gen.generate(template=neg_prompt)
                 pos_prompt = pos_interpreted[0] if pos_interpreted else pos_prompt
                 neg_prompt = neg_interpreted[0] if neg_interpreted else neg_prompt
-                temp_string += "Result:\n" + prompt_string_construcotr(pos_prompt, neg_prompt, False)
+                temp_string += "Result:\n" + prompt_string_construcotr(pos_prompt, neg_prompt)
                 print(temp_string)
             # Translate prompts to English if translate a flag is set
             if self._config_registry.get_config(self.CONFIG_ENABLE_TRANSLATE) and translate:
-                temp_string = f"{Fore.MAGENTA}Translating prompts\n" + prompt_string_construcotr(
-                    pos_prompt, neg_prompt, False
-                )
+                temp_string = f"{Fore.MAGENTA}Translating prompts\n" + prompt_string_construcotr(pos_prompt, neg_prompt)
                 pos_prompt = translate("en", pos_prompt, "auto")
                 neg_prompt = translate("en", neg_prompt, "auto")
-                temp_string += "Result:\n" + prompt_string_construcotr(pos_prompt, neg_prompt, False)
+                temp_string += "Result:\n" + prompt_string_construcotr(pos_prompt, neg_prompt)
                 print(temp_string)
 
             if self._config_registry.get_config(self.CONFIG_ENABLE_SHUFFLE_PROMPT):
@@ -192,14 +190,14 @@ class StableDiffusionPlugin(AbstractPlugin):
                 print(
                     f"{Fore.YELLOW}IMG TO IMG ORDER\n"
                     f"Downloading image from: {message[Image, 1][0].url}\n"
-                    + prompt_string_construcotr(pos_prompt, neg_prompt, True)
+                    + prompt_string_construcotr(pos_prompt, neg_prompt)
                 )
                 img_path = download_image(save_dir=temp_dir_path, url=message[Image, 1][0].url)
                 send_result = await SD_app.img2img(
                     diffusion_parameters=diffusion_paser, image_path=img_path, output_dir=output_dir_path
                 )
             else:
-                print(f"{Fore.YELLOW}TXT TO IMG ORDER\n" + prompt_string_construcotr(pos_prompt, neg_prompt, True))
+                print(f"{Fore.YELLOW}TXT TO IMG ORDER\n" + prompt_string_construcotr(pos_prompt, neg_prompt))
                 # Generate the image using the diffusion parser
                 send_result = await SD_app.txt2img(diffusion_parameters=diffusion_paser, output_dir=output_dir_path)
 
@@ -260,21 +258,27 @@ def de_assembly(
     return pos_prompt, neg_prompt
 
 
-def prompt_string_construcotr(pos_prompt: str, neg_prompt: str, split: bool) -> str:
+def prompt_string_construcotr(pos_prompt: str, neg_prompt: str) -> str:
     from colorama import Fore
 
-    if split:
-        return (
-            f"{Fore.MAGENTA}___________________________________________\n"
-            f"{Fore.GREEN}POSITIVE PROMPT:\n\t{pos_prompt}\n"
-            f"{Fore.MAGENTA}___________________________________________\n"
-            f"{Fore.RED}NEGATIVE PROMPT:\n\t{neg_prompt}\n"
-            f"{Fore.MAGENTA}___________________________________________\n{Fore.RESET}"
-        )
-    else:
-        return (
-            f"{Fore.MAGENTA}___________________________________________\n"
-            f"{Fore.GREEN}POSITIVE PROMPT:\n\t{pos_prompt}\n"
-            f"{Fore.RED}NEGATIVE PROMPT:\n\t{neg_prompt}\n"
-            f"{Fore.MAGENTA}___________________________________________\n{Fore.RESET}"
-        )
+    return (
+        f"{Fore.MAGENTA}___________________________________________\n"
+        f"{Fore.GREEN}POSITIVE PROMPT:\n\t{pos_prompt}\n"
+        f"{Fore.RED}NEGATIVE PROMPT:\n\t{neg_prompt}\n"
+        f"{Fore.MAGENTA}___________________________________________\n{Fore.RESET}"
+    )
+
+
+class PromptProcessorRegistry(object):
+    def __init__(self):
+        self._registry_list: List[Tuple[Callable[[], Any], Callable[[str, str], Tuple[str, str]]]] = []
+
+    def process(self, pos_prompt: str, neg_prompt: str) -> Tuple[str, str]:
+        for processor in self._registry_list:
+            if processor[0]():
+                pos_prompt, neg_prompt = processor[1](pos_prompt, neg_prompt)
+
+        return pos_prompt, neg_prompt
+
+    def register(self, judge: Callable[[], Any], processor: Callable[[str, str], Tuple[str, str]]) -> None:
+        self._registry_list.append((judge, processor))
