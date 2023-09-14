@@ -114,16 +114,18 @@ class StableDiffusionApp(object):
 
     async def img2img(
         self,
-        image_path: str,
         output_dir: str,
         diffusion_parameters: DiffusionParser = DiffusionParser(),
         controlnet_parameters: Optional[ControlNetUnit] = None,
+        image_path: Optional[str] = None,
+        image_base64: Optional[str] = None,
     ) -> List[str]:
         """
         Converts an image to another image using the specified diffusion parameters and controlnet parameters (optional).
         Saves the generated images to the specified output directory.
 
         Args:
+            image_base64 ():
             image_path: The path of the input image file.
             output_dir: The directory where the generated images will be saved.
             diffusion_parameters: An instance of DiffusionParser class containing the diffusion parameters.
@@ -142,8 +144,13 @@ class StableDiffusionApp(object):
         # Add the diffusion parameters to the payload
         payload.update(diffusion_parameters._asdict())
 
-        # Convert the input image to base64 and add it to the payload
-        png_payload: Dict = {INIT_IMAGES_KEY: [img_to_base64(image_path)]}
+        if image_path:
+            # Convert the input image to base64 and add it to the payload
+            png_payload: Dict = {INIT_IMAGES_KEY: [img_to_base64(image_path)]}
+        elif image_base64:
+            png_payload: Dict = {INIT_IMAGES_KEY: [image_base64]}
+        else:
+            raise ValueError("one of image_path and image_base64 must be specified!")
         payload.update(png_payload)
 
         # If controlnet parameters are provided, update the alwayson scripts with them

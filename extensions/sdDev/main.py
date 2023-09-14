@@ -86,6 +86,8 @@ class StableDiffusionPlugin(AbstractPlugin):
         from .stable_diffusion import StableDiffusionApp, DiffusionParser, HiResParser
 
         from modules.config_utils import ConfigClient, CmdBuilder
+        from modules.file_manager import img_to_base64
+        from .controlnet import ControlNetUnit
 
         self.__register_all_config()
         self._config_registry.load_config()
@@ -199,8 +201,17 @@ class StableDiffusionPlugin(AbstractPlugin):
                 # Download the first image in the chain
                 print(f"Downloading image from: {message[Image, 1][0].url}\n")
                 img_path = download_image(save_dir=temp_dir_path, url=message[Image, 1][0].url)
+                img_base64 = img_to_base64(img_path)
+
+                # TODO decouple these two params
+                cn_unit = ControlNetUnit(
+                    input_image=img_base64, module="openpose_full", model="control_v11p_sd15_openpose"
+                )
                 send_result = await SD_app.img2img(
-                    diffusion_parameters=diffusion_paser, image_path=img_path, output_dir=output_dir_path
+                    image_base64=img_base64,
+                    output_dir=output_dir_path,
+                    diffusion_parameters=diffusion_paser,
+                    controlnet_parameters=cn_unit,
                 )
             else:
                 # Generate the image using the diffusion parser

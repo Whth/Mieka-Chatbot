@@ -52,10 +52,10 @@ class Controlnet(object):
     def __init__(self, host_url: str):
         self._host_url = host_url
 
-    async def get_model_list(self) -> Dict[str]:
+    async def get_model_list(self) -> Dict:
         return await self.__async_get(f"{self._host_url}/{API_CONTROLNET_MODEL_LIST}")
 
-    async def get_module_list(self) -> Dict[str]:
+    async def get_module_list(self) -> Dict:
         return await self.__async_get(f"{self._host_url}/{API_CONTROLNET_MODULE_LIST}")
 
     async def detect(self, payload: Dict) -> Dict:
