@@ -61,10 +61,10 @@ class Controlnet(object):
     async def detect(self, payload: Dict) -> Dict:
         return await self.__async_post(f"{self._host_url}/{API_CONTROLNET_DETECT}", payload=payload)
 
-    @staticmethod
-    def make_payload(units: List[ControlNetUnit]) -> Dict:
-        unit_seq: List[Dict] = []
-        for unit in units:
-            unit: ControlNetUnit
-            unit_seq.append(unit._asdict())
-        return {CONTROLNET_KEY: {ARGS_KEY: unit_seq}}
+
+def make_payload(units: List[ControlNetUnit]) -> Dict:
+    unit_seq: List[Dict] = []
+    for unit in units:
+        unit: ControlNetUnit
+        unit_seq.append(unit._asdict())
+    return {CONTROLNET_KEY: {ARGS_KEY: unit_seq}}

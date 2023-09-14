@@ -83,7 +83,7 @@ class StableDiffusionPlugin(AbstractPlugin):
         from graia.ariadne.model import Group
         from dynamicprompts.wildcards import WildcardManager
         from dynamicprompts.generators import RandomPromptGenerator
-        from .stable_diffusion import StableDiffusionApp, DiffusionParser
+        from .stable_diffusion import StableDiffusionApp, DiffusionParser, HiResParser
 
         from modules.config_utils import ConfigClient, CmdBuilder
 
@@ -189,12 +189,10 @@ class StableDiffusionPlugin(AbstractPlugin):
                     prompt=pos_prompt,
                     negative_prompt=neg_prompt,
                     styles=self._config_registry.get_config(self.CONFIG_STYLES),
-                    enable_hr=self._config_registry.get_config(self.CONFIG_ENABLE_HR),
                 )
                 if pos_prompt
                 else DiffusionParser(
                     styles=self._config_registry.get_config(self.CONFIG_STYLES),
-                    enable_hr=self._config_registry.get_config(self.CONFIG_ENABLE_HR),
                 )
             )
             if Image in message:
@@ -206,7 +204,11 @@ class StableDiffusionPlugin(AbstractPlugin):
                 )
             else:
                 # Generate the image using the diffusion parser
-                send_result = await SD_app.txt2img(diffusion_parameters=diffusion_paser, output_dir=output_dir_path)
+                send_result = await SD_app.txt2img(
+                    diffusion_parameters=diffusion_paser,
+                    HiRes_parameters=HiResParser(enable_hr=self._config_registry.get_config(self.CONFIG_ENABLE_HR)),
+                    output_dir=output_dir_path,
+                )
 
             # Send the image as a message in the group
             await ariadne_app.send_message(group, MessageChain("") + Image(path=send_result[0]))

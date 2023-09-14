@@ -2,7 +2,7 @@
 import base64
 import io
 import os.path
-from typing import NamedTuple, List, Dict
+from typing import NamedTuple, List, Dict, Optional
 
 import aiohttp
 import requests
@@ -17,8 +17,10 @@ from extensions.sdDev.api import (
     IMAGE_KEY,
     IMAGES_KEY,
     PNG_INFO_KEY,
+    ALWAYSON_SCRIPTS_KEY,
 )
 from modules.file_manager import rename_image_with_hash, img_to_base64
+from .controlnet import ControlNetUnit, make_payload
 
 DEFAULT_NEGATIVE_PROMPT = "loathed,low resolution,porn,NSFW,strange shaped finger,cropped,panties visible"
 
@@ -45,14 +47,13 @@ class DiffusionParser(NamedTuple):
     width: int = 512
     height: int = 768
 
-    enable_hr: bool = False
-
 
 class HiResParser(NamedTuple):
     """
     use to parse hires config
     """
 
+    enable_hr: bool = False
     denoising_strength: float = 0.69
     hr_scale: float = 1.3
     hr_upscaler: str = "Latent"
@@ -75,27 +76,34 @@ class StableDiffusionApp(object):
         output_dir: str,
         diffusion_parameters: DiffusionParser = DiffusionParser(),
         HiRes_parameters: HiResParser = HiResParser(),
+        controlnet_parameters: Optional[ControlNetUnit] = None,
     ) -> List[str]:
         """
         Converts text to image and saves the generated images to the specified output directory.
 
         Args:
+
             output_dir (str): The directory where the generated images will be saved.
             diffusion_parameters (DiffusionParser, optional): An optional instance of the DiffusionParser class
                 that contains the diffusion parameters.
             HiRes_parameters (HiResParser, optional): An optional instance of the HiResParser class that contains
                 the Hi-Res parameters. Defaults to HiResParser().
-
+            controlnet_parameters (ControlNetUnit, optional): An optional instance of the HiResParser class that contains
+                the controlnet parameters. Defaults to None.
         Returns:
             List[str]: A list of image filenames that were saved.
 
         """
 
         pay_load: Dict = {}
+        alwayson_scripts: Dict = {ALWAYSON_SCRIPTS_KEY: {}}
         pay_load.update(diffusion_parameters._asdict())
-        if diffusion_parameters.enable_hr:
-            pay_load.update(HiRes_parameters._asdict())
+        pay_load.update(HiRes_parameters._asdict())
 
+        if controlnet_parameters:
+            alwayson_scripts[ALWAYSON_SCRIPTS_KEY].update(make_payload([controlnet_parameters]))
+
+        pay_load.update(alwayson_scripts)
         async with aiohttp.ClientSession() as session:
             response = await session.post(f"{self._host_url}/{API_TXT2IMG}", json=pay_load)
             response_payload: Dict = await response.json()
@@ -105,30 +113,54 @@ class StableDiffusionApp(object):
         return save_base64_img_with_hash(img_base64_list=img_base64, output_dir=output_dir, host_url=self._host_url)
 
     async def img2img(
-        self, image_path: str, output_dir: str, diffusion_parameters: DiffusionParser = DiffusionParser()
+        self,
+        image_path: str,
+        output_dir: str,
+        diffusion_parameters: DiffusionParser = DiffusionParser(),
+        controlnet_parameters: Optional[ControlNetUnit] = None,
     ) -> List[str]:
         """
-        Converts image to image and saves the generated images to the specified output directory.
+        Converts an image to another image using the specified diffusion parameters and controlnet parameters (optional).
+        Saves the generated images to the specified output directory.
+
         Args:
-            diffusion_parameters ():
-            image_path ():
-            output_dir ():
+            image_path: The path of the input image file.
+            output_dir: The directory where the generated images will be saved.
+            diffusion_parameters: An instance of DiffusionParser class containing the diffusion parameters.
+            controlnet_parameters: An optional instance of ControlNetUnit class containing the controlnet parameters.
 
         Returns:
-
+            A list of file paths of the saved generated images.
         """
 
-        pay_load: Dict = {}
-        pay_load.update(diffusion_parameters._asdict())
+        # Create the payload dictionary to be sent in the request
+        payload: Dict = {}
 
-        png_pay_load: Dict = {INIT_IMAGES_KEY: [img_to_base64(image_path)]}
-        pay_load.update(png_pay_load)
+        # Create a dictionary to store the alwayson scripts
+        alwayson_scripts: Dict = {ALWAYSON_SCRIPTS_KEY: {}}
 
+        # Add the diffusion parameters to the payload
+        payload.update(diffusion_parameters._asdict())
+
+        # Convert the input image to base64 and add it to the payload
+        png_payload: Dict = {INIT_IMAGES_KEY: [img_to_base64(image_path)]}
+        payload.update(png_payload)
+
+        # If controlnet parameters are provided, update the alwayson scripts with them
+        if controlnet_parameters:
+            alwayson_scripts[ALWAYSON_SCRIPTS_KEY].update(make_payload([controlnet_parameters]))
+
+        # Add the alwayson scripts to the payload
+        payload.update(alwayson_scripts)
+
+        # Send a POST request to the API with the payload and get the response
         async with aiohttp.ClientSession() as session:
-            response = await session.post(f"{self._host_url}/{API_IMG2IMG}", json=pay_load)
-            response_payload: Dict = await response.json()
+            response_payload: Dict = await (await session.post(f"{self._host_url}/{API_IMG2IMG}", json=payload)).json()
+
+        # Extract the generated images from the response payload
         img_base64: List[str] = extract_png_from_payload(response_payload)
 
+        # Save the generated images to the output directory and return the list of file paths
         return save_base64_img_with_hash(img_base64_list=img_base64, output_dir=output_dir, host_url=self._host_url)
 
 

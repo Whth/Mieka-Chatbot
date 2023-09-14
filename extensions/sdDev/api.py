@@ -9,6 +9,7 @@ API_CONTROLNET_DETECT: str = "controlnet/detect"
 
 CONTROLNET_KEY = "controlnet"
 
+ALWAYSON_SCRIPTS_KEY = "alwayson_scripts"
 ARGS_KEY = "args"  # used to parse always on scripts
 INIT_IMAGES_KEY = "init_images"  # used in img2img payload making
 IMAGE_KEY = "image"  # used in png-info payload making
