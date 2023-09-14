@@ -40,8 +40,8 @@ class DiffusionParser(NamedTuple):
     styles: List[str] = []
     seed: int = -1
     sampler_name: str = "UniPC"
-    steps: int = 20
-    cfg_scale: float = 7.6
+    steps: int = 18
+    cfg_scale: float = 6.9
     width: int = 512
     height: int = 768
 
@@ -53,7 +53,7 @@ class HiResParser(NamedTuple):
     use to parse hires config
     """
 
-    denoising_strength: float = 0.61
+    denoising_strength: float = 0.69
     hr_scale: float = 1.3
     hr_upscaler: str = "Latent"
     # hr_checkpoint_name: string

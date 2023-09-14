@@ -36,6 +36,7 @@ class StableDiffusionPlugin(AbstractPlugin):
 
     CONFIG_ENABLE_TRANSLATE = "enable_translate"
 
+    CONFIG_ENABLE_SHUFFLE_PROMPT = "enable_shuffle_prompt"
     CONFIG_ENABLE_DYNAMIC_PROMPT = "enable_dynamic_prompt"
     CONFIG_CONFIG_CLIENT_KEYWORD = "config_client_keyword"
 
@@ -53,7 +54,7 @@ class StableDiffusionPlugin(AbstractPlugin):
 
     @classmethod
     def get_plugin_version(cls) -> str:
-        return "0.0.5"
+        return "0.0.6"
 
     @classmethod
     def get_plugin_author(cls) -> str:
@@ -73,6 +74,7 @@ class StableDiffusionPlugin(AbstractPlugin):
         self._config_registry.register_config(self.CONFIG_ENABLE_HR, 0)
         self._config_registry.register_config(self.CONFIG_ENABLE_TRANSLATE, 0)
         self._config_registry.register_config(self.CONFIG_ENABLE_DYNAMIC_PROMPT, 1)
+        self._config_registry.register_config(self.CONFIG_ENABLE_SHUFFLE_PROMPT, 0)
         self._config_registry.register_config(self.CONFIG_CONFIG_CLIENT_KEYWORD, "sd")
 
     def install(self):
@@ -95,6 +97,7 @@ class StableDiffusionPlugin(AbstractPlugin):
             self.CONFIG_ENABLE_HR,
             self.CONFIG_ENABLE_TRANSLATE,
             self.CONFIG_ENABLE_DYNAMIC_PROMPT,
+            self.CONFIG_ENABLE_SHUFFLE_PROMPT,
         ]
 
         def list_out_configs() -> str:
@@ -152,6 +155,7 @@ class StableDiffusionPlugin(AbstractPlugin):
             pos_prompt, neg_prompt = de_assembly(str(message))
             pos_prompt = "".join(pos_prompt)
             neg_prompt = "".join(neg_prompt)
+
             if self._config_registry.get_config(self.CONFIG_ENABLE_DYNAMIC_PROMPT):
                 temp_string = f"{Fore.MAGENTA}Interpreting prompts\n" + prompt_string_construcotr(
                     pos_prompt, neg_prompt, False
@@ -160,7 +164,7 @@ class StableDiffusionPlugin(AbstractPlugin):
                 neg_interpreted = gen.generate(template=neg_prompt)
                 pos_prompt = pos_interpreted[0] if pos_interpreted else pos_prompt
                 neg_prompt = neg_interpreted[0] if neg_interpreted else neg_prompt
-                temp_string += f"Result:\n" + prompt_string_construcotr(pos_prompt, neg_prompt, False)
+                temp_string += "Result:\n" + prompt_string_construcotr(pos_prompt, neg_prompt, False)
                 print(temp_string)
             # Translate prompts to English if translate a flag is set
             if self._config_registry.get_config(self.CONFIG_ENABLE_TRANSLATE) and translate:
@@ -172,7 +176,15 @@ class StableDiffusionPlugin(AbstractPlugin):
                 temp_string += "Result:\n" + prompt_string_construcotr(pos_prompt, neg_prompt, False)
                 print(temp_string)
 
-            DiffusionParser.enable_hr = self._config_registry.get_config(self.CONFIG_ENABLE_HR)
+            if self._config_registry.get_config(self.CONFIG_ENABLE_SHUFFLE_PROMPT):
+                from random import shuffle
+
+                pos_tokens = pos_prompt.split(",")
+                shuffle(pos_tokens)
+                pos_prompt: str = ",".join(pos_tokens)
+                neg_tokens = neg_prompt.split(",")
+                shuffle(neg_tokens)
+                neg_prompt: str = ",".join(neg_tokens)
             # Create a diffusion parser with the prompts
             diffusion_paser = (
                 DiffusionParser(
@@ -182,7 +194,7 @@ class StableDiffusionPlugin(AbstractPlugin):
                     enable_hr=self._config_registry.get_config(self.CONFIG_ENABLE_HR),
                 )
                 if pos_prompt
-                else DiffusionParser()
+                else DiffusionParser(enable_hr=self._config_registry.get_config(self.CONFIG_ENABLE_HR))
             )
             if Image in message:
                 # Download the first image in the chain
