@@ -75,7 +75,7 @@ class CyVoice(AbstractPlugin):
         from graia.ariadne.message.parser.base import DetectPrefix
         from graia.ariadne.model import Group
 
-        from modules.config_utils import ConfigClient, CmdSetterBuilder
+        from modules.config_utils import ConfigClient, CmdBuilder
 
         from .api import VITS
 
@@ -89,7 +89,7 @@ class CyVoice(AbstractPlugin):
         temp_dir: str = self._config_registry.get_config(self.CONFIG_TEMP_FILE_DIR_PATH)
         os.makedirs(temp_dir, exist_ok=True)
         VITS.base = self._config_registry.get_config(self.CONFIG_API_HOST_URL)
-        cmd_builder = CmdSetterBuilder(
+        cmd_builder = CmdBuilder(
             config_setter=self._config_registry.set_config, config_getter=self._config_registry.get_config
         )
         configurable_options: List[str] = [
@@ -160,11 +160,11 @@ class CyVoice(AbstractPlugin):
                 self.__CURRENT_CV_CMD: get_current_cv,
                 self.__CONFIG_CMD: {
                     self.__CONFIG_LIST_CMD: list_out_configs,
-                    self.__CONFIG_SET_CMD: cmd_builder.build(),
+                    self.__CONFIG_SET_CMD: cmd_builder.build_setter_hall(),
                 },
                 self.__TRANSLATE_CMD: {
-                    self.__TRANSLATE_ENABLE_CMD: cmd_builder.build_for(self.CONFIG_ENABLE_TRANSLATE),
-                    self.__TRANSLATE_TO_LANG_CMD: cmd_builder.build_for(self.CONFIG_TARGET_LANGUAGE),
+                    self.__TRANSLATE_ENABLE_CMD: cmd_builder.build_setter_for(self.CONFIG_ENABLE_TRANSLATE),
+                    self.__TRANSLATE_TO_LANG_CMD: cmd_builder.build_setter_for(self.CONFIG_TARGET_LANGUAGE),
                 },
             }
         }

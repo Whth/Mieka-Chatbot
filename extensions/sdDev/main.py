@@ -86,11 +86,11 @@ class StableDiffusionPlugin(AbstractPlugin):
         from dynamicprompts.generators import RandomPromptGenerator
         from .stable_diffusion import StableDiffusionApp, DiffusionParser
 
-        from modules.config_utils import ConfigClient, CmdSetterBuilder
+        from modules.config_utils import ConfigClient, CmdBuilder
 
         self.__register_all_config()
         self._config_registry.load_config()
-        cmd_builder = CmdSetterBuilder(
+        cmd_builder = CmdBuilder(
             config_setter=self._config_registry.set_config, config_getter=self._config_registry.get_config
         )
         configurable_options: List[str] = [
@@ -116,7 +116,7 @@ class StableDiffusionPlugin(AbstractPlugin):
             self._config_registry.get_config(self.CONFIG_CONFIG_CLIENT_KEYWORD): {
                 self.__CONFIG_CMD: {
                     self.__CONFIG_LIST_CMD: list_out_configs,
-                    self.__CONFIG_SET_CMD: cmd_builder.build(),
+                    self.__CONFIG_SET_CMD: cmd_builder.build_setter_hall(),
                 }
             }
         }

@@ -358,36 +358,16 @@ class ConfigClient(object):
 ConfigValue = TypeVar("ConfigValue", int, str, float, list, dict)
 
 
-def setter_builder(cmd_function: Callable[[str, ConfigValue], None], config_type: Type) -> Callable[[str, str], str]:
+class CmdBuilder(object):
     """
-    Builds and returns a setter function that can be used to update a specific configuration value.
-
-    Args:
-        cmd_function (Callable[[str, ConfigValue], None]): The command function that will be called to update the configuration value.
-        config_type (Type): The type of the configuration value that will be passed to the command function.
-
-    Returns:
-        None: This function does not return any value.
-
+    build the cmd functions for a specific config client
     """
 
-    def _setter(config_path: str, new_config: str) -> str:
-        try:
-            converted = config_type(new_config)
-        except ValueError as e:
-            return f"Can not set [{config_path}] to [{new_config}]\nERROR:\n\t[{e}]"
-        cmd_function(config_path, converted)
-        return f"Set [{config_path}] to [{new_config}]"
-
-    return _setter
-
-
-class CmdSetterBuilder(object):
     def __init__(self, config_getter: Callable[[str], Value], config_setter: Callable[[str, Value], None]):
         self._config_setter = config_setter
         self._config_getter = config_getter
 
-    def build_for(self, config_path: str) -> Callable[[str], str]:
+    def build_setter_for(self, config_path: str) -> Callable[[str], str]:
         """
         Returns a callable function that can be used to set a configuration value.
 
@@ -409,9 +389,10 @@ class CmdSetterBuilder(object):
             self._config_setter(config_path, converted)
             return f"Set [{config_path}]:\nFrom [{origin_config}] to [{new_config}]"
 
+        _setter(origin_config)  # test if it works
         return _setter
 
-    def build(self) -> Callable[[str, str], str]:
+    def build_setter_hall(self) -> Callable[[str, str], str]:
         """
         Builds and returns a setter function that can be used to modify configuration values.
 
@@ -443,3 +424,23 @@ class CmdSetterBuilder(object):
             return f"Set [{config_path}]:\nFrom [{origin_config}] to [{new_config}]"
 
         return _setter
+
+    def build_list_out_for(self, config_paths: List[str]) -> Callable[[], str]:
+        """
+        Builds and returns a function that lists out the values of the given config paths.
+
+        Parameters:
+            config_paths (List[str]): A list of config paths.
+
+        Returns:
+            Callable[[], str]: A function that, when called, returns a string listing out the values of the config paths.
+        """
+
+        def _list_out() -> str:
+            temp_string: str = ""
+            for config_path in config_paths:
+                temp_string += f"{config_path} = {self._config_getter(config_path)}\n"
+            return temp_string
+
+        _list_out()  # test if it works
+        return _list_out
