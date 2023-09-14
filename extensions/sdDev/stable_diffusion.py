@@ -62,22 +62,6 @@ class HiResParser(NamedTuple):
     # hr_negative_prompt:
 
 
-class ControlNetParser(NamedTuple):
-    """
-    containing control net parsers
-    """
-
-    enabled: bool = False
-    image: str = ""
-    module: str = ""
-    model: str = ""
-    weight: float = 1.0
-    guidance: float = 1.0
-    guidance_start: float = 0.0
-    guidance_end: float = 1.0
-    guess_mode: bool = False
-
-
 class StableDiffusionApp(object):
     """
     class that implements the basic diffusion api
