@@ -100,22 +100,10 @@ class StableDiffusionPlugin(AbstractPlugin):
             self.CONFIG_ENABLE_SHUFFLE_PROMPT,
         ]
 
-        def list_out_configs() -> str:
-            """
-            Returns a string that lists out the configurations.
-
-            Returns:
-                str: The string that lists out the configurations.
-            """
-            result_string = ""
-            for option in configurable_options:
-                result_string += f"{option} = {self._config_registry.get_config(option)}\n"
-            return result_string
-
         cmd_syntax_tree: Dict = {
             self._config_registry.get_config(self.CONFIG_CONFIG_CLIENT_KEYWORD): {
                 self.__CONFIG_CMD: {
-                    self.__CONFIG_LIST_CMD: list_out_configs,
+                    self.__CONFIG_LIST_CMD: cmd_builder.build_list_out_for(configurable_options),
                     self.__CONFIG_SET_CMD: cmd_builder.build_setter_hall(),
                 }
             }
@@ -194,7 +182,10 @@ class StableDiffusionPlugin(AbstractPlugin):
                     enable_hr=self._config_registry.get_config(self.CONFIG_ENABLE_HR),
                 )
                 if pos_prompt
-                else DiffusionParser(enable_hr=self._config_registry.get_config(self.CONFIG_ENABLE_HR))
+                else DiffusionParser(
+                    styles=self._config_registry.get_config(self.CONFIG_STYLES),
+                    enable_hr=self._config_registry.get_config(self.CONFIG_ENABLE_HR),
+                )
             )
             if Image in message:
                 # Download the first image in the chain
