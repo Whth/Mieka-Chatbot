@@ -54,7 +54,7 @@ class StableDiffusionPlugin(AbstractPlugin):
 
     @classmethod
     def get_plugin_version(cls) -> str:
-        return "0.0.6"
+        return "0.0.7"
 
     @classmethod
     def get_plugin_author(cls) -> str:
@@ -121,7 +121,48 @@ class StableDiffusionPlugin(AbstractPlugin):
         gen = RandomPromptGenerator(
             wildcard_manager=WildcardManager(path=self._config_registry.get_config(self.CONFIG_WILDCARD_DIR_PATH))
         )
+        processor = PromptProcessorRegistry()
 
+        def _dynamic_process(pos_prompt: str, neg_prompt: str) -> Tuple[str, str]:
+            pos_interpreted = gen.generate(template=pos_prompt)
+            neg_interpreted = gen.generate(template=neg_prompt)
+            pos_prompt = pos_interpreted[0] if pos_interpreted else pos_prompt
+            neg_prompt = neg_interpreted[0] if neg_interpreted else neg_prompt
+            return pos_prompt, neg_prompt
+
+        processor.register(
+            judge=lambda: self._config_registry.get_config(self.CONFIG_ENABLE_DYNAMIC_PROMPT),
+            processor=_dynamic_process,
+            process_name="DYNAMIC_PROMPT_INTERPRET",
+        )
+
+        def _translate_process(pos_prompt: str, neg_prompt: str) -> Tuple[str, str]:
+            pos_prompt = translate("en", pos_prompt, "auto")
+            neg_prompt = translate("en", neg_prompt, "auto")
+            return pos_prompt, neg_prompt
+
+        processor.register(
+            judge=lambda: self._config_registry.get_config(self.CONFIG_ENABLE_TRANSLATE) and translate,
+            processor=_translate_process,
+            process_name="TRANSLATE",
+        )
+
+        def _shuffle_process(pos_prompt: str, neg_prompt: str) -> Tuple[str, str]:
+            from random import shuffle
+
+            pos_tokens = pos_prompt.split(",")
+            shuffle(pos_tokens)
+            pos_prompt: str = ",".join(pos_tokens)
+            neg_tokens = neg_prompt.split(",")
+            shuffle(neg_tokens)
+            neg_prompt: str = ",".join(neg_tokens)
+            return pos_prompt, neg_prompt
+
+        processor.register(
+            judge=lambda: self._config_registry.get_config(self.CONFIG_ENABLE_SHUFFLE_PROMPT),
+            processor=_shuffle_process,
+            process_name="SHUFFLE",
+        )
         # TODO add quick async response
 
         @bord_cast.receiver(
@@ -144,33 +185,7 @@ class StableDiffusionPlugin(AbstractPlugin):
             pos_prompt = "".join(pos_prompt)
             neg_prompt = "".join(neg_prompt)
 
-            if self._config_registry.get_config(self.CONFIG_ENABLE_DYNAMIC_PROMPT):
-                temp_string = f"{Fore.MAGENTA}Interpreting prompts\n" + prompt_string_construcotr(
-                    pos_prompt, neg_prompt
-                )
-                pos_interpreted = gen.generate(template=pos_prompt)
-                neg_interpreted = gen.generate(template=neg_prompt)
-                pos_prompt = pos_interpreted[0] if pos_interpreted else pos_prompt
-                neg_prompt = neg_interpreted[0] if neg_interpreted else neg_prompt
-                temp_string += "Result:\n" + prompt_string_construcotr(pos_prompt, neg_prompt)
-                print(temp_string)
-            # Translate prompts to English if translate a flag is set
-            if self._config_registry.get_config(self.CONFIG_ENABLE_TRANSLATE) and translate:
-                temp_string = f"{Fore.MAGENTA}Translating prompts\n" + prompt_string_construcotr(pos_prompt, neg_prompt)
-                pos_prompt = translate("en", pos_prompt, "auto")
-                neg_prompt = translate("en", neg_prompt, "auto")
-                temp_string += "Result:\n" + prompt_string_construcotr(pos_prompt, neg_prompt)
-                print(temp_string)
-
-            if self._config_registry.get_config(self.CONFIG_ENABLE_SHUFFLE_PROMPT):
-                from random import shuffle
-
-                pos_tokens = pos_prompt.split(",")
-                shuffle(pos_tokens)
-                pos_prompt: str = ",".join(pos_tokens)
-                neg_tokens = neg_prompt.split(",")
-                shuffle(neg_tokens)
-                neg_prompt: str = ",".join(neg_tokens)
+            pos_prompt, neg_prompt = processor.process(pos_prompt, neg_prompt)
             # Create a diffusion parser with the prompts
             diffusion_paser = (
                 DiffusionParser(
@@ -272,13 +287,42 @@ def prompt_string_construcotr(pos_prompt: str, neg_prompt: str) -> str:
 class PromptProcessorRegistry(object):
     def __init__(self):
         self._registry_list: List[Tuple[Callable[[], Any], Callable[[str, str], Tuple[str, str]]]] = []
+        self._process_name: List[str] = []
 
     def process(self, pos_prompt: str, neg_prompt: str) -> Tuple[str, str]:
-        for processor in self._registry_list:
+        """
+        Process the given positive and negative prompts using the registered processors.
+
+        Args:
+            pos_prompt (str): The positive prompt to be processed.
+            neg_prompt (str): The negative prompt to be processed.
+
+        Returns:
+            Tuple[str, str]: A tuple containing the processed positive prompt and the processed negative prompt.
+        """
+        for processor, name in zip(self._registry_list, self._process_name):
             if processor[0]():
                 pos_prompt, neg_prompt = processor[1](pos_prompt, neg_prompt)
-
+                print(f"Executing {name}")
+                print(prompt_string_construcotr(pos_prompt=pos_prompt, neg_prompt=neg_prompt))
         return pos_prompt, neg_prompt
 
-    def register(self, judge: Callable[[], Any], processor: Callable[[str, str], Tuple[str, str]]) -> None:
+    def register(
+        self, judge: Callable[[], Any], processor: Callable[[str, str], Tuple[str, str]], process_name: str = None
+    ) -> None:
+        """
+        Register a new judge and processor pair to the registry list.
+
+        Args:
+            judge: A callable that takes no arguments and returns any value.
+            processor: A callable that takes two strings as arguments and returns a tuple of two strings.
+            process_name: (optional) A string representing the process name.
+                If not provided, a default process name will be generated.
+
+        Returns:
+            None
+        """
         self._registry_list.append((judge, processor))
+        if not process_name:
+            process_name = f"Process-{len(self._registry_list)}"
+        self._process_name.append(process_name)
