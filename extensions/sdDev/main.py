@@ -31,11 +31,14 @@ class StableDiffusionPlugin(AbstractPlugin):
     CONFIG_NEG_KEYWORD = "negative_keyword"
 
     CONFIG_WILDCARD_DIR_PATH = "wildcard_dir_path"
+
+    CONFIG_CONTROLNET_MODULE = "controlnet_module"
+    CONFIG_CONTROLNET_MODEL = "controlnet_model"
     CONFIG_STYLES = "styles"
     CONFIG_ENABLE_HR = "enable_hr"
 
     CONFIG_ENABLE_TRANSLATE = "enable_translate"
-
+    CONFIG_ENABLE_CONTROLNET = "enable_controlnet"
     CONFIG_ENABLE_SHUFFLE_PROMPT = "enable_shuffle_prompt"
     CONFIG_ENABLE_DYNAMIC_PROMPT = "enable_dynamic_prompt"
     CONFIG_CONFIG_CLIENT_KEYWORD = "config_client_keyword"
@@ -70,11 +73,14 @@ class StableDiffusionPlugin(AbstractPlugin):
         self._config_registry.register_config(
             self.CONFIG_WILDCARD_DIR_PATH, f"{self._get_config_parent_dir()}/asset/wildcard"
         )
+        self._config_registry.register_config(self.CONFIG_CONTROLNET_MODULE, "openpose_full")
+        self._config_registry.register_config(self.CONFIG_CONTROLNET_MODEL, "control_v11p_sd15_openpose")
         self._config_registry.register_config(self.CONFIG_STYLES, [])
         self._config_registry.register_config(self.CONFIG_ENABLE_HR, 0)
         self._config_registry.register_config(self.CONFIG_ENABLE_TRANSLATE, 0)
         self._config_registry.register_config(self.CONFIG_ENABLE_DYNAMIC_PROMPT, 1)
         self._config_registry.register_config(self.CONFIG_ENABLE_SHUFFLE_PROMPT, 0)
+        self._config_registry.register_config(self.CONFIG_ENABLE_CONTROLNET, 0)
         self._config_registry.register_config(self.CONFIG_CONFIG_CLIENT_KEYWORD, "sd")
 
     def install(self):
@@ -99,6 +105,9 @@ class StableDiffusionPlugin(AbstractPlugin):
             self.CONFIG_ENABLE_TRANSLATE,
             self.CONFIG_ENABLE_DYNAMIC_PROMPT,
             self.CONFIG_ENABLE_SHUFFLE_PROMPT,
+            self.CONFIG_ENABLE_CONTROLNET,
+            self.CONFIG_CONTROLNET_MODULE,
+            self.CONFIG_CONTROLNET_MODEL,
         ]
 
         cmd_syntax_tree: Dict = {
@@ -203,9 +212,14 @@ class StableDiffusionPlugin(AbstractPlugin):
                 img_path = download_image(save_dir=temp_dir_path, url=message[Image, 1][0].url)
                 img_base64 = img_to_base64(img_path)
 
-                # TODO decouple these two params
-                cn_unit = ControlNetUnit(
-                    input_image=img_base64, module="openpose_full", model="control_v11p_sd15_openpose"
+                cn_unit = (
+                    ControlNetUnit(
+                        input_image=img_base64,
+                        module=self._config_registry.get_config(self.CONFIG_CONTROLNET_MODULE),
+                        model=self._config_registry.get_config(self.CONFIG_CONTROLNET_MODEL),
+                    )
+                    if self._config_registry.get_config(self.CONFIG_ENABLE_CONTROLNET)
+                    else None
                 )
                 send_result = await SD_app.img2img(
                     image_base64=img_base64,
