@@ -1,4 +1,3 @@
-# TODO use fatory mode,build config,
 import base64
 import io
 import os.path
@@ -20,7 +19,7 @@ from extensions.sdDev.api import (
     ALWAYSON_SCRIPTS_KEY,
 )
 from modules.file_manager import rename_image_with_hash, img_to_base64
-from .controlnet import ControlNetUnit, make_payload
+from .controlnet import ControlNetUnit, make_cn_payload
 
 DEFAULT_NEGATIVE_PROMPT = "loathed,low resolution,porn,NSFW,strange shaped finger,cropped,panties visible"
 
@@ -88,8 +87,8 @@ class StableDiffusionApp(object):
                 that contains the diffusion parameters.
             HiRes_parameters (HiResParser, optional): An optional instance of the HiResParser class that contains
                 the Hi-Res parameters. Defaults to HiResParser().
-            controlnet_parameters (ControlNetUnit, optional): An optional instance of the HiResParser class that contains
-                the controlnet parameters. Defaults to None.
+            controlnet_parameters (ControlNetUnit, optional): An optional instance of the HiResParser class
+                that contains the controlnet parameters. Defaults to None.
         Returns:
             List[str]: A list of image filenames that were saved.
 
@@ -101,7 +100,7 @@ class StableDiffusionApp(object):
         pay_load.update(HiRes_parameters._asdict())
 
         if controlnet_parameters:
-            alwayson_scripts[ALWAYSON_SCRIPTS_KEY].update(make_payload([controlnet_parameters]))
+            alwayson_scripts[ALWAYSON_SCRIPTS_KEY].update(make_cn_payload([controlnet_parameters]))
 
         pay_load.update(alwayson_scripts)
         async with aiohttp.ClientSession() as session:
@@ -121,7 +120,8 @@ class StableDiffusionApp(object):
         image_base64: Optional[str] = None,
     ) -> List[str]:
         """
-        Converts an image to another image using the specified diffusion parameters and controlnet parameters (optional).
+        Converts an image to another image using the specified diffusion parameters and
+        controlnet parameters (optional).
         Saves the generated images to the specified output directory.
 
         Args:
@@ -155,7 +155,7 @@ class StableDiffusionApp(object):
 
         # If controlnet parameters are provided, update the alwayson scripts with them
         if controlnet_parameters:
-            alwayson_scripts[ALWAYSON_SCRIPTS_KEY].update(make_payload([controlnet_parameters]))
+            alwayson_scripts[ALWAYSON_SCRIPTS_KEY].update(make_cn_payload([controlnet_parameters]))
 
         # Add the alwayson scripts to the payload
         payload.update(alwayson_scripts)
@@ -181,7 +181,7 @@ def extract_png_from_payload(payload: Dict) -> List[str]:
     Returns:
 
     """
-    # TODO this function may not as necessary
+
     if IMAGES_KEY not in payload:
         raise KeyError(f"{IMAGES_KEY} not found in payload")
     img_base64 = payload.get(IMAGES_KEY)
