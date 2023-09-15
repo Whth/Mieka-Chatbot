@@ -1,6 +1,6 @@
 import os
 import re
-from typing import Tuple, List, Optional, Callable, Dict
+from typing import Tuple, List, Optional, Callable, Dict, Any
 
 from modules.file_manager import download_image
 from modules.plugin_base import AbstractPlugin
@@ -18,6 +18,10 @@ class StableDiffusionPlugin(AbstractPlugin):
     __CONFIG_LIST_CMD = "list"
 
     __CONFIG_SET_CMD = "set"
+    __CONTROLNET_CMD = "cn"
+    __CONTROLNET_MODELS_CMD = "models"
+    __CONTROLNET_MODULES_CMD = "modules"
+    # TODO add cn detect cmd
 
     TXT2IMG_DIRNAME = "txt2img"
     IMG2IMG_DIRNAME = "img2img"
@@ -31,11 +35,15 @@ class StableDiffusionPlugin(AbstractPlugin):
     CONFIG_NEG_KEYWORD = "negative_keyword"
 
     CONFIG_WILDCARD_DIR_PATH = "wildcard_dir_path"
+
+    CONFIG_CONTROLNET_MODULE = "controlnet_module"
+    CONFIG_CONTROLNET_MODEL = "controlnet_model"
     CONFIG_STYLES = "styles"
     CONFIG_ENABLE_HR = "enable_hr"
 
     CONFIG_ENABLE_TRANSLATE = "enable_translate"
-
+    CONFIG_ENABLE_CONTROLNET = "enable_controlnet"
+    CONFIG_ENABLE_SHUFFLE_PROMPT = "enable_shuffle_prompt"
     CONFIG_ENABLE_DYNAMIC_PROMPT = "enable_dynamic_prompt"
     CONFIG_CONFIG_CLIENT_KEYWORD = "config_client_keyword"
 
@@ -53,7 +61,7 @@ class StableDiffusionPlugin(AbstractPlugin):
 
     @classmethod
     def get_plugin_version(cls) -> str:
-        return "0.0.5"
+        return "0.0.9"
 
     @classmethod
     def get_plugin_author(cls) -> str:
@@ -69,52 +77,66 @@ class StableDiffusionPlugin(AbstractPlugin):
         self._config_registry.register_config(
             self.CONFIG_WILDCARD_DIR_PATH, f"{self._get_config_parent_dir()}/asset/wildcard"
         )
+        self._config_registry.register_config(self.CONFIG_CONTROLNET_MODULE, "openpose_full")
+        self._config_registry.register_config(self.CONFIG_CONTROLNET_MODEL, "control_v11p_sd15_openpose")
         self._config_registry.register_config(self.CONFIG_STYLES, [])
         self._config_registry.register_config(self.CONFIG_ENABLE_HR, 0)
         self._config_registry.register_config(self.CONFIG_ENABLE_TRANSLATE, 0)
         self._config_registry.register_config(self.CONFIG_ENABLE_DYNAMIC_PROMPT, 1)
+        self._config_registry.register_config(self.CONFIG_ENABLE_SHUFFLE_PROMPT, 0)
+        self._config_registry.register_config(self.CONFIG_ENABLE_CONTROLNET, 0)
         self._config_registry.register_config(self.CONFIG_CONFIG_CLIENT_KEYWORD, "sd")
 
     def install(self):
-        from colorama import Fore
         from graia.ariadne.message.chain import MessageChain, Image
         from graia.ariadne.message.parser.base import ContainKeyword, DetectPrefix
         from graia.ariadne.model import Group
         from dynamicprompts.wildcards import WildcardManager
         from dynamicprompts.generators import RandomPromptGenerator
-        from .stable_diffusion import StableDiffusionApp, DiffusionParser
+        from .stable_diffusion import StableDiffusionApp, DiffusionParser, HiResParser
 
-        from modules.config_utils import ConfigClient, CmdSetterBuilder
+        from modules.config_utils import ConfigClient, CmdBuilder
+        from modules.file_manager import img_to_base64
+        from .controlnet import ControlNetUnit, Controlnet
 
         self.__register_all_config()
         self._config_registry.load_config()
-        cmd_builder = CmdSetterBuilder(
+        cmd_builder = CmdBuilder(
             config_setter=self._config_registry.set_config, config_getter=self._config_registry.get_config
         )
+        controlnet: Controlnet = Controlnet(host_url=self._config_registry.get_config(self.CONFIG_SD_HOST))
+
+        def sync(async_function):
+            import asyncio
+
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(async_function())
+
+        sync(controlnet.fetch_resources)
+        SD_app = StableDiffusionApp(host_url=self._config_registry.get_config(self.CONFIG_SD_HOST))
+        gen = RandomPromptGenerator(
+            wildcard_manager=WildcardManager(path=self._config_registry.get_config(self.CONFIG_WILDCARD_DIR_PATH))
+        )
+        processor = PromptProcessorRegistry()
         configurable_options: List[str] = [
             self.CONFIG_ENABLE_HR,
             self.CONFIG_ENABLE_TRANSLATE,
             self.CONFIG_ENABLE_DYNAMIC_PROMPT,
+            self.CONFIG_ENABLE_SHUFFLE_PROMPT,
+            self.CONFIG_ENABLE_CONTROLNET,
+            self.CONFIG_CONTROLNET_MODULE,
+            self.CONFIG_CONTROLNET_MODEL,
         ]
-
-        def list_out_configs() -> str:
-            """
-            Returns a string that lists out the configurations.
-
-            Returns:
-                str: The string that lists out the configurations.
-            """
-            result_string = ""
-            for option in configurable_options:
-                result_string += f"{option} = {self._config_registry.get_config(option)}\n"
-            return result_string
-
         cmd_syntax_tree: Dict = {
             self._config_registry.get_config(self.CONFIG_CONFIG_CLIENT_KEYWORD): {
                 self.__CONFIG_CMD: {
-                    self.__CONFIG_LIST_CMD: list_out_configs,
-                    self.__CONFIG_SET_CMD: cmd_builder.build(),
-                }
+                    self.__CONFIG_LIST_CMD: cmd_builder.build_list_out_for(configurable_options),
+                    self.__CONFIG_SET_CMD: cmd_builder.build_setter_hall(),
+                },
+                self.__CONTROLNET_CMD: {
+                    self.__CONTROLNET_MODELS_CMD: lambda: "CN_Models:\n" + "\n".join(controlnet.models),
+                    self.__CONTROLNET_MODULES_CMD: lambda: "CN_Modules:\n" + "\n".join(controlnet.modules),
+                },
             }
         }
         config_client = ConfigClient(cmd_syntax_tree)
@@ -126,11 +148,46 @@ class StableDiffusionPlugin(AbstractPlugin):
         ariadne_app = self._ariadne_app
         bord_cast = ariadne_app.broadcast
 
-        SD_app = StableDiffusionApp(host_url=self._config_registry.get_config(self.CONFIG_SD_HOST))
-        gen = RandomPromptGenerator(
-            wildcard_manager=WildcardManager(path=self._config_registry.get_config(self.CONFIG_WILDCARD_DIR_PATH))
+        def _dynamic_process(pos_prompt: str, neg_prompt: str) -> Tuple[str, str]:
+            pos_interpreted = gen.generate(template=pos_prompt)
+            neg_interpreted = gen.generate(template=neg_prompt)
+            pos_prompt = pos_interpreted[0] if pos_interpreted else pos_prompt
+            neg_prompt = neg_interpreted[0] if neg_interpreted else neg_prompt
+            return pos_prompt, neg_prompt
+
+        processor.register(
+            judge=lambda: self._config_registry.get_config(self.CONFIG_ENABLE_DYNAMIC_PROMPT),
+            processor=_dynamic_process,
+            process_name="DYNAMIC_PROMPT_INTERPRET",
         )
 
+        def _translate_process(pos_prompt: str, neg_prompt: str) -> Tuple[str, str]:
+            pos_prompt = translate("en", pos_prompt, "auto")
+            neg_prompt = translate("en", neg_prompt, "auto")
+            return pos_prompt, neg_prompt
+
+        processor.register(
+            judge=lambda: self._config_registry.get_config(self.CONFIG_ENABLE_TRANSLATE) and translate,
+            processor=_translate_process,
+            process_name="TRANSLATE",
+        )
+
+        def _shuffle_process(pos_prompt: str, neg_prompt: str) -> Tuple[str, str]:
+            from random import shuffle
+
+            pos_tokens = pos_prompt.split(",")
+            shuffle(pos_tokens)
+            pos_prompt: str = ",".join(pos_tokens)
+            neg_tokens = neg_prompt.split(",")
+            shuffle(neg_tokens)
+            neg_prompt: str = ",".join(neg_tokens)
+            return pos_prompt, neg_prompt
+
+        processor.register(
+            judge=lambda: self._config_registry.get_config(self.CONFIG_ENABLE_SHUFFLE_PROMPT),
+            processor=_shuffle_process,
+            process_name="SHUFFLE",
+        )
         # TODO add quick async response
 
         @bord_cast.receiver(
@@ -150,55 +207,50 @@ class StableDiffusionPlugin(AbstractPlugin):
             """
             # Extract positive and negative prompts from the message
             pos_prompt, neg_prompt = de_assembly(str(message))
-            pos_prompt = "".join(pos_prompt)
-            neg_prompt = "".join(neg_prompt)
-            if self._config_registry.get_config(self.CONFIG_ENABLE_DYNAMIC_PROMPT):
-                temp_string = f"{Fore.MAGENTA}Interpreting prompts\n" + prompt_string_construcotr(
-                    pos_prompt, neg_prompt, False
-                )
-                pos_interpreted = gen.generate(template=pos_prompt)
-                neg_interpreted = gen.generate(template=neg_prompt)
-                pos_prompt = pos_interpreted[0] if pos_interpreted else pos_prompt
-                neg_prompt = neg_interpreted[0] if neg_interpreted else neg_prompt
-                temp_string += f"Result:\n" + prompt_string_construcotr(pos_prompt, neg_prompt, False)
-                print(temp_string)
-            # Translate prompts to English if translate a flag is set
-            if self._config_registry.get_config(self.CONFIG_ENABLE_TRANSLATE) and translate:
-                temp_string = f"{Fore.MAGENTA}Translating prompts\n" + prompt_string_construcotr(
-                    pos_prompt, neg_prompt, False
-                )
-                pos_prompt = translate("en", pos_prompt, "auto")
-                neg_prompt = translate("en", neg_prompt, "auto")
-                temp_string += "Result:\n" + prompt_string_construcotr(pos_prompt, neg_prompt, False)
-                print(temp_string)
 
-            DiffusionParser.enable_hr = self._config_registry.get_config(self.CONFIG_ENABLE_HR)
+            pos_prompt, neg_prompt = processor.process("".join(pos_prompt), "".join(neg_prompt))
             # Create a diffusion parser with the prompts
             diffusion_paser = (
                 DiffusionParser(
                     prompt=pos_prompt,
                     negative_prompt=neg_prompt,
                     styles=self._config_registry.get_config(self.CONFIG_STYLES),
-                    enable_hr=self._config_registry.get_config(self.CONFIG_ENABLE_HR),
                 )
                 if pos_prompt
-                else DiffusionParser()
+                else DiffusionParser(
+                    styles=self._config_registry.get_config(self.CONFIG_STYLES),
+                )
             )
             if Image in message:
                 # Download the first image in the chain
-                print(
-                    f"{Fore.YELLOW}IMG TO IMG ORDER\n"
-                    f"Downloading image from: {message[Image, 1][0].url}\n"
-                    + prompt_string_construcotr(pos_prompt, neg_prompt, True)
-                )
+                print(f"Downloading image from: {message[Image, 1][0].url}\n")
                 img_path = download_image(save_dir=temp_dir_path, url=message[Image, 1][0].url)
+                img_base64 = img_to_base64(img_path)
+                cn_unit = None
+                if self._config_registry.get_config(self.CONFIG_ENABLE_CONTROLNET):
+                    module = self._config_registry.get_config(self.CONFIG_CONTROLNET_MODULE)
+                    model = self._config_registry.get_config(self.CONFIG_CONTROLNET_MODEL)
+
+                    if module in controlnet.modules and model in controlnet.models:
+                        cn_unit = ControlNetUnit(
+                            input_image=img_base64,
+                            module=module,
+                            model=model,
+                        )
+
                 send_result = await SD_app.img2img(
-                    diffusion_parameters=diffusion_paser, image_path=img_path, output_dir=output_dir_path
+                    image_base64=img_base64,
+                    output_dir=output_dir_path,
+                    diffusion_parameters=diffusion_paser,
+                    controlnet_parameters=cn_unit,
                 )
             else:
-                print(f"{Fore.YELLOW}TXT TO IMG ORDER\n" + prompt_string_construcotr(pos_prompt, neg_prompt, True))
                 # Generate the image using the diffusion parser
-                send_result = await SD_app.txt2img(diffusion_parameters=diffusion_paser, output_dir=output_dir_path)
+                send_result = await SD_app.txt2img(
+                    diffusion_parameters=diffusion_paser,
+                    HiRes_parameters=HiResParser(enable_hr=self._config_registry.get_config(self.CONFIG_ENABLE_HR)),
+                    output_dir=output_dir_path,
+                )
 
             # Send the image as a message in the group
             await ariadne_app.send_message(group, MessageChain("") + Image(path=send_result[0]))
@@ -257,18 +309,68 @@ def de_assembly(
     return pos_prompt, neg_prompt
 
 
-def prompt_string_construcotr(pos_prompt: str, neg_prompt: str, split: bool) -> str:
-    from colorama import Fore
+class PromptProcessorRegistry(object):
+    def __init__(self):
+        self._registry_list: List[Tuple[Callable[[], Any], Callable[[str, str], Tuple[str, str]]]] = []
+        self._process_name: List[str] = []
 
-    if split:
-        return (
-            f"{Fore.MAGENTA}___________________________________________\n"
-            f"{Fore.GREEN}POSITIVE PROMPT:\n\t{pos_prompt}\n"
-            f"{Fore.MAGENTA}___________________________________________\n"
-            f"{Fore.RED}NEGATIVE PROMPT:\n\t{neg_prompt}\n"
-            f"{Fore.MAGENTA}___________________________________________\n{Fore.RESET}"
-        )
-    else:
+    def process(self, pos_prompt: str, neg_prompt: str) -> Tuple[str, str]:
+        from colorama import Fore
+
+        """
+        Process the given positive and negative prompts using the registered processors.
+
+        Args:
+            pos_prompt (str): The positive prompt to be processed.
+            neg_prompt (str): The negative prompt to be processed.
+
+        Returns:
+            Tuple[str, str]: A tuple containing the processed positive prompt and the processed negative prompt.
+        """
+        for processor, name in zip(self._registry_list, self._process_name):
+            if processor[0]():
+                pos_prompt, neg_prompt = processor[1](pos_prompt, neg_prompt)
+                print(
+                    f"\n{Fore.YELLOW}Executing {name}\n"
+                    f"{self.prompt_string_constructor(pos_prompt=pos_prompt, neg_prompt=neg_prompt)}"
+                )
+
+        return pos_prompt, neg_prompt
+
+    def register(
+        self, judge: Callable[[], Any], processor: Callable[[str, str], Tuple[str, str]], process_name: str = None
+    ) -> None:
+        """
+        Register a new judge and processor pair to the registry list.
+
+        Args:
+            judge: A callable that takes no arguments and returns any value.
+            processor: A callable that takes two strings as arguments and returns a tuple of two strings.
+            process_name: (optional) A string representing the process name.
+                If not provided, a default process name will be generated.
+
+        Returns:
+            None
+        """
+        self._registry_list.append((judge, processor))
+        if not process_name:
+            process_name = f"Process-{len(self._registry_list)}"
+        self._process_name.append(process_name)
+
+    @staticmethod
+    def prompt_string_constructor(pos_prompt: str, neg_prompt: str) -> str:
+        """
+        Generate a formatted string containing positive and negative prompts.
+
+        Args:
+            pos_prompt (str): The positive prompt.
+            neg_prompt (str): The negative prompt.
+
+        Returns:
+            str: A formatted string containing the positive and negative prompts.
+        """
+        from colorama import Fore
+
         return (
             f"{Fore.MAGENTA}___________________________________________\n"
             f"{Fore.GREEN}POSITIVE PROMPT:\n\t{pos_prompt}\n"
