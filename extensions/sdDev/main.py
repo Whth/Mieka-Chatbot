@@ -230,6 +230,7 @@ class StableDiffusionPlugin(AbstractPlugin):
                 if self._config_registry.get_config(self.CONFIG_ENABLE_CONTROLNET):
                     module = self._config_registry.get_config(self.CONFIG_CONTROLNET_MODULE)
                     model = self._config_registry.get_config(self.CONFIG_CONTROLNET_MODEL)
+
                     if module in controlnet.modules and model in controlnet.models:
                         cn_unit = ControlNetUnit(
                             input_image=img_base64,

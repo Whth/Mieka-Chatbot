@@ -132,7 +132,13 @@ class Controlnet(object):
         Returns:
             A list of strings representing the models.
         """
-        return (await self.__async_get(f"{self._host_url}/{API_CONTROLNET_MODEL_LIST}")).get(CONTROLNET_MODEL_KEY)
+        models: List[str] = (await self.__async_get(f"{self._host_url}/{API_CONTROLNET_MODEL_LIST}")).get(
+            CONTROLNET_MODEL_KEY
+        )
+        # since string from the api is with a hash suffix
+        removed_suffix = [model.split(" ")[0] for model in models]
+
+        return removed_suffix
 
     async def get_module_list(self) -> List[str]:
         """
