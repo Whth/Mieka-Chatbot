@@ -4,7 +4,7 @@ import hashlib
 import os
 import time
 from datetime import datetime
-from typing import List
+from typing import List, Sequence
 
 import requests
 
@@ -20,33 +20,38 @@ def get_current_file_path() -> str:
     return inspect.getabsfile(inspect.currentframe())
 
 
-def explore_folder(root_path: str) -> List[str]:
+def explore_folder(root_path: str, ignore_list: Sequence[str] = tuple()) -> List[str]:
     """
+    Recursively explores a folder and returns a list of all file paths.
 
     Args:
-        root_path (str):
+        root_path (str): The root path of the folder to explore.
+        ignore_list (Sequence[str]): A list of folder names to ignore.
 
     Returns:
-
+        List[str]: A list of all file paths found in the folder.
     """
-    # 存储所有文件的路径
+    # Store all file paths
     file_paths = []
 
-    # 遍历目录下所有文件和子目录
+    # Traverse all files and subdirectories in the directory
     for root, dirs, files in os.walk(root_path):
+        # Exclude folders in the ignored list
+        dirs[:] = [d for d in dirs if d not in ignore_list]
+
         for file in files:
-            # 处理每个文件
+            # Process each file
             file_path = os.path.join(root, file)
-            # 存储文件路径到列表
+            # Add a file path to the list
             file_paths.append(file_path)
 
-        for dir in dirs:
-            # 处理每个子目录
-            subdir = os.path.join(root, dir)
-            # 递归遍历子目录，并将子目录中的文件路径加到列表中
-            file_paths.extend(explore_folder(subdir))
+        for directory in dirs:
+            # Process each subdirectory
+            subdir = os.path.join(root, directory)
+            # Recursively explore the subdirectory and add file paths to the list
+            file_paths.extend(explore_folder(subdir, ignore_list))
 
-    # 返回所有文件的路径列表
+    # Return the list of all file paths
     return file_paths
 
 
