@@ -18,6 +18,10 @@ class StableDiffusionPlugin(AbstractPlugin):
     __CONFIG_LIST_CMD = "list"
 
     __CONFIG_SET_CMD = "set"
+    __CONTROLNET_CMD = "cn"
+    __CONTROLNET_MODELS_CMD = "models"
+    __CONTROLNET_MODULES_CMD = "modules"
+    # TODO add cn detect cmd
 
     TXT2IMG_DIRNAME = "txt2img"
     IMG2IMG_DIRNAME = "img2img"
@@ -93,13 +97,27 @@ class StableDiffusionPlugin(AbstractPlugin):
 
         from modules.config_utils import ConfigClient, CmdBuilder
         from modules.file_manager import img_to_base64
-        from .controlnet import ControlNetUnit
+        from .controlnet import ControlNetUnit, Controlnet
 
         self.__register_all_config()
         self._config_registry.load_config()
         cmd_builder = CmdBuilder(
             config_setter=self._config_registry.set_config, config_getter=self._config_registry.get_config
         )
+        controlnet: Controlnet = Controlnet(host_url=self._config_registry.get_config(self.CONFIG_SD_HOST))
+
+        def sync(async_function):
+            import asyncio
+
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(async_function())
+
+        sync(controlnet.fetch_resources)
+        SD_app = StableDiffusionApp(host_url=self._config_registry.get_config(self.CONFIG_SD_HOST))
+        gen = RandomPromptGenerator(
+            wildcard_manager=WildcardManager(path=self._config_registry.get_config(self.CONFIG_WILDCARD_DIR_PATH))
+        )
+        processor = PromptProcessorRegistry()
         configurable_options: List[str] = [
             self.CONFIG_ENABLE_HR,
             self.CONFIG_ENABLE_TRANSLATE,
@@ -109,13 +127,16 @@ class StableDiffusionPlugin(AbstractPlugin):
             self.CONFIG_CONTROLNET_MODULE,
             self.CONFIG_CONTROLNET_MODEL,
         ]
-
         cmd_syntax_tree: Dict = {
             self._config_registry.get_config(self.CONFIG_CONFIG_CLIENT_KEYWORD): {
                 self.__CONFIG_CMD: {
                     self.__CONFIG_LIST_CMD: cmd_builder.build_list_out_for(configurable_options),
                     self.__CONFIG_SET_CMD: cmd_builder.build_setter_hall(),
-                }
+                },
+                self.__CONTROLNET_CMD: {
+                    self.__CONTROLNET_MODELS_CMD: lambda: "CN_Models:\n" + "\n".join(controlnet.models),
+                    self.__CONTROLNET_MODULES_CMD: lambda: "CN_Modules:\n" + "\n".join(controlnet.modules),
+                },
             }
         }
         config_client = ConfigClient(cmd_syntax_tree)
@@ -126,12 +147,6 @@ class StableDiffusionPlugin(AbstractPlugin):
         temp_dir_path = self._config_registry.get_config(self.CONFIG_IMG_TEMP_DIR_PATH)
         ariadne_app = self._ariadne_app
         bord_cast = ariadne_app.broadcast
-
-        SD_app = StableDiffusionApp(host_url=self._config_registry.get_config(self.CONFIG_SD_HOST))
-        gen = RandomPromptGenerator(
-            wildcard_manager=WildcardManager(path=self._config_registry.get_config(self.CONFIG_WILDCARD_DIR_PATH))
-        )
-        processor = PromptProcessorRegistry()
 
         def _dynamic_process(pos_prompt: str, neg_prompt: str) -> Tuple[str, str]:
             pos_interpreted = gen.generate(template=pos_prompt)
@@ -211,16 +226,17 @@ class StableDiffusionPlugin(AbstractPlugin):
                 print(f"Downloading image from: {message[Image, 1][0].url}\n")
                 img_path = download_image(save_dir=temp_dir_path, url=message[Image, 1][0].url)
                 img_base64 = img_to_base64(img_path)
+                cn_unit = None
+                if self._config_registry.get_config(self.CONFIG_ENABLE_CONTROLNET):
+                    module = self._config_registry.get_config(self.CONFIG_CONTROLNET_MODULE)
+                    model = self._config_registry.get_config(self.CONFIG_CONTROLNET_MODEL)
+                    if module in controlnet.modules and model in controlnet.models:
+                        cn_unit = ControlNetUnit(
+                            input_image=img_base64,
+                            module=module,
+                            model=model,
+                        )
 
-                cn_unit = (
-                    ControlNetUnit(
-                        input_image=img_base64,
-                        module=self._config_registry.get_config(self.CONFIG_CONTROLNET_MODULE),
-                        model=self._config_registry.get_config(self.CONFIG_CONTROLNET_MODEL),
-                    )
-                    if self._config_registry.get_config(self.CONFIG_ENABLE_CONTROLNET)
-                    else None
-                )
                 send_result = await SD_app.img2img(
                     image_base64=img_base64,
                     output_dir=output_dir_path,

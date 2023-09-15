@@ -76,6 +76,23 @@ class Controlnet(object):
         _module_list (List[str]): The list of available modules.
     """
 
+    @property
+    def models(self) -> List[str]:
+        """
+        Returns a list of strings representing the available models.
+        """
+        return self._model_list
+
+    @property
+    def modules(self) -> List[str]:
+        """
+        Returns the list of modules.
+
+        :return: A list of strings representing the modules.
+        :rtype: List[str]
+        """
+        return self._module_list
+
     @staticmethod
     async def __async_get(url: str) -> Dict:
         async with aiohttp.ClientSession() as session:
