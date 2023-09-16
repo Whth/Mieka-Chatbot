@@ -2,7 +2,7 @@ import os
 import re
 from typing import Tuple, List, Optional, Callable, Dict, Any
 
-from modules.file_manager import download_image
+from modules.file_manager import download_file
 from modules.plugin_base import AbstractPlugin
 
 __all__ = ["StableDiffusionPlugin"]
@@ -224,7 +224,7 @@ class StableDiffusionPlugin(AbstractPlugin):
             if Image in message:
                 # Download the first image in the chain
                 print(f"Downloading image from: {message[Image, 1][0].url}\n")
-                img_path = download_image(save_dir=temp_dir_path, url=message[Image, 1][0].url)
+                img_path = await download_file(save_dir=temp_dir_path, url=message[Image, 1][0].url)
                 img_base64 = img_to_base64(img_path)
                 cn_unit = None
                 if self._config_registry.get_config(self.CONFIG_ENABLE_CONTROLNET):

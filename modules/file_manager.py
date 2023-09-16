@@ -1,12 +1,10 @@
 import base64
-import datetime
 import hashlib
 import os
 import time
-from datetime import datetime
 from typing import List, Sequence
 
-import requests
+import aiohttp
 
 
 def get_current_file_path() -> str:
@@ -96,25 +94,44 @@ def clean_files(folder_path, time_limit):
     print(f"清理文件个数：{clean_file_num}，清理文件大小：{clean_file_size/1024/1024} MB")
 
 
-def download_image(url: str, save_dir: str) -> str:
+async def download_file(url: str, save_dir: str, force_download: bool = False) -> str:
     """
-    Downloads an image from the given URL and saves it to the specified directory.
+    Downloads a file from the given URL and saves it to the specified directory.
 
     Args:
-        url (str): The URL of the image.
-        save_dir (str): The directory where the image should be saved.
+        url (str): The URL of the file to download.
+        save_dir (str): The directory to save the downloaded file.
+        force_download (bool, optional): Whether to force re-download of the file if it already exists. Defaults to False.
 
     Returns:
-        str: The path where the image is saved, or None if the download fails.
+        str: The path to the downloaded file.
     """
-    img_name = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-    response = requests.get(url)
-    if response.status_code == 200:
-        os.makedirs(save_dir, exist_ok=True)
-        path = os.path.join(save_dir, f"{img_name}.png")
-        with open(path, "wb") as f:
-            f.write(response.content)
+    # Generate the file name using the MD5 hash of the URL
+    url_hash = hashlib.md5(url.encode()).hexdigest()
+
+    # Create the save directory if it doesn't exist
+    os.makedirs(save_dir, exist_ok=True)
+
+    # Generate the file path
+    path = os.path.join(save_dir, f"{url_hash}.png")
+
+    # Check if the file already exists and force_download is False
+    if not force_download and os.path.exists(path):
         return path
+
+    # Download the file using aiohttp
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            if response.status == 200:
+                # Write the file in chunks
+                with open(path, "wb") as f:
+                    while True:
+                        chunk = await response.content.read(1024)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                return path
+
     return ""
 
 
