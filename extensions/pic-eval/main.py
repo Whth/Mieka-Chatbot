@@ -74,7 +74,6 @@ class PicEval(AbstractPlugin):
 
         @bord_cast.receiver(
             "GroupMessage",
-            # decorators=[ContainKeyword(keyword=self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD))],
         )
         async def eval(group: Group, message: MessageChain, event: MessageEvent):
             if not hasattr(event.quote, "origin"):
@@ -89,14 +88,14 @@ class PicEval(AbstractPlugin):
                 return
             if Image in origin_chain:
                 print("FOUND IMAGE")
+                # TODO hash the url to get the image name,prevent re-download
                 path = download_image(origin_chain.get(Image, 1)[0].url, cache_dir_path)
             elif MultimediaElement in origin_chain:
                 print("FOUND MULTIMEDIA")
                 path = download_image(origin_chain.get(MultimediaElement, 1)[0].url, cache_dir_path)
             else:
                 return
-            # TODO add a check of the origin sender, save the extra transmitting,
-            #  not all picture is only available in the net
+            # TODO use deepdanboru to interrogate the content
             print(f"eval {score} at {path}")
             evaluator.mark(path, score)
             await ariadne_app.send_group_message(group, f"Evaluated pic as {score}")
