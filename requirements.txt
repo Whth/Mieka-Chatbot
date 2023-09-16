@@ -1,4 +1,6 @@
 graia-ariadne
-colorama
-packaging
-requests
+colorama==0.4.6
+packaging==23.1
+requests==2.31.0
+
+Pillow==10.0.0

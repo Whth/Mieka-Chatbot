@@ -4,9 +4,10 @@ import hashlib
 import os
 import time
 from datetime import datetime
-from typing import List, Sequence
+from typing import List, Sequence, Tuple
 
 import requests
+from PIL import Image
 
 
 def get_current_file_path() -> str:
@@ -96,6 +97,24 @@ def clean_files(folder_path, time_limit):
     print(f"清理文件个数：{clean_file_num}，清理文件大小：{clean_file_size/1024/1024} MB")
 
 
+def is_image(file_path) -> bool:
+    """
+    Check if a file is an image.
+
+    Parameters:
+        file_path (str): The path to the file.
+
+    Returns:
+        bool: True if the file is an image, False otherwise.
+    """
+    try:
+        img = Image.open(file_path)
+        img.close()
+        return True
+    except IOError:
+        return False
+
+
 def download_image(url: str, save_dir: str) -> str:
     """
     Downloads an image from the given URL and saves it to the specified directory.
@@ -116,6 +135,75 @@ def download_image(url: str, save_dir: str) -> str:
             f.write(response.content)
         return path
     return ""
+
+
+def compress_image_max_res(input_image_path: str, output_image_path: str, size: Tuple[int, int]):
+    """
+    Compresses an image to a specified size.
+
+    Args:
+        input_image_path (str): The path to the input image file.
+        size (Tuple[int, int]): The desired width and height of the output image.
+        output_image_path (str): The path to save the compressed image.
+
+    Returns:
+        str: The path to the compressed image file.
+    """
+
+    # 打开图像
+    image = Image.open(input_image_path)
+
+    # 获取原始图像的宽度和高度
+    width, height = image.size
+    max_width, max_height = size
+    if max_height > height and max_width > width:
+        image.save(output_image_path, format="png")
+        return
+    # 计算压缩比例
+    ratio = min(max_width / width, max_height / height)
+
+    # 计算压缩后的新宽度和高度
+    new_width = int(width * ratio)
+    new_height = int(height * ratio)
+
+    # 压缩图像
+    resized_image = image.resize((new_width, new_height), reducing_gap=2.0)
+
+    # 保存压缩后的图像
+    resized_image.save(output_image_path, format="png")
+
+
+def compress_image_max_vol(
+    input_image_path: str, output_image_path: str, max_file_size: int, min_quality: int = 85
+) -> int:
+    """
+    Compresses an image to reduce its file size while maintaining a minimum quality.
+    Args:
+        input_image_path (str): The path of the input image file.
+        output_image_path (str): The path to save the compressed image file.
+        max_file_size (int): The maximum size in bytes that the compressed image file should have.
+        min_quality (int, optional): The minimum quality level (0-100) to maintain while compressing the image.
+         Defaults to 85.
+    Returns:
+        int: the quality level that the image has been
+    Raises:
+        ValueError: If the `min_quality` is not a multiple of 5.
+    """
+    step = 5
+    if min_quality % step != 0:
+        raise ValueError(f"min_quality must be a multiple of {step}")
+    img = Image.open(input_image_path)
+    current_quality = 100
+    while current_quality >= min_quality:
+        img.save(output_image_path, quality=current_quality)
+
+        compressed_img_vol = os.path.getsize(output_image_path)
+
+        if compressed_img_vol < max_file_size:
+            break
+        img = Image.open(output_image_path)
+        current_quality -= step
+    return current_quality
 
 
 def img_to_base64(file_path: str) -> str:
