@@ -2,6 +2,7 @@ import warnings
 from typing import NamedTuple, Dict, List
 
 import aiohttp
+from aiohttp import ClientConnectorError
 
 from .api import (
     API_CONTROLNET_MODEL_LIST,
@@ -122,8 +123,11 @@ class Controlnet(object):
         Asynchronously fetches the model and module lists from the API and
         stores them in the corresponding attributes.
         """
-        self._model_list: List[str] = await self.get_model_list()
-        self._module_list: List[str] = await self.get_module_list()
+        try:
+            self._model_list: List[str] = await self.get_model_list()
+            self._module_list: List[str] = await self.get_module_list()
+        except ClientConnectorError:
+            pass
 
     async def get_model_list(self) -> List[str]:
         """
