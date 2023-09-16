@@ -50,14 +50,16 @@ class PicEval(AbstractPlugin):
     def install(self):
         from graia.ariadne.message.chain import MessageChain
         from graia.ariadne.model import Group
-        from .select import Selector
-        from .evaluate import Evaluate
+
         from graia.ariadne.message.parser.base import ContainKeyword
         from graia.ariadne.message.element import Image, MultimediaElement, Plain
         from graia.ariadne.util.cooldown import CoolDown
         from graia.ariadne.event.message import MessageEvent
         from graia.ariadne.event.message import GroupMessage
-        from modules.file_manager import download_image, compress_image_max_vol
+        from graia.ariadne.exception import UnknownTarget
+        from modules.file_manager import download_file, compress_image_max_vol
+        from .select import Selector
+        from .evaluate import Evaluate
 
         self.__register_all_config()
         self._config_registry.load_config()
@@ -78,21 +80,24 @@ class PicEval(AbstractPlugin):
         async def eval(group: Group, message: MessageChain, event: MessageEvent):
             if not hasattr(event.quote, "origin"):
                 return
-
-            origin_message: GroupMessage = await ariadne_app.get_message_from_id(message=event.quote.id, target=group)
-            origin_chain: MessageChain = origin_message.message_chain
-            print()
             try:
                 score = int(str(message.get(Plain, 1)[0]))
             except ValueError:
                 return
+            try:
+                origin_message: GroupMessage = await ariadne_app.get_message_from_id(
+                    message=event.quote.id, target=group
+                )
+            except UnknownTarget:
+                await ariadne_app.send_group_message(group, "a, 这次不行")
+                return
+            origin_chain: MessageChain = origin_message.message_chain
             if Image in origin_chain:
                 print("FOUND IMAGE")
-                # TODO hash the url to get the image name,prevent re-download
-                path = download_image(origin_chain.get(Image, 1)[0].url, cache_dir_path)
+                path = await download_file(origin_chain.get(Image, 1)[0].url, cache_dir_path)
             elif MultimediaElement in origin_chain:
                 print("FOUND MULTIMEDIA")
-                path = download_image(origin_chain.get(MultimediaElement, 1)[0].url, cache_dir_path)
+                path = await download_file(origin_chain.get(MultimediaElement, 1)[0].url, cache_dir_path)
             else:
                 return
             # TODO use deepdanboru to interrogate the content

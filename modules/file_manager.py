@@ -2,11 +2,12 @@ import base64
 import hashlib
 import os
 import time
-from typing import List, Sequence,Tuple
-import requests
+from typing import List, Sequence, Tuple
+
 import aiohttp
 from PIL import Image
-from datetime import datetime
+
+
 def get_current_file_path() -> str:
     """
     get current file path
@@ -93,6 +94,7 @@ def clean_files(folder_path, time_limit):
 
     print(f"清理文件个数：{clean_file_num}，清理文件大小：{clean_file_size/1024/1024} MB")
 
+
 def is_image(file_path) -> bool:
     """
     Check if a file is an image.
@@ -109,6 +111,7 @@ def is_image(file_path) -> bool:
         return True
     except IOError:
         return False
+
 
 async def download_file(url: str, save_dir: str, force_download: bool = False) -> str:
     """
@@ -151,7 +154,7 @@ async def download_file(url: str, save_dir: str, force_download: bool = False) -
     return ""
 
 
-def compress_image_max_res(input_image_path: str, output_image_path: str, size: Tuple[int, int]):
+def compress_image_max_res(input_image_path: str, output_image_path: str, size: Tuple[int, int]) -> None:
     """
     Compresses an image to a specified size.
 
@@ -172,7 +175,7 @@ def compress_image_max_res(input_image_path: str, output_image_path: str, size: 
     max_width, max_height = size
     if max_height > height and max_width > width:
         image.save(output_image_path, format="png")
-        return
+        return None
     # 计算压缩比例
     ratio = min(max_width / width, max_height / height)
 
