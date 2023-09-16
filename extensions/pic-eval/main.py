@@ -17,6 +17,8 @@ class PicEval(AbstractPlugin):
 
     CONFIG_RAND_KEYWORD = "RandKeyword"
 
+    CONFIG_MAX_FILE_SIZE = "MaxFileSize"
+
     def _get_config_parent_dir(self) -> str:
         return os.path.abspath(os.path.dirname(__file__))
 
@@ -46,11 +48,12 @@ class PicEval(AbstractPlugin):
         self._config_registry.register_config(
             self.CONFIG_PICTURE_CACHE_DIR_PATH, f"{self._get_config_parent_dir()}/cache"
         )
+        self._config_registry.register_config(self.CONFIG_MAX_FILE_SIZE, 6 * 1024 * 1024)
 
     def install(self):
+        from colorama import Fore
         from graia.ariadne.message.chain import MessageChain
         from graia.ariadne.model import Group
-
         from graia.ariadne.message.parser.base import ContainKeyword
         from graia.ariadne.message.element import Image, MultimediaElement, Plain
         from graia.ariadne.util.cooldown import CoolDown
@@ -100,8 +103,8 @@ class PicEval(AbstractPlugin):
                 path = await download_file(origin_chain.get(MultimediaElement, 1)[0].url, cache_dir_path)
             else:
                 return
-            # TODO use deepdanboru to interrogate the content
-            print(f"eval {score} at {path}")
+
+            print(f"{Fore.GREEN}eval {score} at {path}")
             evaluator.mark(path, score)
             await ariadne_app.send_group_message(group, f"Evaluated pic as {score}")
 
@@ -115,6 +118,9 @@ class PicEval(AbstractPlugin):
         async def rand_picture(group: Group):
             picture = selector.random_select()
             output_path = f"{cache_dir_path}/{os.path.basename(picture)}"
-            print(f"Compress to {compress_image_max_vol(picture, output_path, 6 * 1024 * 1024)}")
+            quality = compress_image_max_vol(
+                picture, output_path, self._config_registry.get_config(self.CONFIG_MAX_FILE_SIZE)
+            )
+            print(f"Compress to {quality}")
 
             await ariadne_app.send_group_message(group, Image(path=output_path))
