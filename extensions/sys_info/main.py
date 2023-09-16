@@ -51,7 +51,7 @@ class SysInfo(AbstractPlugin):
 
         def get_all_cmd_info() -> str:
             temp_string = "Available CMD:\n"
-            for cmd in ConfigClient.all_available_cmd():
+            for cmd in ConfigClient.get_all_available_cmd():
                 temp_string += f"\t{cmd}\n"
             return temp_string
 
