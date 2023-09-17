@@ -89,13 +89,13 @@ class StableDiffusionPlugin(AbstractPlugin):
 
     def install(self):
         from graia.ariadne.message.chain import MessageChain, Image
-        from graia.ariadne.message.parser.base import ContainKeyword, DetectPrefix
+        from graia.ariadne.message.parser.base import ContainKeyword
         from graia.ariadne.model import Group
         from dynamicprompts.wildcards import WildcardManager
         from dynamicprompts.generators import RandomPromptGenerator
         from .stable_diffusion import StableDiffusionApp, DiffusionParser, HiResParser
 
-        from modules.config_utils import ConfigClient, CmdBuilder
+        from modules.config_utils import CmdBuilder
         from modules.file_manager import img_to_base64
         from .controlnet import ControlNetUnit, Controlnet
 
@@ -139,7 +139,7 @@ class StableDiffusionPlugin(AbstractPlugin):
                 },
             }
         }
-        config_client = ConfigClient(cmd_syntax_tree)
+        self._cmd_client.register(cmd_syntax_tree)
         translater: Optional[AbstractPlugin] = self._plugin_view.get(self.__TRANSLATE_PLUGIN_NAME, None)
         if translater:
             translate: StableDiffusionPlugin.__TRANSLATE_METHOD_TYPE = getattr(translater, self.__TRANSLATE_METHOD_NAME)
@@ -254,24 +254,6 @@ class StableDiffusionPlugin(AbstractPlugin):
 
             # Send the image as a message in the group
             await ariadne_app.send_message(group, MessageChain("") + Image(path=send_result[0]))
-
-        @bord_cast.receiver(
-            "GroupMessage",
-            decorators=[DetectPrefix(prefix=self._config_registry.get_config(self.CONFIG_CONFIG_CLIENT_KEYWORD))],
-        )
-        async def sd_client(group: Group, message: MessageChain):
-            """
-            Allows cli operations
-            Args:
-                group ():
-                message ():
-
-            Returns:
-
-            """
-            out_string = config_client.interpret(str(message))
-            if isinstance(out_string, str):
-                await ariadne_app.send_message(group, message=out_string)
 
 
 def de_assembly(

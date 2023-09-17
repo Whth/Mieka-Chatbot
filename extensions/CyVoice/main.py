@@ -70,13 +70,8 @@ class CyVoice(AbstractPlugin):
         self._config_registry.register_config(self.CONFIG_ANNOTATE_STATEMENT, "ちゃんと聞いてくださいね、私の名前は")
 
     def install(self):
-        from graia.ariadne.message.chain import MessageChain
         from graia.ariadne.message.element import Voice
-        from graia.ariadne.message.parser.base import DetectPrefix
-        from graia.ariadne.model import Group
-
-        from modules.config_utils import ConfigClient, CmdBuilder
-
+        from modules.config_utils import CmdBuilder
         from .api import VITS
 
         self.__register_all_config()
@@ -84,8 +79,7 @@ class CyVoice(AbstractPlugin):
         translater: Optional[AbstractPlugin] = self._plugin_view.get(self.__TRANSLATE_PLUGIN_NAME, None)
         if translater:
             translate: CyVoice.__TRANSLATE_METHOD_TYPE = getattr(translater, self.__TRANSLATE_METHOD_NAME)
-        ariadne_app = self._ariadne_app
-        bord_cast = ariadne_app.broadcast
+
         temp_dir: str = self._config_registry.get_config(self.CONFIG_TEMP_FILE_DIR_PATH)
         os.makedirs(temp_dir, exist_ok=True)
         VITS.base = self._config_registry.get_config(self.CONFIG_API_HOST_URL)
@@ -168,12 +162,4 @@ class CyVoice(AbstractPlugin):
                 },
             }
         }
-        client = ConfigClient(tree)
-
-        @bord_cast.receiver(
-            "GroupMessage",
-            decorators=[DetectPrefix(prefix=self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD))],
-        )
-        async def cyvoice_client(group: Group, message: MessageChain):
-            result = client.interpret(str(message))
-            await ariadne_app.send_message(group, result)
+        self._cmd_client.register(tree)

@@ -11,7 +11,7 @@ from graia.ariadne.message.chain import MessageChain
 from graia.ariadne.model import Group, Friend, Member, Stranger
 
 from constant import MAIN, REQUIREMENTS_FILE_NAME
-from modules.config_utils import ConfigClient
+from modules.config_utils import CmdClient
 from modules.file_manager import get_all_sub_dirs
 from modules.launch_utils import run_pip_install, requirements_met
 from modules.plugin_base import AbstractPlugin, PluginsView
@@ -71,7 +71,10 @@ class ChatBot(object):
         )
 
         self._bot_name: str = bot_info.bot_name
-        self._bot_client: ConfigClient = ConfigClient(bot_config.syntax_tree)
+        self._bot_client: CmdClient = CmdClient(
+            bot_config.syntax_tree
+        )  # TODO parse this instance to very plugin, to let them able to register cmd
+
         # init plugin installation registry dict and proxy
         self._installed_plugins: Dict[str, AbstractPlugin] = {}
         self._installed_plugins_proxy: PluginsView = MappingProxyType(self._installed_plugins)
@@ -170,7 +173,7 @@ class ChatBot(object):
         """
         if plugin.get_plugin_name in self._installed_plugins:
             raise ValueError("Plugin already registered")
-        plugin_instance = plugin(self._ariadne_app, self.get_installed_plugins)
+        plugin_instance = plugin(self._ariadne_app, self.get_installed_plugins, self._bot_client)
 
         plugin_instance.install()
         self._installed_plugins[plugin.get_plugin_name()] = plugin_instance

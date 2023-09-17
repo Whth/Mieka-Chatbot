@@ -4,7 +4,7 @@ from graia.ariadne.connection.config import WebsocketClientConfig
 
 from constant import CONFIG_FILE_NAME, CONFIG_DIR, EXTENSION_DIR
 from modules.chat_bot import ChatBot, BotInfo, BotConfig, BotConnectionConfig
-from modules.config_utils import ConfigRegistry, ConfigClient
+from modules.config_utils import ConfigRegistry, CmdClient
 from modules.file_manager import get_all_sub_dirs
 
 WEBSOCKET_HOST = "websocket_host"
@@ -18,7 +18,7 @@ __version__ = "v0.3.1"
 
 def get_all_cmd_info() -> str:
     temp_string = "Available CMD:\n"
-    for cmd in ConfigClient.get_all_available_cmd():
+    for cmd in CmdClient.get_all_available_cmd():
         temp_string += f"\t{cmd}\n"
     return temp_string
 

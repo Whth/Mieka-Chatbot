@@ -317,23 +317,23 @@ class ConfigRegistry(object):
         self._config_registry_table[config_path] = new_config_value
 
 
-Setter = Callable[[Any], None]
+Setter = Callable[[...], None]
 Void = Callable[[], None]
+StringMaker = Callable[[], str]
 
 
-class ConfigClient(object):
+class CmdClient(object):
     """
     a config client that allows simple cli-liked operation on config
     """
 
-    __Clients: List["ConfigClient"] = []
+    def __init__(self, syntax_tree: Optional[Dict[str, Any]] = None):
+        self._Hall_Cmd_Tree: Dict[str, Any] = {}
+        self.Hall_Cmd_Tree: MappingProxyType = MappingProxyType(self._Hall_Cmd_Tree)
+        self.register(syntax_tree) if syntax_tree else None
 
-    __Hall_Cmd_Tree: Dict[str, Any] = {}
-
-    Hall_Cmd_Tree: MappingProxyType = MappingProxyType(__Hall_Cmd_Tree)
-
-    @classmethod
-    def get_all_available_cmd(cls) -> List[str]:
+    @property
+    def get_all_available_cmd(self) -> Tuple[str]:
         """
         Returns a list of all available commands.
 
@@ -341,10 +341,9 @@ class ConfigClient(object):
         :rtype: List[str]
         """
 
-        return list(cls.__Hall_Cmd_Tree.keys())
+        return tuple(self._Hall_Cmd_Tree.keys())
 
-    @classmethod
-    def get_help(cls, cmd_path_chain: List[str]) -> Union[List[str], Dict[str, Any]]:
+    def get_help(self, cmd_path_chain: List[str]) -> Union[List[str], Dict[str, Any]]:
         """
         Retrieves the help information for a command specified by the given command path chain.
 
@@ -356,16 +355,11 @@ class ConfigClient(object):
             If the command is callable, return the signature with annotations.
             If the command is a dictionary, returns a list of its keys.
         """
-        cmd_options = get_config(cls.Hall_Cmd_Tree, cmd_path_chain)
+        cmd_options = get_config(self.Hall_Cmd_Tree, cmd_path_chain)
         if callable(cmd_options):
             return get_signature_with_annotations(cmd_options)
         if isinstance(cmd_options, Dict):
             return list(cmd_options.keys())
-
-    def __init__(self, syntax_tree: Dict[str, Any]):
-        self._syntax_tree = syntax_tree
-        self.__Clients.append(self)
-        self.__update(syntax_tree)
 
     def interpret(self, cmd: str) -> Any:
         """
@@ -384,7 +378,7 @@ class ConfigClient(object):
         # Split the command into tokens
         cmd_tokens: List[str] = re.split(r"\s+", cmd)
         tokens_count = len(cmd_tokens)
-        temp: Union[Dict, Setter, Void] = self._syntax_tree
+        temp: Union[Dict, MappingProxyType, Setter, Void, StringMaker] = self.Hall_Cmd_Tree
 
         # Traverse the syntax tree based on command tokens
         for token in cmd_tokens:
@@ -417,11 +411,22 @@ class ConfigClient(object):
 
         raise KeyError("Bad syntax tree, please check")
 
-    def __update(self, syntax_tree: Dict[str, Any]):
-        hall_tree_cmds = self.Hall_Cmd_Tree.keys()
-        if any(key in hall_tree_cmds for key in syntax_tree.keys()):
+    def register(self, syntax_tree: Dict[str, Any]):
+        """
+        Register a new syntax tree for a command.
+
+        Parameters:
+            syntax_tree (Dict[str, Any]): The syntax tree to register.
+
+        Raises:
+            KeyError: If the command is already registered.
+
+        Returns:
+            None
+        """
+        if any(key in self.Hall_Cmd_Tree for key in syntax_tree.keys()):
             raise KeyError("cmd already registered!")
-        self.__Hall_Cmd_Tree.update(syntax_tree)
+        self._Hall_Cmd_Tree.update(syntax_tree)
 
 
 ConfigValue = TypeVar("ConfigValue", int, str, float, list, dict)
