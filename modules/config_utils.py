@@ -25,9 +25,44 @@ def registry_path_to_chain(config_registry_path) -> List[str]:
     return config_registry_path_chain
 
 
+def get_signature(func) -> List[str]:
+    """
+    Returns a list of strings representing the names of the parameters of the given function.
+
+    Parameters:
+        func (callable): The function for which to retrieve the parameter names.
+
+    Returns:
+        List[str]: A list of strings representing the names of the parameters of the given function.
+    """
+    sig = inspect.signature(func)
+    params = [param for param in sig.parameters]
+    return params
+
+
+import inspect
+
+
+def get_signature_with_annotations(func) -> Dict[str, Any]:
+    """
+    Retrieves the signature of a function with its annotations.
+
+    Args:
+        func (callable): The function to retrieve the signature from.
+
+    Returns:
+        dict: A dictionary containing the parameters as keys and their corresponding annotations as values.
+    """
+    sig = inspect.signature(func)
+    params = {}
+    for param in sig.parameters.values():
+        params[param.name] = param.annotation
+    return params
+
+
 # region get_config
 @singledispatch
-def get_config(body: Dict, chain: Sequence[str]) -> Any:
+def get_config(body: Union[Dict, MappingProxyType], chain: Sequence[str]) -> Any:
     """
     Get config recursively from the nested dict
     Args:
@@ -41,7 +76,7 @@ def get_config(body: Dict, chain: Sequence[str]) -> Any:
 
 
 @get_config.register(dict)
-def _(body: Dict, chain: Sequence[str]) -> Any:
+def _(body: Union[Dict, MappingProxyType], chain: Sequence[str]) -> Any:
     if len(chain) == 1:
         # Store the value
         return body.get(chain[0])
@@ -293,22 +328,44 @@ class ConfigClient(object):
 
     __Clients: List["ConfigClient"] = []
 
+    __Hall_Cmd_Tree: Dict[str, Any] = {}
+
+    Hall_Cmd_Tree: MappingProxyType = MappingProxyType(__Hall_Cmd_Tree)
+
     @classmethod
-    def all_available_cmd(cls) -> List[str]:
+    def get_all_available_cmd(cls) -> List[str]:
         """
         Returns a list of all available commands.
 
         :return: A list of strings representing the available commands.
         :rtype: List[str]
         """
-        cmds: List[str] = []
-        for client in cls.__Clients:
-            cmds.extend(list(client._syntax_tree.keys()))
-        return cmds
+
+        return list(cls.__Hall_Cmd_Tree.keys())
+
+    @classmethod
+    def get_help(cls, cmd_path_chain: List[str]) -> Union[List[str], Dict[str, Any]]:
+        """
+        Retrieves the help information for a command specified by the given command path chain.
+
+        Parameters:
+            cmd_path_chain (List[str]): A list of strings representing the path to the desired command.
+
+        Returns:
+            Union[List[str], Dict[str, Any]]: The help information for the command.
+            If the command is callable, return the signature with annotations.
+            If the command is a dictionary, returns a list of its keys.
+        """
+        cmd_options = get_config(cls.Hall_Cmd_Tree, cmd_path_chain)
+        if callable(cmd_options):
+            return get_signature_with_annotations(cmd_options)
+        if isinstance(cmd_options, Dict):
+            return list(cmd_options.keys())
 
     def __init__(self, syntax_tree: Dict[str, Any]):
         self._syntax_tree = syntax_tree
         self.__Clients.append(self)
+        self.__update(syntax_tree)
 
     def interpret(self, cmd: str) -> Any:
         """
@@ -353,6 +410,12 @@ class ConfigClient(object):
                     raise ValueError(f"expected {required_token_count} args, got {tokens_count}")
 
         raise KeyError("Bad syntax tree, please check")
+
+    def __update(self, syntax_tree: Dict[str, Any]):
+        hall_tree_cmds = self.Hall_Cmd_Tree.keys()
+        if any(key in hall_tree_cmds for key in syntax_tree.keys()):
+            raise KeyError("cmd already registered!")
+        self.__Hall_Cmd_Tree.update(syntax_tree)
 
 
 ConfigValue = TypeVar("ConfigValue", int, str, float, list, dict)
