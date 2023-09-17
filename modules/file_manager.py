@@ -211,7 +211,7 @@ def compress_image_max_vol(
         raise ValueError(f"min_quality must be a multiple of {step}")
     img = Image.open(input_image_path)
     current_quality = 100
-    while current_quality >= min_quality:
+    while current_quality > min_quality:
         img.save(output_image_path, quality=current_quality)
 
         compressed_img_vol = os.path.getsize(output_image_path)
