@@ -381,10 +381,12 @@ class ConfigClient(object):
             KeyError: If the command is not supported or has an incorrect number
                 of arguments.
         """
+        # Split the command into tokens
         cmd_tokens: List[str] = re.split(r"\s+", cmd)
         tokens_count = len(cmd_tokens)
         temp: Union[Dict, Setter, Void] = self._syntax_tree
 
+        # Traverse the syntax tree based on command tokens
         for token in cmd_tokens:
             if token not in temp:
                 return
@@ -392,14 +394,18 @@ class ConfigClient(object):
             temp = temp[token]
             tokens_count -= 1
 
+            # If a callable is encountered, execute it
             if callable(temp):
+                # Extract the parameter names from the function signature
                 hints = signature(temp).parameters
                 params_name_list: List[str] = list(hints.keys())
                 required_token_count = len(hints)
 
+                # If the number of tokens matches the number of parameters
                 if tokens_count == required_token_count:
                     raw_params = cmd_tokens[-tokens_count:]
 
+                    # Convert the raw parameters to their annotated types
                     params_pack = tuple(
                         hints[param_name].annotation(raw_param)
                         for param_name, raw_param in zip(params_name_list, raw_params)

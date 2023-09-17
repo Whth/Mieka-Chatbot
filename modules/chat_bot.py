@@ -90,7 +90,11 @@ class ChatBot(object):
             Returns:
                 None
             """
-            await self._ariadne_app.send_message(target, message=(self._bot_client.interpret(str(message))))
+            try:
+                stdout = self._bot_client.interpret(str(message))
+            except KeyError:
+                return
+            (await self._ariadne_app.send_message(target, message=stdout)) if stdout else None
 
         for message_type in bot_config.accepted_message_types:
             self._ariadne_app.broadcast.receiver(message_type)(_bot_client_call)
