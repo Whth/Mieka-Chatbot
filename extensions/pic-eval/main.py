@@ -65,12 +65,13 @@ class PicEval(AbstractPlugin):
         from modules.file_manager import download_file, compress_image_max_vol
         from .select import Selector
         from .evaluate import Evaluate
+        from .img_manager import ImageRegistry
 
         self.__register_all_config()
         self._config_registry.load_config()
         ariadne_app = self._ariadne_app
         bord_cast = ariadne_app.broadcast
-
+        img_registry = ImageRegistry(f"{self._get_config_parent_dir()}/images_registry.json")
         asset_dir_path: List[str] = self._config_registry.get_config(self.CONFIG_PICTURE_ASSET_PATH)
         ignored: List[str] = self._config_registry.get_config(self.CONFIG_PICTURE_IGNORED_DIRS)
         cache_dir_path: str = self._config_registry.get_config(self.CONFIG_PICTURE_CACHE_DIR_PATH)
@@ -157,6 +158,7 @@ class PicEval(AbstractPlugin):
                 None
             """
             picture = selector.random_select()
+
             output_path = f"{cache_dir_path}/{os.path.basename(picture)}"
             quality = compress_image_max_vol(
                 picture, output_path, self._config_registry.get_config(self.CONFIG_MAX_FILE_SIZE)

@@ -10,14 +10,16 @@ class Evaluate(object):
     LEVEL_SUFFIX = ""
 
     def __init__(self, store_dir_path: str, level_resolution: int):
-        sub_dirs: List[str] = get_all_sub_dirs(store_dir_path)
+        if level_resolution < 1 or level_resolution > 100:
+            raise ValueError("the level resolution is too big")
         self._level_dirs: List[str] = [
             f"{self.LEVEL_PREFIX}{level}{self.LEVEL_SUFFIX}" for level in list(range(1, level_resolution + 1))
         ]
-        if sub_dirs and not all(sub_dir in self._level_dirs for sub_dir in sub_dirs):
+        sub_dirs: List[str] = get_all_sub_dirs(store_dir_path)
+        if any(sub_dir not in self._level_dirs for sub_dir in sub_dirs):
             raise FileExistsError("store dir have incorrect content!")
-        if level_resolution < 1 or level_resolution > 100:
-            raise ValueError("the level resolution is too big")
+        for level_dir in self._level_dirs:
+            os.makedirs(f"{store_dir_path}/{level_dir}", exist_ok=True)
         self._store_dir_path: str = store_dir_path
 
         self._score_bound: Tuple[int, int] = (1, level_resolution)
