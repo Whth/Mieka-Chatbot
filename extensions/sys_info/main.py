@@ -49,12 +49,6 @@ class SysInfo(AbstractPlugin):
         self.__register_all_config()
         self._config_registry.load_config()
 
-        def get_all_cmd_info() -> str:
-            temp_string = "Available CMD:\n"
-            for cmd in ConfigClient.all_available_cmd():
-                temp_string += f"\t{cmd}\n"
-            return temp_string
-
         tree = {
             self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD): {
                 self.__INFO_CMD: {
@@ -63,8 +57,7 @@ class SysInfo(AbstractPlugin):
                     self.__INFO_DISK_CMD: get_disk_info,
                     self.__INFO_GPU_CMD: get_gpu_info,
                     self.__INFO_ALL_CMD: get_all_info,
-                },
-                self.__SYS_HELP: get_all_cmd_info,
+                }
             }
         }
         client = ConfigClient(tree)
