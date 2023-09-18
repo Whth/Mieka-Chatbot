@@ -41,14 +41,8 @@ class BaiduTranslater(AbstractPlugin):
         self._config_registry.register_config(self.CONFIG_TRANSLATE_KEYWORD, "翻译")
 
     def install(self):
-        from graia.ariadne.message.chain import MessageChain
-        from graia.ariadne.message.parser.base import DetectPrefix
-        from graia.ariadne.model import Group
         from .translater import Translater
-        from modules.config_utils import ConfigClient
 
-        ariadne_app = self._ariadne_app
-        bord_cast = ariadne_app.broadcast
         self.__register_all_config()
         self._config_registry.load_config()
         self.translater = Translater(
@@ -58,29 +52,10 @@ class BaiduTranslater(AbstractPlugin):
         )
 
         def _trans_partial(to_lang: str, query: str) -> str:
-            return self.translater.translate(to_lang, query)
+            return f"翻译结果:\n\t{self.translater.translate(to_lang, query)}"
 
         cmd_syntax_tree: Dict = {self._config_registry.get_config(self.CONFIG_TRANSLATE_KEYWORD): _trans_partial}
-        client = ConfigClient(cmd_syntax_tree)
-
-        @bord_cast.receiver(
-            "GroupMessage",
-            decorators=[DetectPrefix(prefix=self._config_registry.get_config(self.CONFIG_TRANSLATE_KEYWORD))],
-        )
-        async def translate(group: Group, message: MessageChain):
-            """
-            Asynchronous function that translates a message in a group.
-
-            Args:
-                group (Group): The group where the message was sent.
-                message (MessageChain): The message to be translated.
-
-            Returns:
-                None
-            """
-            result = client.interpret(str(message))
-
-            await ariadne_app.send_message(group, message=f"翻译结果:\n\t{result}")
+        self._cmd_client.register(cmd_syntax_tree)
 
     def translate(self, to_lang: str, query: str, from_lang: str = "auto"):
         """

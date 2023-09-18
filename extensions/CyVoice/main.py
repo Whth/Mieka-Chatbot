@@ -70,13 +70,8 @@ class CyVoice(AbstractPlugin):
         self._config_registry.register_config(self.CONFIG_ANNOTATE_STATEMENT, "ちゃんと聞いてくださいね、私の名前は")
 
     def install(self):
-        from graia.ariadne.message.chain import MessageChain
         from graia.ariadne.message.element import Voice
-        from graia.ariadne.message.parser.base import DetectPrefix
-        from graia.ariadne.model import Group
-
-        from modules.config_utils import ConfigClient, CmdSetterBuilder
-
+        from modules.config_utils import CmdBuilder
         from .api import VITS
 
         self.__register_all_config()
@@ -84,12 +79,11 @@ class CyVoice(AbstractPlugin):
         translater: Optional[AbstractPlugin] = self._plugin_view.get(self.__TRANSLATE_PLUGIN_NAME, None)
         if translater:
             translate: CyVoice.__TRANSLATE_METHOD_TYPE = getattr(translater, self.__TRANSLATE_METHOD_NAME)
-        ariadne_app = self._ariadne_app
-        bord_cast = ariadne_app.broadcast
+
         temp_dir: str = self._config_registry.get_config(self.CONFIG_TEMP_FILE_DIR_PATH)
         os.makedirs(temp_dir, exist_ok=True)
         VITS.base = self._config_registry.get_config(self.CONFIG_API_HOST_URL)
-        cmd_builder = CmdSetterBuilder(
+        cmd_builder = CmdBuilder(
             config_setter=self._config_registry.set_config, config_getter=self._config_registry.get_config
         )
         configurable_options: List[str] = [
@@ -160,20 +154,12 @@ class CyVoice(AbstractPlugin):
                 self.__CURRENT_CV_CMD: get_current_cv,
                 self.__CONFIG_CMD: {
                     self.__CONFIG_LIST_CMD: list_out_configs,
-                    self.__CONFIG_SET_CMD: cmd_builder.build(),
+                    self.__CONFIG_SET_CMD: cmd_builder.build_setter_hall(),
                 },
                 self.__TRANSLATE_CMD: {
-                    self.__TRANSLATE_ENABLE_CMD: cmd_builder.build_for(self.CONFIG_ENABLE_TRANSLATE),
-                    self.__TRANSLATE_TO_LANG_CMD: cmd_builder.build_for(self.CONFIG_TARGET_LANGUAGE),
+                    self.__TRANSLATE_ENABLE_CMD: cmd_builder.build_setter_for(self.CONFIG_ENABLE_TRANSLATE),
+                    self.__TRANSLATE_TO_LANG_CMD: cmd_builder.build_setter_for(self.CONFIG_TARGET_LANGUAGE),
                 },
             }
         }
-        client = ConfigClient(tree)
-
-        @bord_cast.receiver(
-            "GroupMessage",
-            decorators=[DetectPrefix(prefix=self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD))],
-        )
-        async def cyvoice_client(group: Group, message: MessageChain):
-            result = client.interpret(str(message))
-            await ariadne_app.send_message(group, result)
+        self._cmd_client.register(tree)

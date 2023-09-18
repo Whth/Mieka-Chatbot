@@ -1,12 +1,11 @@
 import base64
-import datetime
 import hashlib
 import os
 import time
-from datetime import datetime
-from typing import List
+from typing import List, Sequence, Tuple
 
-import requests
+import aiohttp
+from PIL import Image
 
 
 def get_current_file_path() -> str:
@@ -20,33 +19,38 @@ def get_current_file_path() -> str:
     return inspect.getabsfile(inspect.currentframe())
 
 
-def explore_folder(root_path: str) -> List[str]:
+def explore_folder(root_path: str, ignore_list: Sequence[str] = tuple()) -> List[str]:
     """
+    Recursively explores a folder and returns a list of all file paths.
 
     Args:
-        root_path (str):
+        root_path (str): The root path of the folder to explore.
+        ignore_list (Sequence[str]): A list of folder names to ignore.
 
     Returns:
-
+        List[str]: A list of all file paths found in the folder.
     """
-    # 存储所有文件的路径
+    # Store all file paths
     file_paths = []
 
-    # 遍历目录下所有文件和子目录
+    # Traverse all files and subdirectories in the directory
     for root, dirs, files in os.walk(root_path):
+        # Exclude folders in the ignored list
+        dirs[:] = [d for d in dirs if d not in ignore_list]
+
         for file in files:
-            # 处理每个文件
+            # Process each file
             file_path = os.path.join(root, file)
-            # 存储文件路径到列表
+            # Add a file path to the list
             file_paths.append(file_path)
 
-        for dir in dirs:
-            # 处理每个子目录
-            subdir = os.path.join(root, dir)
-            # 递归遍历子目录，并将子目录中的文件路径加到列表中
-            file_paths.extend(explore_folder(subdir))
+        for directory in dirs:
+            # Process each subdirectory
+            subdir = os.path.join(root, directory)
+            # Recursively explore the subdirectory and add file paths to the list
+            file_paths.extend(explore_folder(subdir, ignore_list))
 
-    # 返回所有文件的路径列表
+    # Return the list of all file paths
     return file_paths
 
 
@@ -91,26 +95,132 @@ def clean_files(folder_path, time_limit):
     print(f"清理文件个数：{clean_file_num}，清理文件大小：{clean_file_size/1024/1024} MB")
 
 
-def download_image(url: str, save_dir: str) -> str:
+def is_image(file_path) -> bool:
     """
-    Downloads an image from the given URL and saves it to the specified directory.
+    Check if a file is an image.
 
-    Args:
-        url (str): The URL of the image.
-        save_dir (str): The directory where the image should be saved.
+    Parameters:
+        file_path (str): The path to the file.
 
     Returns:
-        str: The path where the image is saved, or None if the download fails.
+        bool: True if the file is an image, False otherwise.
     """
-    img_name = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-    response = requests.get(url)
-    if response.status_code == 200:
-        os.makedirs(save_dir, exist_ok=True)
-        path = os.path.join(save_dir, f"{img_name}.png")
-        with open(path, "wb") as f:
-            f.write(response.content)
+    try:
+        img = Image.open(file_path)
+        img.close()
+        return True
+    except IOError:
+        return False
+
+
+async def download_file(url: str, save_dir: str, force_download: bool = False) -> str:
+    """
+    Downloads a file from the given URL and saves it to the specified directory.
+
+    Args:
+        url (str): The URL of the file to download.
+        save_dir (str): The directory to save the downloaded file.
+        force_download (bool, optional): Whether to force re-download of the file if it already exists. Defaults to False.
+
+    Returns:
+        str: The path to the downloaded file.
+    """
+    # Generate the file name using the MD5 hash of the URL
+    url_hash = hashlib.md5(url.encode()).hexdigest()
+
+    # Create the save directory if it doesn't exist
+    os.makedirs(save_dir, exist_ok=True)
+
+    # Generate the file path
+    path = os.path.join(save_dir, f"{url_hash}.png")
+
+    # Check if the file already exists and force_download is False
+    if not force_download and os.path.exists(path):
         return path
+
+    # Download the file using aiohttp
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            if response.status == 200:
+                # Write the file in chunks
+                with open(path, "wb") as f:
+                    while True:
+                        chunk = await response.content.read(1024)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                return path
+
     return ""
+
+
+def compress_image_max_res(input_image_path: str, output_image_path: str, size: Tuple[int, int]) -> None:
+    """
+    Compresses an image to a specified size.
+
+    Args:
+        input_image_path (str): The path to the input image file.
+        size (Tuple[int, int]): The desired width and height of the output image.
+        output_image_path (str): The path to save the compressed image.
+
+    Returns:
+        str: The path to the compressed image file.
+    """
+
+    # 打开图像
+    image = Image.open(input_image_path)
+
+    # 获取原始图像的宽度和高度
+    width, height = image.size
+    max_width, max_height = size
+    if max_height > height and max_width > width:
+        image.save(output_image_path, format="png")
+        return None
+    # 计算压缩比例
+    ratio = min(max_width / width, max_height / height)
+
+    # 计算压缩后的新宽度和高度
+    new_width = int(width * ratio)
+    new_height = int(height * ratio)
+
+    # 压缩图像
+    resized_image = image.resize((new_width, new_height), reducing_gap=2.0)
+
+    # 保存压缩后的图像
+    resized_image.save(output_image_path, format="png")
+
+
+def compress_image_max_vol(
+    input_image_path: str, output_image_path: str, max_file_size: int, min_quality: int = 85
+) -> int:
+    """
+    Compresses an image to reduce its file size while maintaining a minimum quality.
+    Args:
+        input_image_path (str): The path of the input image file.
+        output_image_path (str): The path to save the compressed image file.
+        max_file_size (int): The maximum size in bytes that the compressed image file should have.
+        min_quality (int, optional): The minimum quality level (0-100) to maintain while compressing the image.
+         Defaults to 85.
+    Returns:
+        int: the quality level that the image has been
+    Raises:
+        ValueError: If the `min_quality` is not a multiple of 5.
+    """
+    step = 5
+    if min_quality % step != 0:
+        raise ValueError(f"min_quality must be a multiple of {step}")
+    img = Image.open(input_image_path)
+    current_quality = 100
+    while current_quality > min_quality:
+        img.save(output_image_path, quality=current_quality)
+
+        compressed_img_vol = os.path.getsize(output_image_path)
+
+        if compressed_img_vol < max_file_size:
+            break
+        img = Image.open(output_image_path)
+        current_quality -= step
+    return current_quality
 
 
 def img_to_base64(file_path: str) -> str:
