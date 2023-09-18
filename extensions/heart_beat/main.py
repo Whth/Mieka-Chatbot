@@ -23,7 +23,7 @@ class HeartBeat(AbstractPlugin):
 
     @classmethod
     def get_plugin_version(cls) -> str:
-        return "0.0.1"
+        return "0.0.2"
 
     @classmethod
     def get_plugin_author(cls) -> str:
@@ -41,27 +41,33 @@ class HeartBeat(AbstractPlugin):
         ariadne_app = self._ariadne_app
         scheduler: GraiaScheduler = ariadne_app.create(GraiaScheduler)
 
-        @scheduler.schedule(
-            timer=timers.every_custom_minutes(self._config_registry.get_config(self.CONFIG_HEART_BEAT_INTERVAL))
-        )
-        async def heart_beat():
-            """
-            Asynchronous function that sends a heart beat message.
+        interval = self._config_registry.get_config(self.CONFIG_HEART_BEAT_INTERVAL)
 
-            This function is decorated with `@scheduler.schedule` and is scheduled to run at a specific interval defined by the value returned by `self._config_registry.get_config(self.CONFIG_HEART_BEAT_INTERVAL)`.
+        if interval > 0:
 
-            Parameters:
-                None.
+            @scheduler.schedule(timer=timers.every_custom_minutes(interval))
+            async def heart_beat():
+                """
+                Asynchronous function that sends a heart beat message.
 
-            Returns:
-                None.
-            """
-            await ariadne_app.send_friend_message(
-                ariadne_app.account,
-                message=f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n'
-                f"HEART BEAT\n"
-                f"CODE: {generate_random_string(10)}",
-            )
+                This function is decorated with `@scheduler.schedule` and is scheduled to run at a specific interval defined by the value returned by `self._config_registry.get_config(self.CONFIG_HEART_BEAT_INTERVAL)`.
+
+                Parameters:
+                    None.
+
+                Returns:
+                    None.
+                """
+                await ariadne_app.send_friend_message(
+                    ariadne_app.account,
+                    message=f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n'
+                    f"HEART BEAT\n"
+                    f"CODE: {generate_random_string(10)}",
+                )
+
+            print(f"heart beat is enabled, beats every {interval} minutes")
+            return
+        print("heart beat is disabled")
 
 
 def generate_random_string(length: int) -> str:
