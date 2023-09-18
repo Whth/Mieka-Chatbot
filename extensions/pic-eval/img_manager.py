@@ -1,14 +1,18 @@
 import json
 import os
+import shutil
 import time
 from types import MappingProxyType
 from typing import Optional, Dict, List
 
 
 class ImageRegistry(object):
-    def __init__(self, save_path: str, max_size: Optional[int] = None) -> None:
+    def __init__(self, save_path: str, recycle_folder: Optional[str] = None, max_size: Optional[int] = None) -> None:
         self._save_path = save_path
         self._max_size = max_size
+        if recycle_folder:
+            os.makedirs(recycle_folder, exist_ok=True)
+        self._recycle_folder = recycle_folder
         self._images_registry: Dict[int, List[str, float]] = {}
         if os.path.exists(self._save_path):
             self.load()
@@ -34,6 +38,11 @@ class ImageRegistry(object):
 
     def remove(self, key: int, save: bool = False) -> bool:
         if key in self._images_registry:
+            file_path = self._images_registry[key][0]
+            if self._recycle_folder:
+                shutil.move(file_path, self._recycle_folder)
+            else:
+                os.remove(file_path)
             del self._images_registry[key]
             if save:
                 self.save()
@@ -42,7 +51,7 @@ class ImageRegistry(object):
 
     def _remove_oldest(self) -> None:
         oldest_key = min(self._images_registry, key=lambda k: self._images_registry[k][1])
-        self.remove(oldest_key)
+        del self._images_registry[oldest_key]
 
     def save(self) -> None:
         with open(self._save_path, "w", encoding="utf-8") as f:

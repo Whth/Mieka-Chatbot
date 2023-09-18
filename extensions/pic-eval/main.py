@@ -70,7 +70,10 @@ class PicEval(AbstractPlugin):
         self._config_registry.load_config()
         ariadne_app = self._ariadne_app
         bord_cast = ariadne_app.broadcast
-        img_registry = ImageRegistry(f"{self._get_config_parent_dir()}/images_registry.json")
+        img_registry = ImageRegistry(
+            f"{self._get_config_parent_dir()}/images_registry.json",
+            recycle_folder=f"{self._get_config_parent_dir()}/recycled",
+        )
         asset_dir_path: List[str] = self._config_registry.get_config(self.CONFIG_PICTURE_ASSET_PATH)
         ignored: List[str] = self._config_registry.get_config(self.CONFIG_PICTURE_IGNORED_DIRS)
         cache_dir_path: str = self._config_registry.get_config(self.CONFIG_PICTURE_CACHE_DIR_PATH)
@@ -171,8 +174,9 @@ class PicEval(AbstractPlugin):
         )
         async def watcher(message: ActiveGroupMessage):
             chain = message.message_chain
-            if Image in chain and os.path.exists(chain.get(Plain, 1)[0].text):
-                img_registry.register(message.id, str(chain))
+            file_path: str = chain.get(Plain, 1)[0].text
+            if Image in chain and os.path.exists(file_path):
+                img_registry.register(message.id, file_path)
                 print(f"registered {message.id}, Current len = {len(img_registry.images_registry)}")
 
         @bord_cast.receiver(
