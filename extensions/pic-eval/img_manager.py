@@ -12,10 +12,18 @@ class ImageRegistry(object):
         self._images_registry: Dict[int, List[str, float]] = {}
         if os.path.exists(self._save_path):
             self.load()
-        self._images_registry_proxy: MappingProxyType[str, List[str, float]] = MappingProxyType(self._images_registry)
+        self._images_registry_proxy: MappingProxyType[int, List[str, float]] = MappingProxyType(self._images_registry)
+
+    @property
+    def images_registry(self) -> MappingProxyType:
+        return self._images_registry_proxy
 
     def register(self, key: int, image_path: str) -> None:
         self._images_registry[key] = [image_path, time.time()]
+        self.prune()
+        self.save()
+
+    def prune(self) -> None:
         if self._max_size and len(self._images_registry) > self._max_size:
             num_to_remove = len(self._images_registry) - self._max_size
             for _ in range(num_to_remove):
@@ -24,18 +32,23 @@ class ImageRegistry(object):
     def get(self, key: int) -> str:
         return self._images_registry[key][0]
 
-    def remove(self, key: int) -> None:
-        del self._images_registry[key]
+    def remove(self, key: int, save: bool = False) -> bool:
+        if key in self._images_registry:
+            del self._images_registry[key]
+            if save:
+                self.save()
+            return True
+        return False
 
     def _remove_oldest(self) -> None:
         oldest_key = min(self._images_registry, key=lambda k: self._images_registry[k][1])
-        del self._images_registry[oldest_key]
+        self.remove(oldest_key)
 
     def save(self) -> None:
         with open(self._save_path, "w", encoding="utf-8") as f:
-            json.dump(self._images_registry, f)
+            json.dump(self._images_registry, f, ensure_ascii=False, indent=2)
 
     def load(self) -> None:
         with open(self._save_path, "r", encoding="utf-8") as f:
-            temp: Dict[int, List[str, float]] = json.loads(f.read())
+            temp: Dict[int, List[str, float]] = json.load(f)
         self._images_registry.update(temp)

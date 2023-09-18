@@ -59,8 +59,7 @@ class PicEval(AbstractPlugin):
         from graia.ariadne.message.parser.base import ContainKeyword
         from graia.ariadne.message.element import Image, MultimediaElement, Plain
         from graia.ariadne.util.cooldown import CoolDown
-        from graia.ariadne.event.message import MessageEvent
-        from graia.ariadne.event.message import GroupMessage
+        from graia.ariadne.event.message import GroupMessage, ActiveGroupMessage, MessageEvent
         from graia.ariadne.exception import UnknownTarget
         from modules.file_manager import download_file, compress_image_max_vol
         from .select import Selector
@@ -165,4 +164,27 @@ class PicEval(AbstractPlugin):
             )
             print(f"Compress to {quality}")
 
-            await ariadne_app.send_group_message(group, Image(path=output_path))
+            await ariadne_app.send_group_message(group, Image(path=output_path) + Plain(picture))
+
+        @bord_cast.receiver(
+            "ActiveGroupMessage",
+        )
+        async def watcher(message: ActiveGroupMessage):
+            chain = message.message_chain
+            if Image in chain and os.path.exists(chain.get(Plain, 1)[0].text):
+                img_registry.register(message.id, str(chain))
+                print(f"registered {message.id}, Current len = {len(img_registry.images_registry)}")
+
+        @bord_cast.receiver(
+            "GroupMessage",
+            decorators=(
+                [
+                    ContainKeyword("rm"),
+                ],
+            ),
+        )
+        async def rm_picture(group: Group, message: MessageChain, event: MessageEvent):
+            if not hasattr(event.quote, "origin"):
+                return
+            success = img_registry.remove(event.quote.id, save=True)
+            await ariadne_app.send_group_message(group, f"Remove id-{event.quote.id}\nSuccess = {success}")
