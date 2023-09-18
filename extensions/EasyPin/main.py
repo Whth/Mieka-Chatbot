@@ -1,5 +1,5 @@
 import os
-from typing import Dict
+from typing import Union
 
 from modules.plugin_base import AbstractPlugin
 
@@ -11,8 +11,6 @@ class EasyPin(AbstractPlugin):
     __TASK_SET_CMD = "set"
     __TASK_LIST_CMD = "list"
     __TASK_DELETE_CMD = "delete"
-
-    CONFIG_DETECTED_KEYWORD = "detected_keyword"
 
     def _get_config_parent_dir(self) -> str:
         return os.path.abspath(os.path.dirname(__file__))
@@ -34,40 +32,40 @@ class EasyPin(AbstractPlugin):
         return "whth"
 
     def __register_all_config(self):
-        self._config_registry.register_config(self.CONFIG_DETECTED_KEYWORD, "pin")
+        pass
 
     def install(self):
         from graia.scheduler import GraiaScheduler
         from graia.broadcast import Broadcast
         from graia.ariadne.message.chain import MessageChain
-        from graia.ariadne.message.parser.base import DetectPrefix
         from graia.ariadne.model import Group, Friend
-
-        from modules.config_utils import ConfigClient
+        from graia.ariadne.event.message import MessageEvent
+        from graia.ariadne.message.parser.base import ContainKeyword
+        from modules.config_utils import CmdClient
 
         self.__register_all_config()
         self._config_registry.load_config()
         ariadne_app = self._ariadne_app
-        bord_cast: Broadcast = ariadne_app.broadcast
-        task_registry: Dict = {}
+        broad_cast: Broadcast = ariadne_app.broadcast
+        scheduler: GraiaScheduler = self._ariadne_app.create(GraiaScheduler)
 
-        task_types: Dict = {}
+        tree = {self.__TASK_CMD: {self.__TASK_SET_CMD: None, self.__TASK_LIST_CMD: None, self.__TASK_DELETE_CMD: None}}
 
-        cmd_syntax_tree: Dict = {
-            self.__TASK_CMD: {
-                self.__TASK_SET_CMD: None,
-                self.__TASK_DELETE_CMD: None,
-                self.__TASK_LIST_CMD: None,
-            },
+        self._cmd_client.register(tree)
+
+        cmd_infer_tree={
+            "后":{},
+            "明":{},
+            "今":{},
+            "下":{},
+            "本":{},
+            "周":{}
+
         }
-        client = ConfigClient(cmd_syntax_tree)
-        scheduler = self._ariadne_app.create(GraiaScheduler)
+        interpret_tree = {}
+        interpreter = CmdClient(interpret_tree)
 
-        @bord_cast.receiver(
-            "GroupMessage",
-            decorators=[DetectPrefix(prefix=self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD))],
-        )
-        async def task_client(group: Group, friend: Friend, chain: MessageChain):
-            async def task():
-                pass
-                # TODO implement task
+        @broad_cast.receiver(MessageEvent, decorators=[ContainKeyword(self.__TASK_CMD)])
+        async def pin_opreator(sender: Union[Group, Friend], message: MessageChain):
+
+
