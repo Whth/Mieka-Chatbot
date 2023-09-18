@@ -19,6 +19,8 @@ class PicEval(AbstractPlugin):
 
     CONFIG_MAX_FILE_SIZE = "MaxFileSize"
 
+    CONFIG_RECYCLE_FOLDER = "RecycleFolder"
+
     def _get_config_parent_dir(self) -> str:
         return os.path.abspath(os.path.dirname(__file__))
 
@@ -32,14 +34,16 @@ class PicEval(AbstractPlugin):
 
     @classmethod
     def get_plugin_version(cls) -> str:
-        return "0.0.1"
+        return "0.0.3"
 
     @classmethod
     def get_plugin_author(cls) -> str:
         return "whth"
 
     def __register_all_config(self):
-        self._config_registry.register_config(self.CONFIG_PICTURE_ASSET_PATH, f"{self._get_config_parent_dir()}/asset")
+        self._config_registry.register_config(
+            self.CONFIG_PICTURE_ASSET_PATH, [f"{self._get_config_parent_dir()}/asset"]
+        )
         self._config_registry.register_config(self.CONFIG_PICTURE_IGNORED_DIRS, [])
         self._config_registry.register_config(self.CONFIG_DETECTED_KEYWORD, "eval")
         self._config_registry.register_config(self.CONFIG_RAND_KEYWORD, "ej")
@@ -48,6 +52,7 @@ class PicEval(AbstractPlugin):
         self._config_registry.register_config(
             self.CONFIG_PICTURE_CACHE_DIR_PATH, f"{self._get_config_parent_dir()}/cache"
         )
+        self._config_registry.register_config(self.CONFIG_RECYCLE_FOLDER, f"{self._get_config_parent_dir()}/recycled")
         self._config_registry.register_config(self.CONFIG_MAX_FILE_SIZE, 6 * 1024 * 1024)
 
     def install(self):
@@ -57,30 +62,59 @@ class PicEval(AbstractPlugin):
         from graia.ariadne.message.parser.base import ContainKeyword
         from graia.ariadne.message.element import Image, MultimediaElement, Plain
         from graia.ariadne.util.cooldown import CoolDown
-        from graia.ariadne.event.message import MessageEvent
-        from graia.ariadne.event.message import GroupMessage
+        from graia.ariadne.event.message import GroupMessage, ActiveGroupMessage, MessageEvent
         from graia.ariadne.exception import UnknownTarget
         from modules.file_manager import download_file, compress_image_max_vol
         from .select import Selector
         from .evaluate import Evaluate
+        from .img_manager import ImageRegistry
 
         self.__register_all_config()
         self._config_registry.load_config()
         ariadne_app = self._ariadne_app
-        bord_cast = ariadne_app.broadcast
+        from graia.broadcast import Broadcast
 
-        asset_dir_path: str = self._config_registry.get_config(self.CONFIG_PICTURE_ASSET_PATH)
+        bord_cast: Broadcast = ariadne_app.broadcast
+
+        img_registry = ImageRegistry(
+            f"{self._get_config_parent_dir()}/images_registry.json",
+            recycle_folder=self._config_registry.get_config(self.CONFIG_RECYCLE_FOLDER),
+        )
+        asset_dir_path: List[str] = self._config_registry.get_config(self.CONFIG_PICTURE_ASSET_PATH)
         ignored: List[str] = self._config_registry.get_config(self.CONFIG_PICTURE_IGNORED_DIRS)
         cache_dir_path: str = self._config_registry.get_config(self.CONFIG_PICTURE_CACHE_DIR_PATH)
         store_dir_path: str = self._config_registry.get_config(self.CONFIG_STORE_DIR_PATH)
         level_resolution: int = self._config_registry.get_config(self.CONFIG_LEVEL_RESOLUTION)
-        selector: Selector = Selector(asset_dir=asset_dir_path, cache_dir=cache_dir_path, ignore_dirs=ignored)
+        selector: Selector = Selector(asset_dirs=asset_dir_path, cache_dir=cache_dir_path, ignore_dirs=ignored)
         evaluator: Evaluate = Evaluate(store_dir_path=store_dir_path, level_resolution=level_resolution)
 
+        # TODO decouple constant use config
         @bord_cast.receiver(
-            "GroupMessage",
+            GroupMessage,
         )
-        async def eval(group: Group, message: MessageChain, event: MessageEvent):
+        async def evaluate(group: Group, message: MessageChain, event: MessageEvent):
+            """
+            Asynchronous function that evaluates a message in a group chat and assigns a score to it.
+
+            Args:
+                group (Group): The group where the message is being evaluated.
+                message (MessageChain): The message that is being evaluated.
+                event (MessageEvent): The event associated with the message.
+
+            Returns:
+                None
+
+            Raises:
+                UnknownTarget: If the origin message cannot be found.
+
+            Notes:
+                - This function is decorated with `@bord_cast.receiver`.
+                - The message is evaluated based on the score provided in the message.
+                - The origin message is retrieved using the `ariadne_app.get_message_from_id` method.
+                - The evaluated message can be an image or a multimedia element.
+                - The evaluated message is marked with the assigned score using the `evaluator.mark` method.
+                - The evaluated message and its score are sent as a group message using the `ariadne_app.send_group_message` method.
+            """
             if not hasattr(event.quote, "origin"):
                 return
             try:
@@ -109,18 +143,57 @@ class PicEval(AbstractPlugin):
             await ariadne_app.send_group_message(group, f"Evaluated pic as {score}")
 
         @bord_cast.receiver(
-            "GroupMessage",
+            GroupMessage,
             decorators=[
                 ContainKeyword(keyword=self._config_registry.get_config(self.CONFIG_RAND_KEYWORD)),
             ],
             dispatchers=[CoolDown(5)],
         )
         async def rand_picture(group: Group):
+            """
+            An asynchronous function that is decorated as a receiver for the "GroupMessage" event.
+            This function is triggered when a group message is received and contains a keyword
+            specified in the configuration.
+            It selects a random picture using the "selector"
+            object, compresses the image to a specified maximum file size using the
+            "compress_image_max_vol" function, and sends the compressed image to the group using
+            the "ariadne_app.send_group_message" function.
+
+            Parameters:
+                group (Group): The group object representing the group where the message was
+                received.
+
+            Returns:
+                None
+            """
             picture = selector.random_select()
+
             output_path = f"{cache_dir_path}/{os.path.basename(picture)}"
             quality = compress_image_max_vol(
                 picture, output_path, self._config_registry.get_config(self.CONFIG_MAX_FILE_SIZE)
             )
             print(f"Compress to {quality}")
 
-            await ariadne_app.send_group_message(group, Image(path=output_path))
+            await ariadne_app.send_group_message(group, Image(path=output_path) + Plain(picture))
+
+        @bord_cast.receiver(
+            ActiveGroupMessage,
+        )
+        async def watcher(message: ActiveGroupMessage):
+            chain = message.message_chain
+            file_path: str = chain.get(Plain, 1)[0].text
+            if Image in chain and os.path.exists(file_path):
+                img_registry.register(message.id, file_path)
+                print(f"registered {message.id}, Current len = {len(img_registry.images_registry)}")
+
+        @bord_cast.receiver(
+            GroupMessage,
+            decorators=[
+                ContainKeyword("rm"),
+            ],
+        )
+        async def rm_picture(group: Group, message: MessageChain, event: MessageEvent):
+            if not hasattr(event.quote, "origin"):
+                return
+            success = img_registry.remove(event.quote.id, save=True)
+            await ariadne_app.send_group_message(group, f"Remove id-{event.quote.id}\nSuccess = {success}")

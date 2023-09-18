@@ -61,12 +61,12 @@ class Selector(object):
     __cache_file = "file_index_cache.pkl"
     __PICKLE_KEY = b"asdjnbskjdvlbkjb"
 
-    def __init__(self, asset_dir: str, cache_dir: str, ignore_dirs: Sequence[str] = tuple()):
+    def __init__(self, asset_dirs: List[str], cache_dir: str, ignore_dirs: Sequence[str] = tuple()):
         """
         Initializes the Selector object.
 
         Args:
-            asset_dir (str): The directory path containing the assets.
+            asset_dirs (str): The directory path containing the assets.
             cache_dir (str): The directory path to store the cache.
             ignore_dirs (Sequence[str], optional): A sequence of directory names to ignore. Defaults to an empty tuple.
 
@@ -74,9 +74,10 @@ class Selector(object):
             FileNotFoundError: If the asset_dir does not exist.
             FileNotFoundError: If the file_index is empty after updating.
         """
-        if not os.path.exists(asset_dir):
-            raise FileNotFoundError("asset_dir not exists")
-        self._asset_dir: str = asset_dir
+
+        if not all(os.path.exists(asset_dir) for asset_dir in asset_dirs):
+            raise FileNotFoundError("some asset_dir not exists")
+        self._asset_dir: List[str] = asset_dirs
         self._cache_dir: str = cache_dir
         os.makedirs(self._cache_dir, exist_ok=True)
         self._ignore_dirs: Sequence[str] = ignore_dirs
@@ -88,7 +89,7 @@ class Selector(object):
 
         if self._file_index:
             temp = self._file_index[0]
-            if asset_dir not in temp:
+            if all(asset_dir not in temp for asset_dir in asset_dirs):
                 self._update_index()
         else:
             self._update_index()
@@ -97,12 +98,24 @@ class Selector(object):
             raise FileNotFoundError("file_index is empty")
 
     def _update_index(self):
-        self._file_index: List[str] = explore_folder(self._asset_dir, ignore_list=self._ignore_dirs)
+        assets = [explore_folder(asset_dir, ignore_list=self._ignore_dirs) for asset_dir in self._asset_dir]
+        self._file_index: List[str] = []
+        for asset in assets:
+            self._file_index += asset
         sign_and_pickle(
             data=self._file_index, key=self.__PICKLE_KEY, file_path=f"{self._cache_dir}/{self.__cache_file}"
         )
 
     def random_select(self) -> str:
+        """
+        Selects a random file from the file index.
+
+        Returns:
+            str: The path of the selected file.
+
+        Raises:
+            None.
+        """
         while True:
             selected = choice(self._file_index)
             if os.path.exists(selected):
@@ -111,3 +124,7 @@ class Selector(object):
                 self._update_index()
 
     # TODO imp more other selector
+
+    @property
+    def asset_size(self) -> int:
+        return len(self._file_index)

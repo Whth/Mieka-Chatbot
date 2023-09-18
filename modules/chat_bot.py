@@ -1,17 +1,63 @@
 import os
 from importlib import import_module
 from types import MappingProxyType
-from typing import Optional, Dict, Type, Sequence, List
+from typing import Dict, Type, Sequence, List, NamedTuple, Any, Union
 
 from colorama import Fore, Back, Style
 from graia.ariadne.app import Ariadne
 from graia.ariadne.connection.config import WebsocketClientConfig
 from graia.ariadne.entry import config
+from graia.ariadne.message.chain import MessageChain
+from graia.ariadne.model import Group, Friend, Member, Stranger
 
-from constant import MAIN, EXTENSION_DIR, REQUIREMENTS_FILE_NAME
+from constant import MAIN, REQUIREMENTS_FILE_NAME
+from modules.config_utils import CmdClient
 from modules.file_manager import get_all_sub_dirs
 from modules.launch_utils import run_pip_install, requirements_met
 from modules.plugin_base import AbstractPlugin, PluginsView
+
+
+class BotInfo(NamedTuple):
+    """
+    Represents information about a bot.
+
+    Attributes:
+        account_id (int): The ID of the bot's account.
+        bot_name (str, optional): The name of the bot. Defaults to an empty string.
+    """
+
+    account_id: int
+    bot_name: str = ""
+
+
+class BotConnectionConfig(NamedTuple):
+    """
+    Represents the connection configuration for a bot.
+
+    Attributes:
+        verify_key (str): The verification key for the connection.
+        websocket_config (WebsocketClientConfig, optional): The configuration for the WebSocket client.
+        Default to WebsocketClientConfig().
+    """
+
+    verify_key: str
+    websocket_config: WebsocketClientConfig = WebsocketClientConfig()
+
+
+class BotConfig(NamedTuple):
+    """
+    Represents the configuration for a bot.
+
+    Attributes:
+        extension_dir (str): The directory where the bot's extensions are located.
+        syntax_tree (Dict[str, Any]): The syntax tree used by the bot.
+        accepted_message_types (List[str], optional): The types of messages accepted by the bot.
+         Defaults to ["GroupMessage"].
+    """
+
+    extension_dir: str
+    syntax_tree: Dict[str, Any]
+    accepted_message_types: List[str] = ["GroupMessage"]
 
 
 class ChatBot(object):
@@ -19,23 +65,42 @@ class ChatBot(object):
     ChatBot class
     """
 
-    def __init__(
-        self,
-        account_id: int,
-        verify_key: str,
-        bot_name: Optional[str] = None,
-        websocket_config: WebsocketClientConfig = WebsocketClientConfig(),
-    ):
-        self._ariadne_app: Ariadne = Ariadne(config(account_id, verify_key, websocket_config))
+    def __init__(self, bot_info: BotInfo, bot_config: BotConfig, bot_connection_config: BotConnectionConfig):
+        self._ariadne_app: Ariadne = Ariadne(
+            config(bot_info.account_id, bot_connection_config.verify_key, bot_connection_config.websocket_config)
+        )
 
-        self._bot_name: str = bot_name
+        self._bot_name: str = bot_info.bot_name
+        self._bot_client: CmdClient = CmdClient(
+            bot_config.syntax_tree
+        )  # TODO parse this instance to very plugin, to let them able to register cmd
 
         # init plugin installation registry dict and proxy
         self._installed_plugins: Dict[str, AbstractPlugin] = {}
         self._installed_plugins_proxy: PluginsView = MappingProxyType(self._installed_plugins)
 
-        self._install_all_requirements(EXTENSION_DIR)
-        self._install_all_extensions(EXTENSION_DIR)
+        self._install_all_requirements(bot_config.extension_dir)
+        self._install_all_extensions(bot_config.extension_dir)
+
+        async def _bot_client_call(target: Union[Group, Friend, Member, Stranger], message: MessageChain):
+            """
+            Asynchronously calls the bot client to send a message to the specified target.
+
+            Args:
+                target (Union[Group, Friend, Member, Stranger]): The target to send the message to.
+                message (MessageChain): The message to send.
+
+            Returns:
+                None
+            """
+            try:
+                stdout = self._bot_client.interpret(str(message))
+            except KeyError:
+                return
+            (await self._ariadne_app.send_message(target, message=stdout)) if stdout else None
+
+        for message_type in bot_config.accepted_message_types:
+            self._ariadne_app.broadcast.receiver(message_type)(_bot_client_call)
 
     @property
     def get_installed_plugins(self) -> PluginsView:
@@ -108,7 +173,7 @@ class ChatBot(object):
         """
         if plugin.get_plugin_name in self._installed_plugins:
             raise ValueError("Plugin already registered")
-        plugin_instance = plugin(self._ariadne_app, self.get_installed_plugins)
+        plugin_instance = plugin(self._ariadne_app, self.get_installed_plugins, self._bot_client)
 
         plugin_instance.install()
         self._installed_plugins[plugin.get_plugin_name()] = plugin_instance
