@@ -19,6 +19,8 @@ class PicEval(AbstractPlugin):
 
     CONFIG_MAX_FILE_SIZE = "MaxFileSize"
 
+    CONFIG_RECYCLE_FOLDER = "RecycleFolder"
+
     def _get_config_parent_dir(self) -> str:
         return os.path.abspath(os.path.dirname(__file__))
 
@@ -32,7 +34,7 @@ class PicEval(AbstractPlugin):
 
     @classmethod
     def get_plugin_version(cls) -> str:
-        return "0.0.2"
+        return "0.0.3"
 
     @classmethod
     def get_plugin_author(cls) -> str:
@@ -50,6 +52,7 @@ class PicEval(AbstractPlugin):
         self._config_registry.register_config(
             self.CONFIG_PICTURE_CACHE_DIR_PATH, f"{self._get_config_parent_dir()}/cache"
         )
+        self._config_registry.register_config(self.CONFIG_RECYCLE_FOLDER, f"{self._get_config_parent_dir()}/recycled")
         self._config_registry.register_config(self.CONFIG_MAX_FILE_SIZE, 6 * 1024 * 1024)
 
     def install(self):
@@ -69,10 +72,13 @@ class PicEval(AbstractPlugin):
         self.__register_all_config()
         self._config_registry.load_config()
         ariadne_app = self._ariadne_app
-        bord_cast = ariadne_app.broadcast
+        from graia.broadcast import Broadcast
+
+        bord_cast: Broadcast = ariadne_app.broadcast
+
         img_registry = ImageRegistry(
             f"{self._get_config_parent_dir()}/images_registry.json",
-            recycle_folder=f"{self._get_config_parent_dir()}/recycled",
+            recycle_folder=self._config_registry.get_config(self.CONFIG_RECYCLE_FOLDER),
         )
         asset_dir_path: List[str] = self._config_registry.get_config(self.CONFIG_PICTURE_ASSET_PATH)
         ignored: List[str] = self._config_registry.get_config(self.CONFIG_PICTURE_IGNORED_DIRS)
@@ -82,8 +88,9 @@ class PicEval(AbstractPlugin):
         selector: Selector = Selector(asset_dirs=asset_dir_path, cache_dir=cache_dir_path, ignore_dirs=ignored)
         evaluator: Evaluate = Evaluate(store_dir_path=store_dir_path, level_resolution=level_resolution)
 
+        # TODO decouple constant use config
         @bord_cast.receiver(
-            "GroupMessage",
+            GroupMessage,
         )
         async def evaluate(group: Group, message: MessageChain, event: MessageEvent):
             """
@@ -136,7 +143,7 @@ class PicEval(AbstractPlugin):
             await ariadne_app.send_group_message(group, f"Evaluated pic as {score}")
 
         @bord_cast.receiver(
-            "GroupMessage",
+            GroupMessage,
             decorators=[
                 ContainKeyword(keyword=self._config_registry.get_config(self.CONFIG_RAND_KEYWORD)),
             ],
@@ -170,7 +177,7 @@ class PicEval(AbstractPlugin):
             await ariadne_app.send_group_message(group, Image(path=output_path) + Plain(picture))
 
         @bord_cast.receiver(
-            "ActiveGroupMessage",
+            ActiveGroupMessage,
         )
         async def watcher(message: ActiveGroupMessage):
             chain = message.message_chain
@@ -180,12 +187,10 @@ class PicEval(AbstractPlugin):
                 print(f"registered {message.id}, Current len = {len(img_registry.images_registry)}")
 
         @bord_cast.receiver(
-            "GroupMessage",
-            decorators=(
-                [
-                    ContainKeyword("rm"),
-                ],
-            ),
+            GroupMessage,
+            decorators=[
+                ContainKeyword("rm"),
+            ],
         )
         async def rm_picture(group: Group, message: MessageChain, event: MessageEvent):
             if not hasattr(event.quote, "origin"):

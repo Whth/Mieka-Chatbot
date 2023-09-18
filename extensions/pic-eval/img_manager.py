@@ -6,7 +6,7 @@ from types import MappingProxyType
 from typing import Optional, Dict, List
 
 
-class ImageRegistry(object):
+class ImageRegistry(object):  # TODO use other high performance serialize toolchain
     def __init__(self, save_path: str, recycle_folder: Optional[str] = None, max_size: Optional[int] = None) -> None:
         self._save_path = save_path
         self._max_size = max_size
