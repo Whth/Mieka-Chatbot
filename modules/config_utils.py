@@ -159,6 +159,37 @@ def _(body, chain: Sequence[str], value: Any) -> Dict:
 # endregion
 
 
+def get_all_config_chains(body: Dict[str, Any]) -> Tuple[List[List[str]], List[Any]]:
+    """
+    Recursively flatten the keys of a dictionary.
+
+    Args:
+        body (Dict[str, Any]): The dictionary to flatten.
+
+
+    Returns:
+        List[List[str]]: The flattened keys.
+    """
+
+    all_config_chains: List[List[str]] = []
+    values: List[Any] = []
+
+    def _get_chains_recursive(
+        data_body: Dict[str, Any], parent_chain: List[str], chain_container: Optional[List[List[str]]] = None
+    ) -> None:
+        chain_container: List[List[str]] = chain_container if chain_container is not None else []
+        for key, value in data_body.items():
+            current_keys: List[str] = parent_chain + [key]
+            if isinstance(value, dict):
+                _get_chains_recursive(value, current_keys, chain_container)
+            else:
+                chain_container.append(current_keys)
+                values.append(value)
+
+    _get_chains_recursive(body, [], all_config_chains)
+    return all_config_chains, values
+
+
 class ConfigRegistry(object):
 
     """
