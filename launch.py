@@ -5,7 +5,6 @@ from graia.ariadne.connection.config import WebsocketClientConfig
 from constant import CONFIG_FILE_NAME, CONFIG_DIR, EXTENSION_DIR
 from modules.chat_bot import ChatBot, BotInfo, BotConfig, BotConnectionConfig
 from modules.config_utils import ConfigRegistry, CmdClient
-from modules.file_manager import get_all_sub_dirs
 
 WEBSOCKET_HOST = "websocket_host"
 
@@ -16,11 +15,23 @@ ACCEPTED_MESSAGE_TYPES = "accepted_message_types"
 __version__ = "v0.3.1"
 
 
-def get_all_cmd_info() -> str:
-    temp_string = "Available CMD:\n"
-    for cmd in CmdClient.get_all_available_cmd():
-        temp_string += f"\t{cmd}\n"
-    return temp_string
+def make_help_cmd(client: CmdClient):
+    def _cmds():
+        temp_string = "Available CMD:\n"
+        for cmd in client.get_all_available_cmd:
+            temp_string += f"\t{cmd}\n"
+        return temp_string
+
+    return _cmds
+
+
+def make_installed_plugins_cmd(plugins_view):
+    def _plugins():
+        return "\n".join(
+            f"{plugin.get_plugin_name()}==>V{plugin.get_plugin_version():>}" for plugin in plugins_view.values()
+        )
+
+    return _plugins
 
 
 class Mieka(object):
@@ -42,11 +53,9 @@ class Mieka(object):
         extension_dir=EXTENSION_DIR,
         syntax_tree={
             "bot": {
-                "cmds": get_all_cmd_info,
                 "version": lambda: __version__,
-                "extensions": lambda: "\n".join(get_all_sub_dirs(EXTENSION_DIR)),
                 "areas": lambda: "\n".join(Mieka.accepted_message_types),  # FIXME unsafe exposure
-            }
+            },
         },
         accepted_message_types=accepted_message_types,
     )
@@ -59,6 +68,15 @@ class Mieka(object):
         bot_config=__bot_config,
         bot_connection_config=__bot_connection_config,
     )
+
+    updated_tree = {
+        "bot": {
+            "cmds": make_help_cmd(__bot.client),
+            "extensions": make_installed_plugins_cmd(__bot.get_installed_plugins),
+        }
+    }
+
+    __bot.client.register(updated_tree, True)
 
     @classmethod
     def run(cls):
