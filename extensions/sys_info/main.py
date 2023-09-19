@@ -54,4 +54,4 @@ class SysInfo(AbstractPlugin):
                 }
             }
         }
-        self._cmd_client.register(tree)
+        self._cmd_client.register(tree, True)

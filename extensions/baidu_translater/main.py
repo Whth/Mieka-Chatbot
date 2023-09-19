@@ -55,7 +55,7 @@ class BaiduTranslater(AbstractPlugin):
             return f"翻译结果:\n\t{self.translater.translate(to_lang, query)}"
 
         cmd_syntax_tree: Dict = {self._config_registry.get_config(self.CONFIG_TRANSLATE_KEYWORD): _trans_partial}
-        self._cmd_client.register(cmd_syntax_tree)
+        self._cmd_client.register(cmd_syntax_tree, True)
 
     def translate(self, to_lang: str, query: str, from_lang: str = "auto"):
         """
