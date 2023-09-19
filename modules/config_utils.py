@@ -72,7 +72,7 @@ def get_config(body: Union[Dict, MappingProxyType], chain: Sequence[str]) -> Any
     Returns:
         Any: The value associated with the specified chain in the nested dictionary
     """
-    raise KeyError("The chain is conflicting")
+    raise KeyError(f"The chain is conflicting, as the chain is {chain}, but the body is {body}")
 
 
 @get_config.register(dict)
@@ -134,6 +134,7 @@ def _(body: Dict, chain: Sequence[str], value: Any) -> Dict:
         For that here parse the nested Dict as the Body,
         which may contain other configurations
     """
+
     if len(chain) == 1:
         # Store the value
         body[chain[0]] = value
@@ -358,10 +359,11 @@ class CmdClient(object):
     a config client that allows simple cli-liked operation on config
     """
 
+    # TODO should add a override lock to avoid concurrent access
     def __init__(self, syntax_tree: Optional[Dict[str, Any]] = None):
         self._Hall_Cmd_Tree: Dict[str, Any] = {}
         self.Hall_Cmd_Tree: MappingProxyType = MappingProxyType(self._Hall_Cmd_Tree)
-        self.register(syntax_tree) if syntax_tree else None
+        self.register(syntax_tree, True) if syntax_tree else None
 
     @property
     def get_all_available_cmd(self) -> Tuple[str]:
@@ -372,7 +374,7 @@ class CmdClient(object):
         :rtype: List[str]
         """
 
-        return tuple(self._Hall_Cmd_Tree.keys())
+        return tuple(self.Hall_Cmd_Tree.keys())
 
     def get_help(self, cmd_path_chain: List[str]) -> Union[List[str], Dict[str, Any]]:
         """
@@ -442,11 +444,11 @@ class CmdClient(object):
 
         raise KeyError("Bad syntax tree, please check")
 
-    def register(self, syntax_tree: Dict[str, Any]):
-        """
-        Register a new syntax tree for a command.
+    def register(self, syntax_tree: Dict[str, Any], logging: bool = False) -> None:
+        """Register a new syntax tree for a command.
 
         Parameters:
+            logging ():
             syntax_tree (Dict[str, Any]): The syntax tree to register.
 
         Raises:
@@ -455,9 +457,11 @@ class CmdClient(object):
         Returns:
             None
         """
-        if any(key in self.Hall_Cmd_Tree for key in syntax_tree.keys()):
-            raise KeyError("cmd already registered!")
-        self._Hall_Cmd_Tree.update(syntax_tree)
+
+        chains, values = get_all_config_chains(syntax_tree)
+        print("\n".join(f"{chain}={value}" for chain, value in zip(chains, values))) if logging else None
+        for chain, value in zip(chains, values):
+            make_config(self._Hall_Cmd_Tree, chain, value)
 
 
 ConfigValue = TypeVar("ConfigValue", int, str, float, list, dict)
