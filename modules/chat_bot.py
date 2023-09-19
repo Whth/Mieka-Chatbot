@@ -65,6 +65,10 @@ class ChatBot(object):
     ChatBot class
     """
 
+    @property
+    def client(self) -> CmdClient:
+        return self._bot_client
+
     def __init__(self, bot_info: BotInfo, bot_config: BotConfig, bot_connection_config: BotConnectionConfig):
         self._ariadne_app: Ariadne = Ariadne(
             config(bot_info.account_id, bot_connection_config.verify_key, bot_connection_config.websocket_config)
