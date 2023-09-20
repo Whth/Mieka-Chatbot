@@ -2,10 +2,8 @@ import re
 from datetime import datetime, timedelta
 from typing import Callable, List, Optional, Sequence, Any, Union
 
-pattern = re.compile(r"^((\d+)月(\d+)[天日]|(\d+)\.(\d+))?(\d+)[点.:：](\d+)?分?$")
+full_pattern = re.compile(r"^((\d+)月(\d+)[天日]|(\d+)\.(\d+))?(\d+)[点.:：](\d+)?分?$")
 
-
-"|早上|晚上|中午"
 
 Procedure = Callable[[str], str]
 
@@ -22,6 +20,36 @@ class Preprocessor(object):
 
     def register_procedure(self, procedure: Procedure) -> None:
         self._procedures.append(procedure)
+
+
+def convert_brief_time_to_num(string: str) -> str:
+    min_map = {
+        "半": 30,
+        "整": 0,
+        "1刻": 15,
+        "2刻": 30,
+        "3刻": 45,
+    }
+    hour_names = ["点", "时"]
+
+    hour_reg = "|".join(hour_names)
+    min_reg = "|".join(min_map.keys())
+
+    reg_exp = rf"({hour_reg})({min_reg})"
+    matches = re.findall(pattern=reg_exp, string=string)
+    if not matches:
+        return string
+
+    # Extract the groups from the first match
+    groups: Sequence[Union[str, Any]] = matches[0]
+
+    minute = min_map.get(groups[-1])
+    return re.sub(
+        pattern=reg_exp,
+        repl=f"时{minute}分",
+        string=string,
+        count=1,
+    )
 
 
 def chinese_to_arabic(string) -> int:
@@ -107,14 +135,14 @@ def convert_relative_to_abs(string: str) -> str:
     min_name_reg = "|".join(min_names)
     day_name_reg = "|".join(day_names)
     month_name_reg = "|".join(month_names)
-    reg_exp = rf"(\d+)(?:({min_name_reg})|({hour_name_reg})|({day_name_reg})|({month_name_reg}))(?:{prepositions})"
+    preposition_reg = "|".join(prepositions)
+    reg_exp = rf"(\d+)(?:({min_name_reg})|({hour_name_reg})|({day_name_reg})|({month_name_reg}))(?:{preposition_reg})"
     # Find all matches in the input string using the regular expression pattern
     matches = re.findall(pattern=reg_exp, string=string)
 
     # If no matches are found, return the original input string
     if not matches:
         return string
-    print(matches)
     # Extract the groups from the first match
     groups: Sequence[Union[str, Any]] = matches[0]
     offset = int(groups[0])
@@ -167,7 +195,7 @@ def convert_relative_day_to_abs(string: str) -> str:
     matches = re.findall(pattern=reg_exp, string=string)
 
     # If no matches are found, return the original date string
-    if not all(matches):
+    if not matches:
         return string
 
     # Extract the groups from the first match
@@ -183,7 +211,7 @@ def convert_relative_day_to_abs(string: str) -> str:
     # Replace the matched relative date string with the absolute date string
     return re.sub(
         pattern=reg_exp,
-        repl=f"{abs_date.month}.{abs_date.day}",
+        repl=f"{abs_date.month}月{abs_date.day}日",
         string=string,
         count=1,
     )
@@ -217,12 +245,11 @@ def convert_relative_month_to_abs(string: str) -> str:
     matches = re.findall(pattern=reg_exp, string=string)
 
     # If no matches are found, return the original input string
-    if not all(matches):
+    if not matches:
         return string
 
     # Extract the groups from the first match
     groups: Sequence[Union[str, Any]] = matches[0]
-    print(groups)
     # Get the numerical value of the relative month offset from the map
     offset = relative_month_offset_map.get(groups[0], 0)
     # Calculate the absolute month by adding the offset and the difference between the month
@@ -274,7 +301,7 @@ def convert_relative_weekday_to_absolute(string: str) -> str:
     matches = re.findall(pattern=reg_exp, string=string)
 
     # If no matches are found, return the original date string
-    if not all(matches):
+    if not matches:
         return string
 
     # Extract the groups from the first match
@@ -295,21 +322,42 @@ def convert_relative_weekday_to_absolute(string: str) -> str:
     # Replace the matched relative date string with the absolute date string
     return re.sub(
         pattern=reg_exp,
-        repl=f"{abs_date.month}.{abs_date.day}",
+        repl=f"{abs_date.month}月{abs_date.day}日",
         string=string,
         count=1,
     )
 
 
-test_strings = [
-    "本月1日上午9点",
-    "下个月3日下午2点半",
-    "10.30",
-    "本周五晚上8点",
-    "明天下午3点15分",
-    "中午12点",
-    "晚上7点半",
-    "下午4点整",
-    "早上10点20分",
-    "这个星期三下午5点",
-]
+if __name__ == "__main__":
+    test_strings = [
+        "本月1日上午9点",
+        "下个月3日下午2点半",
+        "10.30",
+        "三个月之后",
+        "三个月",
+        "今天十点半",
+        "本周五晚上8点",
+        "明天下午3点15分",
+        "后天下午十二点",
+        "中午12点",
+        "晚上7点半",
+        "下午4点整",
+        "早上10点20分",
+        "这个星期三下午5点",
+    ]
+    p = Preprocessor(
+        [
+            convert_brief_time_to_num,
+            convert_relative_weekday_to_absolute,
+            replace_chinese_numbers,
+            convert_relative_to_abs,
+            convert_relative_day_to_abs,
+            convert_relative_month_to_abs,
+        ]
+    )
+    print(
+        "\n---------------------------\n".join(
+            f"{before}  =>  {after}"
+            for before, after in zip(test_strings, [p.process(string) for string in test_strings])
+        )
+    )
