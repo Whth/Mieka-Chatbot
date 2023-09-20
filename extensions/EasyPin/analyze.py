@@ -2,6 +2,8 @@ import re
 from datetime import datetime, timedelta
 from typing import Callable, List, Optional, Sequence, Any, Union
 
+from colorama import Fore
+
 full_pattern = re.compile(r"^((\d+)月(\d+)[天日]|(\d+)\.(\d+))?(\d+)[点.:：](\d+)?分?$")
 
 
@@ -15,9 +17,16 @@ class Preprocessor(object):
 
     def process(self, string: str, logging: bool = False) -> str:
         for procedure in self._procedures:
-            string = procedure(string)
-            print(f"Use {procedure.__name__}\nProcessed to {string}") if logging else None
-        print("--------------------------------------------")
+            temp = string
+            string = procedure(temp)
+            if logging:
+                applied = temp != string
+                stdout = (
+                    f"{Fore.GREEN if applied else Fore.RED }With {procedure.__name__}, {'Not ' if not applied else ''}applied\n"
+                    f"{string}"
+                )
+                print(stdout)
+        print(f"{Fore.MAGENTA}--------------------------------------------{Fore.RESET}") if logging else None
         return string
 
     def register_procedure(self, procedure: Procedure) -> None:
@@ -389,10 +398,9 @@ def convert_relative_weekday_to_absolute(string: str) -> str:
 
 
 if __name__ == "__main__":
-    test_strings = [
+    shall_pass_tests = [
         "下个月3日下午2点半",
         "本月1日上午9点",
-        "10.30",
         "三个月之后",
         "三个月后",
         "今天十点半",
@@ -405,6 +413,7 @@ if __name__ == "__main__":
         "早上10点20分",
         "这个星期三下午5点",
     ]
+    shall_not_pass_tests = ["今年八月16日的阿纳", "之后的三天"]
     p = Preprocessor(
         [
             convert_brief_time_to_num,
@@ -419,6 +428,14 @@ if __name__ == "__main__":
     print(
         "\n---------------------------\n".join(
             f"{before}  =>  {after}"
-            for before, after in zip(test_strings, [p.process(string, logging=True) for string in test_strings])
+            for before, after in zip(shall_pass_tests, [p.process(string, True) for string in shall_pass_tests])
+        )
+    )
+
+    print("================================================")
+    print(
+        "\n---------------------------\n".join(
+            f"{before}  =>  {after}"
+            for before, after in zip(shall_not_pass_tests, [p.process(string) for string in shall_not_pass_tests])
         )
     )
