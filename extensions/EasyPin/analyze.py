@@ -1,10 +1,11 @@
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
+from datetime import timedelta
 from typing import Callable, List, Optional, Sequence, Any, Union
 
 from colorama import Fore
 
-full_pattern = re.compile(r"^((\d+)月(\d+)[天日]|(\d+)\.(\d+))?(\d+)[点.:：](\d+)?分?$")
+full_pattern = re.compile(r"^((\d+)月(\d+)[天日]|(\d+)\.(\d+))?(\d+)[点时.:：](\d+)?分?$")
 
 
 Procedure = Callable[[str], str]
@@ -15,7 +16,7 @@ class Preprocessor(object):
         self._procedures: List[Procedure] = []
         self._procedures.extend(procedures) if procedures else None
 
-    def process(self, string: str, logging: bool = False) -> str:
+    def process(self, string: str, logging: bool = False) -> Any:
         for procedure in self._procedures:
             temp = string
             string = procedure(temp)
@@ -397,6 +398,84 @@ def convert_relative_weekday_to_absolute(string: str) -> str:
     )
 
 
+def convert_to_crontab(string) -> str | None:
+    match = re.match(full_pattern, string)
+
+    if match:
+        month = match.group(2)
+        day = match.group(3)
+        hour = match.group(6)
+        minute = match.group(7)
+
+        minute = minute or datetime.now().minute
+        hour = hour or datetime.now().hour
+        day = day or datetime.now().day
+        month = month or datetime.now().month
+
+        return f"{minute} {hour} {day} {month} *"
+    else:
+        return None
+
+
+def normalize_crontab(crontab_string: str | None) -> str | None:
+    if not crontab_string:
+        return
+    parts = crontab_string.split()
+
+    # 规范化分钟部分
+    if parts[0] == "60":
+        parts[0] = "0"
+    # 规范化小时部分
+    if parts[1] == "24":
+        parts[1] = "0"
+
+    return " ".join(parts)
+
+
+TO_DATETIME_PRESET = [
+    convert_brief_time_to_num,
+    convert_relative_weekday_to_absolute,
+    replace_chinese_numbers,
+    convert_relative_to_abs,
+    convert_relative_day_to_abs,
+    convert_relative_month_to_abs,
+    convert_day_period_to_abs_time,
+]
+DATETIME_TO_CRONTAB_PRESET = [
+    convert_to_crontab,
+    normalize_crontab,
+]
+DEFAULT_PRESET = TO_DATETIME_PRESET + DATETIME_TO_CRONTAB_PRESET
+
+
+def is_crontab_expired(crontab_string: str) -> bool:
+    """
+    Check if a crontab schedule has expired.
+
+    Args:
+        crontab_string (str): The crontab schedule string.
+
+    Returns:
+        bool: True if the crontab schedule has not expired, False otherwise.
+    """
+    now = datetime.now()
+
+    # split the crontab string into its individual components
+    cron_parts = crontab_string.split()
+    minute, hour, day, month, *_ = cron_parts
+
+    # check if the current time matches the crontab schedule
+    if (
+        int(month) > now.month
+        or (int(month) == now.month and int(day) > now.day)
+        or (int(month) == now.month and int(day) == now.day and int(hour) > now.hour)
+        or (int(month) == now.month and int(day) == now.day and int(hour) == now.hour and int(minute) > now.minute)
+    ):
+        return False
+
+    return True
+
+
 if __name__ == "__main__":
     shall_pass_tests = [
         "下个月3日下午2点半",
@@ -410,28 +489,23 @@ if __name__ == "__main__":
         "中午12点",
         "晚上7点半",
         "下午4点整",
+        "今天早上8点46分",
         "早上10点20分",
-        "这个星期三下午5点",
+        "这个星期三下午8点",
+        "今天17点",
+        "晚上",
     ]
     shall_not_pass_tests = ["今年八月16日的阿纳", "之后的三天"]
-    p = Preprocessor(
-        [
-            convert_brief_time_to_num,
-            convert_relative_weekday_to_absolute,
-            replace_chinese_numbers,
-            convert_relative_to_abs,
-            convert_relative_day_to_abs,
-            convert_relative_month_to_abs,
-            convert_day_period_to_abs_time,
-        ]
-    )
+
+    p = Preprocessor(DEFAULT_PRESET)
+    result = [p.process(string, True) for string in shall_pass_tests]
     print(
         "\n---------------------------\n".join(
-            f"{before}  =>  {after}"
-            for before, after in zip(shall_pass_tests, [p.process(string, True) for string in shall_pass_tests])
+            f"{before}  =>  {after}" for before, after in zip(shall_pass_tests, result)
         )
     )
-
+    print(result)
+    print("\n".join([f"{tab} is expired: {is_crontab_expired(tab)}" for tab in result]))
     print("================================================")
     print(
         "\n---------------------------\n".join(
