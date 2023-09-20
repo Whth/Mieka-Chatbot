@@ -96,6 +96,8 @@ class Selector(object):
 
         if len(self._file_index) == 0:
             raise FileNotFoundError("file_index is empty")
+        else:
+            print(f"Found {len(self._file_index)} files")
 
     def _update_index(self):
         assets = [explore_folder(asset_dir, ignore_list=self._ignore_dirs) for asset_dir in self._asset_dir]
