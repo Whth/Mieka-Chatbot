@@ -12,6 +12,21 @@ Procedure = Callable[[str], str]
 
 
 class Preprocessor(object):
+    """
+    A class for preprocessing strings using a sequence of procedures.
+
+    Attributes:
+        _procedures (List[Procedure]): A list of procedures to be applied during the preprocessing.
+
+    Methods:
+        __init__(procedures: Optional[Sequence[Procedure]] = None):
+            Initialize the Preprocessor with a list of procedures.
+        process(string: str, logging: bool = False) -> Any:
+            Apply the registered procedures to the input string.
+        register_procedure(procedure: Procedure) -> None:
+            Add a procedure to the list of registered procedures.
+    """
+
     def __init__(self, procedures: Optional[Sequence[Procedure]] = None):
         self._procedures: List[Procedure] = []
         self._procedures.extend(procedures) if procedures else None
@@ -35,6 +50,22 @@ class Preprocessor(object):
 
 
 def convert_day_period_to_abs_time(string: str) -> str:
+    """
+    Convert a string representation of a day period to absolute time.
+
+    Args:
+        string (str): The string representation of the day period.
+
+    Returns:
+        str: The converted string with the absolute time.
+
+    Raises:
+        ValueError: If the provided string does not match the expected format.
+
+    Example:
+        >>> convert_day_period_to_abs_time("黎明5点30分")
+        "5时30分"
+    """
     AM_hours_map = {
         "凌晨": [1, 0],
         "深夜": [3, 30],
@@ -98,6 +129,15 @@ def convert_day_period_to_abs_time(string: str) -> str:
 
 
 def convert_brief_time_to_num(string: str) -> str:
+    """
+    Convert a brief time string to a numerical representation.
+
+    Args:
+        string (str): The brief time string to be converted.
+
+    Returns:
+        str: The converted numerical representation of the brief time string.
+    """
     min_map = {"半": 30, "整": 0, "1刻": 15, "2刻": 30, "3刻": 45}
     hour_names = ["点", "时"]
 
@@ -399,6 +439,15 @@ def convert_relative_weekday_to_absolute(string: str) -> str:
 
 
 def convert_to_crontab(string) -> str | None:
+    """
+    Convert a string representation of a cron expression into a crontab format.
+
+    Args:
+        string (str): The string representation of the cron expression.
+
+    Returns:
+        str | None: The converted crontab format string, or None if the input string does not match the expected pattern.
+    """
     match = re.match(full_pattern, string)
 
     if match:
@@ -418,6 +467,13 @@ def convert_to_crontab(string) -> str | None:
 
 
 def normalize_crontab(crontab_string: str | None) -> str | None:
+    """
+    Normalize a crontab string by replacing "60" with "0" in the minutes part, and "24" with "0" in the hours part.
+
+    :param crontab_string: The crontab string to be normalized. Must be a string or None.
+    :return: The normalized crontab string. Returns None if the input crontab string is None.
+    :rtype: str or None
+    """
     if not crontab_string:
         return
     parts = crontab_string.split()
