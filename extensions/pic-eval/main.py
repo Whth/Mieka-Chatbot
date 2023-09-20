@@ -181,7 +181,10 @@ class PicEval(AbstractPlugin):
         )
         async def watcher(message: ActiveGroupMessage):
             chain = message.message_chain
-            file_path: str = chain.get(Plain, 1)[0].text
+            plain_ele = chain.get(Plain, 1)
+            if not plain_ele:
+                return
+            file_path: str = plain_ele[0].text
             if Image in chain and os.path.exists(file_path):
                 img_registry.register(message.id, file_path)
                 print(f"registered {message.id}, Current len = {len(img_registry.images_registry)}")

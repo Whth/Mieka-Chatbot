@@ -2,7 +2,9 @@ import base64
 import hashlib
 import os
 import time
-from typing import List, Sequence, Tuple
+from pathlib import Path
+from typing import List, Sequence
+from typing import Tuple
 
 import aiohttp
 from PIL import Image
@@ -34,21 +36,18 @@ def explore_folder(root_path: str, ignore_list: Sequence[str] = tuple()) -> List
     file_paths = []
 
     # Traverse all files and subdirectories in the directory
-    for root, dirs, files in os.walk(root_path):
-        # Exclude folders in the ignored list
-        dirs[:] = [d for d in dirs if d not in ignore_list]
-
-        for file in files:
+    for path in Path(root_path).rglob("*"):
+        if path.is_file():
             # Process each file
-            file_path = os.path.join(root, file)
-            # Add a file path to the list
-            file_paths.append(file_path)
+            file_paths.append(str(path))
 
-        for directory in dirs:
-            # Process each subdirectory
-            subdir = os.path.join(root, directory)
-            # Recursively explore the subdirectory and add file paths to the list
-            file_paths.extend(explore_folder(subdir, ignore_list))
+    # Exclude folders in the ignored list
+    ignored_paths = [Path(root_path) / ignore_folder for ignore_folder in ignore_list]
+    file_paths = [
+        file_path
+        for file_path in file_paths
+        if not any(str(ignored_path) in file_path for ignored_path in ignored_paths)
+    ]
 
     # Return the list of all file paths
     return file_paths
@@ -77,20 +76,20 @@ def clean_files(folder_path, time_limit):
     clean_file_num = 0
     clean_file_size = 0
 
-    files = os.listdir(folder_path)
+    folder_path = Path(folder_path)
+    current_time = time.time()
 
-    for file in files:
-        file_path = os.path.join(folder_path, file)
-        modify_time = os.path.getmtime(file_path)
-        current_time = time.time()
-        file_time = current_time - modify_time
+    for file_path in folder_path.iterdir():
+        if file_path.is_file():
+            modify_time = file_path.stat().st_mtime
+            file_time = current_time - modify_time
 
-        if file_time > time_limit:
-            file_size = os.path.getsize(file_path)
-            os.remove(file_path)
-            clean_file_num += 1
-            clean_file_size += file_size
-            print(f"清理文件：{file_path}，大小：{file_size/1024/1024} MB")
+            if file_time > time_limit:
+                file_size = file_path.stat().st_size
+                file_path.unlink()
+                clean_file_num += 1
+                clean_file_size += file_size
+                print(f"清理文件：{file_path}，大小：{file_size/1024/1024} MB")
 
     print(f"清理文件个数：{clean_file_num}，清理文件大小：{clean_file_size/1024/1024} MB")
 
