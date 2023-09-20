@@ -13,29 +13,89 @@ class Preprocessor(object):
         self._procedures: List[Procedure] = []
         self._procedures.extend(procedures) if procedures else None
 
-    def process(self, string: str) -> str:
+    def process(self, string: str, logging: bool = False) -> str:
         for procedure in self._procedures:
             string = procedure(string)
+            print(f"Use {procedure.__name__}\nProcessed to {string}") if logging else None
+        print("--------------------------------------------")
         return string
 
     def register_procedure(self, procedure: Procedure) -> None:
         self._procedures.append(procedure)
 
 
-def convert_brief_time_to_num(string: str) -> str:
-    min_map = {
-        "半": 30,
-        "整": 0,
-        "1刻": 15,
-        "2刻": 30,
-        "3刻": 45,
+def convert_day_period_to_abs_time(string: str) -> str:
+    AM_hours_map = {
+        "凌晨": [1, 0],
+        "深夜": [3, 30],
+        "黎明": [5, 30],
+        "清晨": [6, 30],
+        "早晨": [7, 30],
+        "早上": [9, 30],
+        "上午": [9, 30],
+        "晌午": [10, 0],
+        "午饭前": [11, 0],
+        "午前": [11, 0],
+        "正午": [12, 0],
+        "中午": [12, 0],
     }
+    PM_hours_map = {
+        "午后": [13, 0],
+        "午饭后": [13, 0],
+        "下午": [15, 0],
+        "黄昏": [16, 30],
+        "傍晚": [17, 30],
+        "晚上": [19, 30],
+    }
+
+    hour_names = ["点", "时"]
+    min_names = ["分", "分钟"]
+
+    am_reg = "|".join(AM_hours_map.keys())
+    pm_reg = "|".join(PM_hours_map.keys())
+    hour_name_reg = "|".join(hour_names)
+    min_name_reg = "|".join(min_names)
+    reg_exp = rf"(?:({am_reg})|({pm_reg}))(?:(\d+)(?:{hour_name_reg})(\d+)(?:{min_name_reg}))?"
+
+    # Find all matches in the input string using the regular expression pattern
+    matches = re.findall(pattern=reg_exp, string=string)
+
+    # If no matches are found, return the original input string
+    if not matches:
+        return string
+    # Extract the groups from the first match
+    groups: Sequence[Union[str, Any]] = matches[0]
+
+    if groups[0]:
+        time_list = AM_hours_map.get(groups[0])
+        offset = 0
+
+    elif groups[1]:
+        time_list = PM_hours_map.get(groups[1])
+        offset = 12
+
+    else:
+        raise ValueError("should never arrive here!, since the reg expr will not let this happen")
+
+    hour = int(groups[-2]) + offset if groups[-2] else time_list[0]
+    minute = int(groups[-1]) if groups[-1] else time_list[-1]
+    return re.sub(
+        pattern=reg_exp,
+        repl=f"{hour}时{minute}分",
+        string=string,
+        count=1,
+    )
+
+
+def convert_brief_time_to_num(string: str) -> str:
+    min_map = {"半": 30, "整": 0, "1刻": 15, "2刻": 30, "3刻": 45}
     hour_names = ["点", "时"]
 
     hour_reg = "|".join(hour_names)
     min_reg = "|".join(min_map.keys())
 
-    reg_exp = rf"({hour_reg})({min_reg})"
+    reg_exp = rf"(?:({hour_reg})({min_reg})|({hour_reg})$)"
+
     matches = re.findall(pattern=reg_exp, string=string)
     if not matches:
         return string
@@ -43,7 +103,7 @@ def convert_brief_time_to_num(string: str) -> str:
     # Extract the groups from the first match
     groups: Sequence[Union[str, Any]] = matches[0]
 
-    minute = min_map.get(groups[-1])
+    minute = min_map.get(groups[1]) if groups[1] else 0
     return re.sub(
         pattern=reg_exp,
         repl=f"时{minute}分",
@@ -330,11 +390,11 @@ def convert_relative_weekday_to_absolute(string: str) -> str:
 
 if __name__ == "__main__":
     test_strings = [
-        "本月1日上午9点",
         "下个月3日下午2点半",
+        "本月1日上午9点",
         "10.30",
         "三个月之后",
-        "三个月",
+        "三个月后",
         "今天十点半",
         "本周五晚上8点",
         "明天下午3点15分",
@@ -353,11 +413,12 @@ if __name__ == "__main__":
             convert_relative_to_abs,
             convert_relative_day_to_abs,
             convert_relative_month_to_abs,
+            convert_day_period_to_abs_time,
         ]
     )
     print(
         "\n---------------------------\n".join(
             f"{before}  =>  {after}"
-            for before, after in zip(test_strings, [p.process(string) for string in test_strings])
+            for before, after in zip(test_strings, [p.process(string, logging=True) for string in test_strings])
         )
     )
