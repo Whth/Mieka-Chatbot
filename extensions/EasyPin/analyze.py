@@ -154,12 +154,11 @@ def convert_brief_time_to_num(string: str) -> str:
         str: The converted numerical representation of the brief time string.
     """
     min_map = {"半": 30, "整": 0, "1刻": 15, "2刻": 30, "3刻": 45}
-    hour_names = ["点", "时"]
+    hour_names = ["点", "时", "小时"]
 
-    hour_reg = "|".join(hour_names)
     min_reg = "|".join(min_map.keys())
-
-    reg_exp = rf"(?:({hour_reg})({min_reg})|({hour_reg})$)"
+    hour_reg = "|".join(hour_names)
+    reg_exp = rf"(?:(?:{hour_reg})({min_reg})|(?:{hour_reg})$)"
 
     matches = re.findall(pattern=reg_exp, string=string)
     if not matches:
@@ -168,10 +167,45 @@ def convert_brief_time_to_num(string: str) -> str:
     # Extract the groups from the first match
     groups: Sequence[Union[str, Any]] = matches[0]
 
-    minute = min_map.get(groups[1]) if groups[1] else 0
+    minute = min_map.get(groups[0]) if groups[0] else 0
+
     return re.sub(
         pattern=reg_exp,
         repl=f"时{minute}分",
+        string=string,
+        count=1,
+    )
+
+
+def convert_brief_time_to_num_reversed(string: str) -> str:
+    """
+    Convert a brief time string to a numerical representation.
+
+    Args:
+        string (str): The brief time string to be converted.
+
+    Returns:
+        str: The converted numerical representation of the brief time string.
+    """
+    min_map = {"半个": 30, "半": 30}
+    hour_names = ["点", "时", "小时", "钟"]
+
+    min_reg = "|".join(min_map.keys())
+    hour_reg = "|".join(hour_names)
+    reg_exp = rf"({min_reg})(?:{hour_reg})"
+
+    matches = re.findall(pattern=reg_exp, string=string)
+    if not matches:
+        return string
+
+    # Extract the groups from the first match
+    groups: Sequence[Union[str, Any]] = matches[0]
+
+    minute = min_map.get(groups[0]) if groups[0] else 0
+
+    return re.sub(
+        pattern=reg_exp,
+        repl=f"{minute}分",
         string=string,
         count=1,
     )
@@ -505,6 +539,7 @@ def normalize_crontab(crontab_string: str | None) -> str | None:
 
 TO_DATETIME_PRESET = [
     convert_brief_time_to_num,
+    convert_brief_time_to_num_reversed,
     convert_relative_weekday_to_absolute,
     replace_chinese_numbers,
     convert_relative_to_abs,
