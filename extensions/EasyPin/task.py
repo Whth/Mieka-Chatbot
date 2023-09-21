@@ -1,6 +1,7 @@
 import pathlib
-import pickle
-from typing import List, Coroutine, Any, Callable
+from typing import List, Coroutine, Any, Callable, Optional
+
+import dill as pickle
 
 Task = Callable[[], Coroutine[Any, Any, Any]]
 
@@ -33,8 +34,12 @@ class TaskRegistry(object):
         if pathlib.Path(save_path).exists():
             self.load_tasks()
 
-    def register_task(self, task: Task, task_name: str, task_crontab: str):
-        self._tasks.append(ScheduledTask(task, task_name, task_crontab))
+    @property
+    def tasks(self):
+        return self._tasks
+
+    def register_task(self, task: Task, task_crontab: str, task_name: Optional[str] = None):
+        self._tasks.append(ScheduledTask(task, task_name if task_name else f"task_{len(self._tasks)}", task_crontab))
 
     def remove_outdated_tasks(self):
         Unexpired_tasks = []
@@ -45,10 +50,13 @@ class TaskRegistry(object):
 
     def load_tasks(self):
         with open(self._save_path, "rb") as f:
-            self._tasks = pickle.load(f)
+            try:
+                self._tasks = pickle.load(f)
+            except EOFError:
+                pathlib.Path(self._save_path).unlink()
         self.remove_outdated_tasks()
 
     def save_tasks(self):
-        pathlib.Path(self._save_path).mkdir(parents=True, exist_ok=True)
+        pathlib.Path(pathlib.Path(self._save_path).parent).mkdir(parents=True, exist_ok=True)
         with open(self._save_path, "wb") as f:
             pickle.dump(self._tasks, f)

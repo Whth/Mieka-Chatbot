@@ -1,5 +1,5 @@
 import os
-from typing import Union
+import re
 
 from modules.plugin_base import AbstractPlugin
 
@@ -44,10 +44,11 @@ class EasyPin(AbstractPlugin):
         from graia.scheduler import GraiaScheduler
         from graia.scheduler.timers import crontabify
         from graia.broadcast import Broadcast
-        from graia.ariadne.model import Group, Friend
-        from graia.ariadne.event.message import MessageEvent
+        from graia.ariadne.event.message import GroupMessage
         from graia.ariadne.message.parser.base import ContainKeyword
+        from graia.ariadne.message.element import Forward
 
+        from graia.ariadne.model import Group
         from .analyze import Preprocessor, DEFAULT_PRESET, TO_DATETIME_PRESET, DATETIME_TO_CRONTAB_PRESET
         from .task import TaskRegistry
 
@@ -79,7 +80,7 @@ class EasyPin(AbstractPlugin):
         tree = {
             self.__TASK_CMD: {
                 self.__TASK_HELP_CMD: _help,
-                self.__TASK_SET_CMD: None,
+                # self.__TASK_SET_CMD: None,
                 self.__TASK_LIST_CMD: None,
                 self.__TASK_DELETE_CMD: None,
                 self.__TASK_TEST_CMD: _test_convert,
@@ -88,12 +89,30 @@ class EasyPin(AbstractPlugin):
 
         self._cmd_client.register(tree, True)
 
-        @broad_cast.receiver(MessageEvent, decorators=[ContainKeyword(self.__TASK_CMD)])
-        async def pin_opreator(sender: Union[Group, Friend], message: MessageEvent):
-            cmd_tokens = str(message.message_chain)
+        # for task in task_registry.tasks:
+        #     scheduler.schedule(crontabify(task.task_crontab))(task.task)
+        # TODO currently not support serialize to disk
+        @broad_cast.receiver(GroupMessage, decorators=[ContainKeyword(self.__TASK_CMD)])
+        async def pin_opreator(group: Group, message: GroupMessage):
+            pat = rf"{self.__TASK_CMD}\s+{self.__TASK_SET_CMD}\s+(\S+)(?:\s+(.+)|(?:\s+)?$)"
+            if not hasattr(message.quote, "origin"):
+                print("no origin, not accepted")
+                return
+            comp = re.compile(pat)
+            matches = re.findall(comp, str(message.message_chain))
+            if not matches:
+                print("reg matches not accepted")
+                return
+            groups = matches[0]
+            origin_id = message.quote.id
 
-            def make_task(time_string: str, task_content: str):
-                async def _task():
-                    pass
+            async def _task():
+                msg_event = await ariadne_app.get_message_from_id(origin_id, group)
+                await ariadne_app.send_message(group, Forward(msg_event))
+                await ariadne_app.send_message(group, "不要忘了哦")
 
-            scheduler.schedule(crontabify(full_processor.process(time_string) + " *"), cancelable=True)(_task)
+            crontab = full_processor.process(groups[0], True) + " 0"
+            task_registry.register_task(task=_task, task_crontab=crontab, task_name=groups[1] if groups[1] else None)
+            print(f"Schedule task {task_registry.tasks[-1].task_name} with crontab {crontab}")
+            scheduler.schedule(crontabify(crontab))(_task)
+            await scheduler.schedule_tasks[-1].run()

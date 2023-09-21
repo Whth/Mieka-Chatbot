@@ -32,6 +32,21 @@ class Preprocessor(object):
         self._procedures.extend(procedures) if procedures else None
 
     def process(self, string: str, logging: bool = False) -> Any:
+        """
+        Process the given string using a series of procedures.
+
+        Args:
+            string (str): The input string to be processed.
+            logging (bool, optional): Whether to enable logging.
+            Defaults to False.
+
+        Returns:
+            Any: The processed string.
+        """
+        print(
+            f"{Fore.MAGENTA}--------------------------------------------{Fore.RESET}\n"
+            f"{Fore.YELLOW}Input: {string}{Fore.RESET}\n"
+        ) if logging else None
         for procedure in self._procedures:
             temp = string
             string = procedure(temp)
@@ -175,7 +190,7 @@ def chinese_to_arabic(string) -> int:
     string = string.strip()
 
     # Define a mapping of Chinese characters to their corresponding numeric values
-    num_map = {"零": 0, "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
+    num_map = {"零": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
 
     # Define a mapping of Chinese characters representing units to their corresponding values
     unit_map = {"十": 10, "百": 100, "千": 1000, "万": 10000, "亿": 100000000}
@@ -207,7 +222,7 @@ def replace_chinese_numbers(string) -> str:
     Returns:
         str: The string with Chinese numbers replaced by their Arabic equivalents.
     """
-    pattern = r"[零一二三四五六七八九十百千万亿]+"  # pattern to match Chinese numbers
+    pattern = r"[零一二两三四五六七八九十百千万亿]+"  # pattern to match Chinese numbers
     matches = re.findall(pattern, string)  # find all matches of Chinese numbers in the string
 
     for match in matches:
