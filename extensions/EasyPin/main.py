@@ -74,14 +74,17 @@ class EasyPin(AbstractPlugin):
                 self.__TASK_HELP_CMD,
             ]
             help_strings = ["用于设置任务，第一个参数为执行时间，第二个参数为任务名称，任务内容由引用的消息决定", "列举出所有的定时任务", "删除指定的任务", "时间字符串解释测试", "展示这条信息"]
-            stdout = "\n".join(f"{cmd} {help_string}" for cmd, help_string in zip(cmds, help_strings))
+            stdout = "\n\n".join(f"{cmd} {help_string}" for cmd, help_string in zip(cmds, help_strings))
             return stdout
+
+        def _task_list() -> str:
+            return "\n".join(f"{task.task_name} | {task.task_crontab}" for task in task_registry.tasks)
 
         tree = {
             self.__TASK_CMD: {
                 self.__TASK_HELP_CMD: _help,
                 # self.__TASK_SET_CMD: None,
-                self.__TASK_LIST_CMD: None,
+                self.__TASK_LIST_CMD: _task_list,
                 self.__TASK_DELETE_CMD: None,
                 self.__TASK_TEST_CMD: _test_convert,
             }
