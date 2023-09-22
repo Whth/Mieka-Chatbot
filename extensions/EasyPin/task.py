@@ -6,7 +6,7 @@ from typing import List, Any, Dict, TypeVar, Type, final, Optional
 
 from colorama import Fore
 from graia.ariadne import Ariadne
-from graia.ariadne.message.element import Forward
+from graia.ariadne.message.element import Forward, ForwardNode
 
 from .analyze import is_crontab_expired
 
@@ -35,7 +35,7 @@ class Task:
         self.crontab: str = crontab
 
     @abstractmethod
-    def make(self, app: Ariadne) -> Any:
+    async def make(self, app: Ariadne) -> Any:
         pass
 
     @final
@@ -76,7 +76,7 @@ class ReminderTask(Task):
         self.remind_content: List[int] = remind_content
         self.target: int = target
 
-    def make(self, app: Ariadne):
+    async def make(self, app: Ariadne):
         """
         Perform the reminder task.
 
@@ -86,17 +86,16 @@ class ReminderTask(Task):
         Returns:
             Callable: An async function that sends the reminder messages.
         """
-        import asyncio
 
-        messages = []
+        nodes = []
         for msg_id in self.remind_content:
-            loop = asyncio.new_event_loop()
-
-            msg_event = loop.run_until_complete(app.get_message_from_id(msg_id, self.target))
-            messages.append(msg_event)
+            msg_event = await app.get_message_from_id(
+                msg_id,
+            )
+            nodes.append(ForwardNode(app.account, time=datetime.datetime.now(), message=msg_event.message_chain))
 
         async def _():
-            await app.send_group_message(self.target, Forward(messages))
+            await app.send_group_message(self.target, Forward(nodes))
             await app.send_group_message(self.target, "不要忘了哦")
 
         return _
