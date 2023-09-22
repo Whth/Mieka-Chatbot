@@ -1,8 +1,10 @@
+import datetime
 import json
 import pathlib
 from abc import abstractmethod
-from typing import List, Any, Dict, TypeVar, Type, final
+from typing import List, Any, Dict, TypeVar, Type, final, Optional
 
+from colorama import Fore
 from graia.ariadne import Ariadne
 from graia.ariadne.message.element import Forward
 
@@ -29,8 +31,8 @@ class Task:
     """
 
     def __init__(self, task_name: str, crontab: str):
-        self.task_name = task_name
-        self.crontab = crontab
+        self.task_name: str = task_name
+        self.crontab: str = crontab
 
     @abstractmethod
     def make(self, app: Ariadne) -> Any:
@@ -39,7 +41,8 @@ class Task:
     @final
     def as_dict(self) -> Dict:
         temp: Dict = {"task_name": self.task_name, "crontab": self.crontab}
-        return temp.update(self._as_dict())
+        temp.update(self._as_dict())
+        return temp
 
     @abstractmethod
     def _as_dict(self) -> Dict:
@@ -65,10 +68,13 @@ class ReminderTask(Task):
             Return a dictionary representation of the ReminderTask.
     """
 
-    def __init__(self, task_name: str, crontab: str, remind_content: List[int], target: int):
+    def __init__(self, crontab: str, remind_content: List[int], target: int, task_name: Optional[str] = None):
+        if task_name is None:
+            time_stamp = datetime.datetime.now().strftime("%Y-%m-%d-%H:%M:%S")
+            task_name = f"{self.__class__.__name__}-{time_stamp}"
         super().__init__(task_name, crontab)
-        self.remind_content = remind_content
-        self.target = target
+        self.remind_content: List[int] = remind_content
+        self.target: int = target
 
     def make(self, app: Ariadne):
         """
@@ -80,7 +86,14 @@ class ReminderTask(Task):
         Returns:
             Callable: An async function that sends the reminder messages.
         """
-        messages = [app.get_message_from_id(msg_id, self.target) for msg_id in self.remind_content]
+        import asyncio
+
+        messages = []
+        for msg_id in self.remind_content:
+            loop = asyncio.new_event_loop()
+
+            msg_event = loop.run_until_complete(app.get_message_from_id(msg_id, self.target))
+            messages.append(msg_event)
 
         async def _():
             await app.send_group_message(self.target, Forward(messages))
@@ -107,14 +120,14 @@ class TaskRegistry(object):
         save_path: str,
         task_type: Type[T_TASK],
     ):
+        self._save_path: str = save_path
         self._task_type: Type[T_TASK] = task_type
         self._tasks: Dict[str, Dict[str, T_TASK]] = {}
         if pathlib.Path(save_path).exists():
-            self._save_path: str = save_path
             self.load_tasks()
 
     @property
-    def tasks(self):
+    def tasks(self) -> Dict[str, Dict[str, T_TASK]]:
         return self._tasks
 
     def register_task(self, task: T_TASK):
@@ -136,10 +149,12 @@ class TaskRegistry(object):
         with open(self._save_path, "r") as f:
             temp_dict: Dict[str, Dict[str, Dict[str, Any]]] = json.load(f)
         for crontab, tasks in temp_dict.items():
+            self._tasks[crontab] = {}
             for task_name, task_data in tasks.items():
                 self._tasks[crontab][task_name] = self._task_type(**task_data)
 
     def save_tasks(self):
+        print(f"{Fore.MAGENTA}Saving tasks to {self._save_path}")
         temp_dict: Dict[str, Dict[str, Dict[str, Any]]] = {}
         for crontab, tasks in self._tasks.items():
             temp_dict[crontab] = {}
