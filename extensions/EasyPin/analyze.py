@@ -158,16 +158,16 @@ def convert_brief_time_to_num(string: str) -> str:
 
     min_reg = "|".join(min_map.keys())
     hour_reg = "|".join(hour_names)
-    reg_exp = rf"(?:(?:{hour_reg})({min_reg})|(?:{hour_reg})$)"
-
+    reg_exp = rf"(?:(?:{hour_reg})({min_reg})|(?:{hour_reg})(?:\s|$))"
+    print(reg_exp)
     matches = re.findall(pattern=reg_exp, string=string)
     if not matches:
         return string
 
     # Extract the groups from the first match
-    groups: Sequence[Union[str, Any]] = matches[0]
+    groups: str = matches[0]
 
-    minute = min_map.get(groups[0]) if groups[0] else 0
+    minute = min_map.get(groups, 0)
 
     return re.sub(
         pattern=reg_exp,
