@@ -6,7 +6,9 @@ from typing import List, Any, Dict, TypeVar, Type, final, Optional
 
 from colorama import Fore
 from graia.ariadne import Ariadne
-from graia.ariadne.message.element import Forward, ForwardNode
+from graia.ariadne.event.message import MessageEvent
+from graia.ariadne.message.element import Forward, ForwardNode, Face
+from graia.ariadne.model import Profile
 
 from .analyze import is_crontab_expired
 
@@ -86,17 +88,34 @@ class ReminderTask(Task):
         Returns:
             Callable: An async function that sends the reminder messages.
         """
+        from graia.ariadne.message.chain import MessageChain
 
         nodes = []
         for msg_id in self.remind_content:
-            msg_event = await app.get_message_from_id(
+            msg_event: MessageEvent = await app.get_message_from_id(
                 msg_id,
             )
-            nodes.append(ForwardNode(app.account, time=datetime.datetime.now(), message=msg_event.message_chain))
+
+            nodes.append(
+                ForwardNode(
+                    msg_event.sender.id,
+                    time=datetime.datetime.now(),
+                    message=msg_event.message_chain,
+                    name=msg_event.sender.name,
+                )
+            )
+        profile: Profile = await app.get_bot_profile()
+        nodes.append(
+            ForwardNode(
+                app.account,
+                time=datetime.datetime.now(),
+                message=MessageChain("不要忘了哦") + Face(name="玫瑰"),
+                name=profile.nickname,
+            )
+        )
 
         async def _():
             await app.send_group_message(self.target, Forward(nodes))
-            await app.send_group_message(self.target, "不要忘了哦")
 
         return _
 
@@ -124,6 +143,7 @@ class TaskRegistry(object):
         self._tasks: Dict[str, Dict[str, T_TASK]] = {}
         if pathlib.Path(save_path).exists():
             self.load_tasks()
+            self.remove_outdated_tasks()
 
     @property
     def tasks(self) -> Dict[str, Dict[str, T_TASK]]:
@@ -162,3 +182,6 @@ class TaskRegistry(object):
                 temp_dict[crontab][task_name] = task.as_dict()
         with open(self._save_path, "w") as f:
             json.dump(temp_dict, f, ensure_ascii=False, indent=2)
+
+    def remove_all_task(self):
+        self._tasks = {}

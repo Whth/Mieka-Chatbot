@@ -11,6 +11,7 @@ class EasyPin(AbstractPlugin):
     __TASK_SET_CMD = "new"
     __TASK_LIST_CMD = "list"
     __TASK_DELETE_CMD = "delete"
+    __TASK_CLEAN_CMD = "clean"
     __TASK_TEST_CMD = "abd"
     __TASK_HELP_CMD = "help"
 
@@ -84,10 +85,18 @@ class EasyPin(AbstractPlugin):
                     temp_string += f"{_task.task_name} | {_task.crontab}\n"
             return temp_string
 
+        def _clean():
+            for scheduled_task in scheduler.schedule_tasks:
+                if not scheduled_task.stopped:
+                    scheduled_task.stop()
+                    scheduled_task.stop_gen_interval()
+            task_registry.remove_all_task()
+
         tree = {
             self.__TASK_CMD: {
                 self.__TASK_HELP_CMD: _help,
                 # self.__TASK_SET_CMD: None,
+                self.__TASK_CLEAN_CMD: _clean,
                 self.__TASK_LIST_CMD: _task_list,
                 self.__TASK_DELETE_CMD: None,
                 self.__TASK_TEST_CMD: _test_convert,
@@ -95,12 +104,6 @@ class EasyPin(AbstractPlugin):
         }
 
         self._cmd_client.register(tree, True)
-
-        for task_name, tasks in task_registry.tasks.items():
-            for task in tasks.values():
-                task: T_TASK
-
-                scheduler.schedule(crontabify(task.crontab))(task.make(ariadne_app))
 
         @broad_cast.receiver(GroupMessage, decorators=[ContainKeyword(self.__TASK_CMD)])
         async def pin_opreator(group: Group, message: GroupMessage):
@@ -123,5 +126,7 @@ class EasyPin(AbstractPlugin):
             task_registry.register_task(task=task)
             task_registry.save_tasks()
             await ariadne_app.send_message(group, f"Schedule new task:\n {task.task_name} | {crontab}")
-            scheduler.schedule(crontabify(crontab))(task.make(ariadne_app))
+            scheduler.schedule(crontabify(crontab), cancelable=True)(
+                await task.make(ariadne_app),
+            )
             await scheduler.schedule_tasks[-1].run()
