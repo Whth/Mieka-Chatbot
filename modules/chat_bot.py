@@ -9,11 +9,9 @@ from graia.ariadne.connection.config import WebsocketClientConfig
 from graia.ariadne.entry import config
 from graia.ariadne.message.chain import MessageChain
 from graia.ariadne.model import Group, Friend, Member, Stranger
-from graia.broadcast import Broadcast
 
 from constant import MAIN, REQUIREMENTS_FILE_NAME
 from modules.config_utils import CmdClient
-from modules.events import AllExtensionsInstalledEvent
 from modules.file_manager import get_all_sub_dirs
 from modules.launch_utils import run_pip_install, requirements_met
 from modules.plugin_base import AbstractPlugin, PluginsView
@@ -249,8 +247,7 @@ class ChatBot(object):
         """
         self._install_all_requirements(self._bot_config.extension_dir)
         self._install_all_extensions(self._bot_config.extension_dir)
-        bcc: Broadcast = self._ariadne_app.broadcast
-        bcc.postEvent(AllExtensionsInstalledEvent())
+
         try:
             self._ariadne_app.launch_blocking()
 

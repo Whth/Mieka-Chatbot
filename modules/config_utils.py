@@ -483,8 +483,8 @@ class CmdBuilder(object):
         Args:
             config_path (str): The path to the configuration value.
 
-        Returns:
-            Callable[[str], str]: A callable function that takes in a new configuration value as a string and returns a string message indicating the success or failure of the operation.
+        Returns: Callable[[str], str]: A callable function that takes in a new configuration value as a string and
+        returns a string message indicating the success or failure of the operation.
         """
 
         origin_config = self._config_getter(config_path)

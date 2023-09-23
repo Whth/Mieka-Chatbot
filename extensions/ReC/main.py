@@ -45,14 +45,7 @@ class ReC(AbstractPlugin):
         max_look_back: int = self._config_registry.get_config(self.CONFIG_MAX_LOOK_BACK)
 
         @bord_cast.receiver(
-            "GroupMessage",
-            decorators=[
-                MentionMe(),
-                ContainKeyword(keyword=self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD)),
-            ],
-        )
-        @bord_cast.receiver(
-            "GroupMessage",
+            GroupMessage,
             decorators=[
                 MentionMe(),
                 ContainKeyword(keyword=self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD)),
