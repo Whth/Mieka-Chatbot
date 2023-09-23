@@ -537,6 +537,7 @@ def normalize_crontab(crontab_string: str | None) -> str | None:
     return " ".join(parts)
 
 
+# FIXME needs a bound check to prevent creating some hazordious crontab
 TO_DATETIME_PRESET = [
     convert_brief_time_to_num,
     convert_brief_time_to_num_reversed,
