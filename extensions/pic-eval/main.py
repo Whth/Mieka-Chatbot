@@ -1,4 +1,5 @@
 import os
+import re
 from typing import List
 
 from modules.plugin_base import AbstractPlugin
@@ -21,6 +22,8 @@ class PicEval(AbstractPlugin):
 
     CONFIG_RECYCLE_FOLDER = "RecycleFolder"
 
+    CONFIG_MAX_BATCH_SIZE = "MaxBatchSize"
+
     def _get_config_parent_dir(self) -> str:
         return os.path.abspath(os.path.dirname(__file__))
 
@@ -34,7 +37,7 @@ class PicEval(AbstractPlugin):
 
     @classmethod
     def get_plugin_version(cls) -> str:
-        return "0.0.3"
+        return "0.0.4"
 
     @classmethod
     def get_plugin_author(cls) -> str:
@@ -54,6 +57,7 @@ class PicEval(AbstractPlugin):
         )
         self._config_registry.register_config(self.CONFIG_RECYCLE_FOLDER, f"{self._get_config_parent_dir()}/recycled")
         self._config_registry.register_config(self.CONFIG_MAX_FILE_SIZE, 6 * 1024 * 1024)
+        self._config_registry.register_config(self.CONFIG_MAX_BATCH_SIZE, 7)
 
     def install(self):
         from colorama import Fore
@@ -85,6 +89,8 @@ class PicEval(AbstractPlugin):
         cache_dir_path: str = self._config_registry.get_config(self.CONFIG_PICTURE_CACHE_DIR_PATH)
         store_dir_path: str = self._config_registry.get_config(self.CONFIG_STORE_DIR_PATH)
         level_resolution: int = self._config_registry.get_config(self.CONFIG_LEVEL_RESOLUTION)
+        max_batch_size: int = self._config_registry.get_config(self.CONFIG_MAX_BATCH_SIZE)
+
         selector: Selector = Selector(asset_dirs=asset_dir_path, cache_dir=cache_dir_path, ignore_dirs=ignored)
         evaluator: Evaluate = Evaluate(store_dir_path=store_dir_path, level_resolution=level_resolution)
 
@@ -142,14 +148,17 @@ class PicEval(AbstractPlugin):
             evaluator.mark(path, score)
             await ariadne_app.send_group_message(group, f"Evaluated pic as {score}")
 
+        activate_keyword: str = self._config_registry.get_config(self.CONFIG_RAND_KEYWORD)
+        reg = re.compile(rf"^{activate_keyword}(?:$|\s+(\d+)$)")
+
         @bord_cast.receiver(
             GroupMessage,
             decorators=[
-                ContainKeyword(keyword=self._config_registry.get_config(self.CONFIG_RAND_KEYWORD)),
+                ContainKeyword(keyword=activate_keyword),
             ],
             dispatchers=[CoolDown(5)],
         )
-        async def rand_picture(group: Group):
+        async def rand_picture(group: Group, message: MessageChain):
             """
             An asynchronous function that is decorated as a receiver for the "GroupMessage" event.
             This function is triggered when a group message is received and contains a keyword
@@ -166,15 +175,25 @@ class PicEval(AbstractPlugin):
             Returns:
                 None
             """
-            picture = selector.random_select()
 
-            output_path = f"{cache_dir_path}/{os.path.basename(picture)}"
-            quality = compress_image_max_vol(
-                picture, output_path, self._config_registry.get_config(self.CONFIG_MAX_FILE_SIZE)
-            )
-            print(f"Compress to {quality}")
+            string: str = str(message)
+            matches = re.match(reg, string)
+            if not matches:
+                return
+            match_groups = matches.groups()
+            loop_len = int(match_groups[0]) if match_groups[0] else 1
+            loop_len = loop_len if loop_len <= max_batch_size else max_batch_size
+            print(f"{Fore.BLUE}Loop for {loop_len}{Fore.RESET}")
+            for _ in range(loop_len):
+                picture = selector.random_select()
 
-            await ariadne_app.send_group_message(group, Image(path=output_path) + Plain(picture))
+                output_path = f"{cache_dir_path}/{os.path.basename(picture)}"
+                quality = compress_image_max_vol(
+                    picture, output_path, self._config_registry.get_config(self.CONFIG_MAX_FILE_SIZE)
+                )
+                print(f"Compress to {quality}")
+
+                await ariadne_app.send_group_message(group, Image(path=output_path) + Plain(picture))
 
         @bord_cast.receiver(
             ActiveGroupMessage,
@@ -185,8 +204,9 @@ class PicEval(AbstractPlugin):
             if not plain_ele:
                 return
             file_path: str = plain_ele[0].text
-            if Image in chain and os.path.exists(file_path):
+            if message.id != -1 and Image in chain and os.path.exists(file_path):
                 img_registry.register(message.id, file_path)
+
                 print(f"registered {message.id}, Current len = {len(img_registry.images_registry)}")
 
         @bord_cast.receiver(
@@ -195,7 +215,7 @@ class PicEval(AbstractPlugin):
                 ContainKeyword("rm"),
             ],
         )
-        async def rm_picture(group: Group, message: MessageChain, event: MessageEvent):
+        async def rm_picture(group: Group, event: MessageEvent):
             if not hasattr(event.quote, "origin"):
                 return
             success = img_registry.remove(event.quote.id, save=True)

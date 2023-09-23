@@ -100,6 +100,19 @@ class Selector(object):
             print(f"Found {len(self._file_index)} files")
 
     def _update_index(self):
+        """
+        Updates the index of files in the class instance.
+
+        This function retrieves all the files in the specified asset directories and updates the file index accordingly.
+        The function uses the `explore_folder` function to explore each asset directory and retrieve the list of files.
+        The retrieved lists are then concatenated to form the complete file index.
+
+        Parameters:
+            None
+
+        Returns:
+            None
+        """
         assets = [explore_folder(asset_dir, ignore_list=self._ignore_dirs) for asset_dir in self._asset_dir]
         self._file_index: List[str] = []
         for asset in assets:
