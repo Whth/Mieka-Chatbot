@@ -85,12 +85,15 @@ class EasyPin(AbstractPlugin):
                     temp_string += f"{_task.task_name} | {_task.crontab}\n"
             return temp_string
 
-        def _clean():
+        def _clean() -> str:
+            clean_task_ct = 0
             for scheduled_task in scheduler.schedule_tasks:
                 if not scheduled_task.stopped:
                     scheduled_task.stop()
                     scheduled_task.stop_gen_interval()
+                    clean_task_ct += 1
             task_registry.remove_all_task()
+            return f"Cleaned {clean_task_ct} Tasks in total"
 
         tree = {
             self.__TASK_CMD: {
