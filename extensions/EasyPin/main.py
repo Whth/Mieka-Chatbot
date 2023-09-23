@@ -26,11 +26,11 @@ class EasyPin(AbstractPlugin):
 
     @classmethod
     def get_plugin_description(cls) -> str:
-        return "EasyPin"
+        return "a simple notify application"
 
     @classmethod
     def get_plugin_version(cls) -> str:
-        return "0.0.1"
+        return "0.0.2"
 
     @classmethod
     def get_plugin_author(cls) -> str:
@@ -46,6 +46,7 @@ class EasyPin(AbstractPlugin):
         from graia.scheduler.timers import crontabify
         from graia.broadcast import Broadcast
         from graia.ariadne.event.message import GroupMessage
+        from graia.ariadne.event.lifecycle import ApplicationLaunch
         from graia.ariadne.message.parser.base import ContainKeyword
 
         from graia.ariadne.model import Group
@@ -78,6 +79,7 @@ class EasyPin(AbstractPlugin):
             return stdout
 
         def _task_list() -> str:
+            task_registry.remove_outdated_tasks()
             temp_string = "Task List:\n"
             for crontab, tasks in task_registry.tasks.items():
                 for name, _task in tasks.items():
@@ -110,26 +112,69 @@ class EasyPin(AbstractPlugin):
 
         @broad_cast.receiver(GroupMessage, decorators=[ContainKeyword(self.__TASK_CMD)])
         async def pin_opreator(group: Group, message: GroupMessage):
+            # Define the pattern for matching the command and arguments
             pat = rf"{self.__TASK_CMD}\s+{self.__TASK_SET_CMD}\s+(\S+)(?:\s+(.+)|(?:\s+)?$)"
+
+            # Check if the message has an origin attribute
             if not hasattr(message.quote, "origin"):
                 print("no origin, not accepted")
                 return
+
+            # Compile the regular expression pattern
             comp = re.compile(pat)
+
+            # Find all matches of the pattern in the message
             matches = re.findall(comp, str(message.message_chain))
+
+            # If no matches are found, return
             if not matches:
                 print("reg matches not accepted")
                 return
+
+            # Get the first match group
             match_groups = matches[0]
+
+            # Get the origin id from the message quote
             origin_id = message.quote.id
 
+            # Process the match group and add "0" at the end
             crontab = full_processor.process(match_groups[0], True) + " 0"
+
+            # Create a new ReminderTask object
             task = ReminderTask(
-                crontab, [origin_id], target=group.id, task_name=match_groups[1] if match_groups[1] else None
+                crontab=crontab,
+                remind_content=[origin_id],
+                target=group.id,
+                task_name=match_groups[1] if match_groups[1] else None,
             )
+
+            # Register the task in the task registry
             task_registry.register_task(task=task)
+
+            # Save the tasks in the task registry
             task_registry.save_tasks()
+
+            # Send a message to the group with the details of the scheduled task
             await ariadne_app.send_message(group, f"Schedule new task:\n {task.task_name} | {crontab}")
+
+            # Schedule the task using the scheduler
             scheduler.schedule(crontabify(crontab), cancelable=True)(
                 await task.make(ariadne_app),
             )
+
+            # Run the last scheduled task
             await scheduler.schedule_tasks[-1].run()
+
+        @broad_cast.receiver(ApplicationLaunch)
+        async def fetch_tasks():
+            from colorama import Fore
+
+            print(f"{Fore.YELLOW}Fetching tasks{Fore.RESET}")
+            for task in task_registry.task_list:
+                # Schedule the task using the scheduler
+                scheduler.schedule(crontabify(task.crontab), cancelable=True)(
+                    await task.make(ariadne_app),
+                )
+
+                # Run the last scheduled task
+                await scheduler.schedule_tasks[-1].run()

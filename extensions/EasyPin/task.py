@@ -92,9 +92,7 @@ class ReminderTask(Task):
 
         nodes = []
         for msg_id in self.remind_content:
-            msg_event: MessageEvent = await app.get_message_from_id(
-                msg_id,
-            )
+            msg_event: MessageEvent = await app.get_message_from_id(msg_id, self.target)
 
             nodes.append(
                 ForwardNode(
@@ -147,9 +145,45 @@ class TaskRegistry(object):
 
     @property
     def tasks(self) -> Dict[str, Dict[str, T_TASK]]:
+        """
+        Return the dictionary of tasks.
+
+        :return: A dictionary containing tasks.
+        :rtype: Dict[str, Dict[str, T_TASK]]
+        """
         return self._tasks
 
+    @property
+    def task_list(self) -> List[T_TASK]:
+        """
+        Returns a list of all tasks in the task list.
+
+        Parameters:
+            None
+
+        Returns:
+            List[T_TASK]: A list of all tasks in the task list.
+        """
+        task_list: List[T_TASK] = []
+        for tasks in self._tasks.values():
+            for task in tasks.values():
+                task: T_TASK
+                task_list.append(task)
+        return task_list
+
     def register_task(self, task: T_TASK):
+        """
+        Registers a task in the task manager.
+
+        Args:
+            task (T_TASK): The task to register.
+
+        Raises:
+            TypeError: If the task is not of the correct type.
+
+        Returns:
+            None
+        """
         if not isinstance(task, self._task_type):
             raise TypeError(f"Task {task} is not of type {self._task_type}")
         if task.crontab in self._tasks:
@@ -158,6 +192,15 @@ class TaskRegistry(object):
             self._tasks[task.crontab] = {task.task_name: task}
 
     def remove_outdated_tasks(self):
+        """
+        Remove outdated tasks from the task dictionary.
+
+        Parameters:
+            None.
+
+        Returns:
+            None.
+        """
         Unexpired_tasks: Dict[str, Dict[str, T_TASK]] = {}
         for crontab, tasks in self._tasks.items():
             if not is_crontab_expired(crontab):
@@ -165,6 +208,18 @@ class TaskRegistry(object):
         self._tasks = Unexpired_tasks
 
     def load_tasks(self):
+        """
+        Load tasks from a file.
+
+        This function reads the tasks from a file specified by `self._save_path` and populates the `_tasks` dictionary
+        based on the contents of the file. The file is expected to be in JSON format.
+
+        Parameters:
+            self (obj): The current instance of the class.
+
+        Returns:
+            None
+        """
         with open(self._save_path, "r") as f:
             temp_dict: Dict[str, Dict[str, Dict[str, Any]]] = json.load(f)
         for crontab, tasks in temp_dict.items():
@@ -173,6 +228,19 @@ class TaskRegistry(object):
                 self._tasks[crontab][task_name] = self._task_type(**task_data)
 
     def save_tasks(self):
+        """
+        Save the tasks to the specified file path.
+
+        This function saves the tasks stored in the `_tasks` attribute to the file specified by `self._save_path`.
+        The tasks are converted into a temporary dictionary structure, where each crontab is a key that maps to a dictionary of task names and their corresponding attributes.
+        The temporary dictionary is then written to the file in JSON format.
+
+        Parameters:
+            None
+
+        Returns:
+            None
+        """
         print(f"{Fore.MAGENTA}Saving tasks to {self._save_path}")
         temp_dict: Dict[str, Dict[str, Dict[str, Any]]] = {}
         for crontab, tasks in self._tasks.items():
@@ -184,4 +252,7 @@ class TaskRegistry(object):
             json.dump(temp_dict, f, ensure_ascii=False, indent=2)
 
     def remove_all_task(self):
+        """
+        Remove all tasks from the task list.
+        """
         self._tasks = {}
