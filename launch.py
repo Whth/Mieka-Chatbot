@@ -12,7 +12,7 @@ VERIFY_KEY = "verify_key"
 
 ACCOUNT_ID = "account_id"
 ACCEPTED_MESSAGE_TYPES = "accepted_message_types"
-__version__ = "v0.3.1"
+__version__ = "v0.3.2"
 
 
 def make_help_cmd(client: CmdClient):
