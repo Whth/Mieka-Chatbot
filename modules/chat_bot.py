@@ -9,9 +9,11 @@ from graia.ariadne.connection.config import WebsocketClientConfig
 from graia.ariadne.entry import config
 from graia.ariadne.message.chain import MessageChain
 from graia.ariadne.model import Group, Friend, Member, Stranger
+from graia.broadcast import Broadcast
 
 from constant import MAIN, REQUIREMENTS_FILE_NAME
 from modules.config_utils import CmdClient
+from modules.events import AllExtensionsInstalledEvent
 from modules.file_manager import get_all_sub_dirs
 from modules.launch_utils import run_pip_install, requirements_met
 from modules.plugin_base import AbstractPlugin, PluginsView
@@ -82,9 +84,7 @@ class ChatBot(object):
         # init plugin installation registry dict and proxy
         self._installed_plugins: Dict[str, AbstractPlugin] = {}
         self._installed_plugins_proxy: PluginsView = MappingProxyType(self._installed_plugins)
-
-        self._install_all_requirements(bot_config.extension_dir)
-        self._install_all_extensions(bot_config.extension_dir)
+        self._bot_config: BotConfig = bot_config
 
         async def _bot_client_call(target: Union[Group, Friend, Member, Stranger], message: MessageChain):
             """
@@ -227,8 +227,30 @@ class ChatBot(object):
 
     def run(self) -> None:
         """
-        Run the bot
+        Runs the function.
+
+        This function is responsible for executing the main logic of the program.
+        It performs the following steps:
+
+        1. Install all the requirements by calling `_install_all_requirements()` with the `extension_dir` parameter.
+        2. Install all the extensions by calling `_install_all_extensions()` with the `extension_dir` parameter.
+        3. Retrieve the `Broadcast` object from the `_ariadne_app` attribute.
+        4. Posts an `AllExtensionsInstalledEvent()` event to the broadcast.
+        5. Launches the `_ariadne_app` in blocking mode.
+
+        If a `KeyboardInterrupt` exception is raised during the execution, the function will call `stop()`
+        to stop the program.
+
+        Parameters:
+
+
+        Returns:
+            None
         """
+        self._install_all_requirements(self._bot_config.extension_dir)
+        self._install_all_extensions(self._bot_config.extension_dir)
+        bcc: Broadcast = self._ariadne_app.broadcast
+        bcc.postEvent(AllExtensionsInstalledEvent())
         try:
             self._ariadne_app.launch_blocking()
 
