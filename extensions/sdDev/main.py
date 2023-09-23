@@ -90,14 +90,17 @@ class StableDiffusionPlugin(AbstractPlugin):
     def install(self):
         from graia.ariadne.message.chain import MessageChain, Image
         from graia.ariadne.message.parser.base import ContainKeyword
+        from graia.ariadne.event.message import GroupMessage
+        from graia.ariadne.event.lifecycle import ApplicationLaunch
+        from graia.broadcast import Broadcast
         from graia.ariadne.model import Group
         from dynamicprompts.wildcards import WildcardManager
         from dynamicprompts.generators import RandomPromptGenerator
-        from .stable_diffusion import StableDiffusionApp, DiffusionParser, HiResParser
 
         from modules.config_utils import CmdBuilder
         from modules.file_manager import img_to_base64
         from .controlnet import ControlNetUnit, Controlnet
+        from .stable_diffusion import StableDiffusionApp, DiffusionParser, HiResParser
 
         self.__register_all_config()
         self._config_registry.load_config()
@@ -106,13 +109,6 @@ class StableDiffusionPlugin(AbstractPlugin):
         )
         controlnet: Controlnet = Controlnet(host_url=self._config_registry.get_config(self.CONFIG_SD_HOST))
 
-        def sync(async_function):
-            import asyncio
-
-            loop = asyncio.get_event_loop()
-            loop.run_until_complete(async_function())
-
-        sync(controlnet.fetch_resources)
         SD_app = StableDiffusionApp(host_url=self._config_registry.get_config(self.CONFIG_SD_HOST))
         gen = RandomPromptGenerator(
             wildcard_manager=WildcardManager(path=self._config_registry.get_config(self.CONFIG_WILDCARD_DIR_PATH))
@@ -146,7 +142,9 @@ class StableDiffusionPlugin(AbstractPlugin):
         output_dir_path = self._config_registry.get_config(self.CONFIG_OUTPUT_DIR_PATH)
         temp_dir_path = self._config_registry.get_config(self.CONFIG_IMG_TEMP_DIR_PATH)
         ariadne_app = self._ariadne_app
-        bord_cast = ariadne_app.broadcast
+        bord_cast: Broadcast = ariadne_app.broadcast
+
+        bord_cast.receiver(ApplicationLaunch)(controlnet.fetch_resources)
 
         def _dynamic_process(pos_prompt: str, neg_prompt: str) -> Tuple[str, str]:
             pos_interpreted = gen.generate(template=pos_prompt)
@@ -191,7 +189,7 @@ class StableDiffusionPlugin(AbstractPlugin):
         # TODO add quick async response
 
         @bord_cast.receiver(
-            "GroupMessage",
+            GroupMessage,
             decorators=[ContainKeyword(keyword=self._config_registry.get_config(self.CONFIG_POS_KEYWORD))],
         )
         async def group_diffusion(group: Group, message: MessageChain):
