@@ -1,5 +1,6 @@
 import os
 import re
+from typing import List, Callable
 
 from modules.plugin_base import AbstractPlugin
 
@@ -95,15 +96,51 @@ class EasyPin(AbstractPlugin):
                     scheduled_task.stop_gen_interval()
                     clean_task_ct += 1
             task_registry.remove_all_task()
+            scheduler.stop()
             return f"Cleaned {clean_task_ct} Tasks in total"
+
+        def _delete_task(task_name: str) -> str:
+            """
+            Deletes tasks with the given task_name.
+
+            Args:
+                task_name (str): The name of the task to delete.
+
+            Returns:
+                str: A message indicating the result of the deletion.
+            """
+            # Find tasks to delete
+            tasks_to_delete: List[T_TASK] = []
+            for task in task_registry.task_list:
+                if task.task_name == task_name:
+                    tasks_to_delete.append(task)
+
+            # Return if no tasks found
+            if len(tasks_to_delete) == 0:
+                return f"Task {task_name} not Found!"
+
+            # Get task functions to delete
+            task_funcs_to_delete: List[Callable] = [_task.task_func for _task in tasks_to_delete]
+
+            # Stop scheduler tasks associated with the task functions
+            for sche_task in scheduler.schedule_tasks:
+                if sche_task.target in task_funcs_to_delete:
+                    print(f"stop task {sche_task.target}")
+                    sche_task.stop()
+                    sche_task.stop_gen_interval()
+
+            # Remove tasks from the task registry
+            task_registry.remove_task(task_name)
+
+            # Return a deletion message
+            return f"Delete {len(tasks_to_delete)} Tasks"
 
         tree = {
             self.__TASK_CMD: {
                 self.__TASK_HELP_CMD: _help,
-                # self.__TASK_SET_CMD: None,
                 self.__TASK_CLEAN_CMD: _clean,
                 self.__TASK_LIST_CMD: _task_list,
-                self.__TASK_DELETE_CMD: None,
+                self.__TASK_DELETE_CMD: _delete_task,
                 self.__TASK_TEST_CMD: _test_convert,
             }
         }
@@ -111,7 +148,20 @@ class EasyPin(AbstractPlugin):
         self._cmd_client.register(tree, True)
 
         @broad_cast.receiver(GroupMessage, decorators=[ContainKeyword(self.__TASK_CMD)])
-        async def pin_opreator(group: Group, message: GroupMessage):
+        async def pin_operator(group: Group, message: GroupMessage):
+            """
+            Asynchronous pin operator function that receives a GroupMessage object and performs various operations based on the command and arguments provided.
+
+            Args:
+                group (Group): The Group object representing the group where the message was sent.
+                message (GroupMessage): The GroupMessage object representing the message received.
+
+            Returns:
+                None
+
+            Raises:
+                None
+            """
             # Define the pattern for matching the command and arguments
             pat = rf"{self.__TASK_CMD}\s+{self.__TASK_SET_CMD}\s+(\S+)(?:\s+(.+)|(?:\s+)?$)"
 
@@ -158,23 +208,28 @@ class EasyPin(AbstractPlugin):
             await ariadne_app.send_message(group, f"Schedule new task:\n {task.task_name} | {crontab}")
 
             # Schedule the task using the scheduler
-            scheduler.schedule(crontabify(crontab), cancelable=True)(
-                await task.make(ariadne_app),
-            )
+            scheduler.schedule(crontabify(crontab), cancelable=True)(await task.make(ariadne_app))
 
             # Run the last scheduled task
             await scheduler.schedule_tasks[-1].run()
 
         @broad_cast.receiver(ApplicationLaunch)
         async def fetch_tasks():
+            """
+            Fetches tasks and schedules them using the scheduler.
+            """
+
             from colorama import Fore
 
-            print(f"{Fore.YELLOW}Fetching tasks{Fore.RESET}")
+            # Print a message indicating that tasks are being fetched
+            print(f"{Fore.YELLOW}------------------------------\nFetching tasks:{Fore.RESET}")
+
+            # Iterate over each task in the task list
             for task in task_registry.task_list:
+                print(f"{Fore.MAGENTA}Retrieve Task {task.crontab}|{task.task_name} ")
                 # Schedule the task using the scheduler
-                scheduler.schedule(crontabify(task.crontab), cancelable=True)(
-                    await task.make(ariadne_app),
-                )
+                scheduler.schedule(crontabify(task.crontab), cancelable=True)(await task.make(ariadne_app))
 
                 # Run the last scheduled task
                 await scheduler.schedule_tasks[-1].run()
+            print(f"{Fore.YELLOW}------------------------------\n{Fore.RESET}")

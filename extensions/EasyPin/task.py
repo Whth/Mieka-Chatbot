@@ -1,8 +1,9 @@
 import datetime
 import json
 import pathlib
+import warnings
 from abc import abstractmethod
-from typing import List, Any, Dict, TypeVar, Type, final, Optional
+from typing import List, Any, Dict, TypeVar, Type, final, Optional, Callable
 
 from colorama import Fore
 from graia.ariadne import Ariadne
@@ -35,6 +36,12 @@ class Task:
     def __init__(self, task_name: str, crontab: str):
         self.task_name: str = task_name
         self.crontab: str = crontab
+        self._task_func: Optional[Callable] = None
+
+    @final
+    @property
+    def task_func(self) -> Optional[Callable]:
+        return self._task_func
 
     @abstractmethod
     async def make(self, app: Ariadne) -> Any:
@@ -78,7 +85,7 @@ class ReminderTask(Task):
         self.remind_content: List[int] = remind_content
         self.target: int = target
 
-    async def make(self, app: Ariadne):
+    async def make(self, app: Ariadne) -> Callable:
         """
         Perform the reminder task.
 
@@ -88,6 +95,9 @@ class ReminderTask(Task):
         Returns:
             Callable: An async function that sends the reminder messages.
         """
+        if callable(self._task_func):
+            warnings.warn("Task is already made")
+            return self._task_func
         from graia.ariadne.message.chain import MessageChain
 
         nodes = []
@@ -115,7 +125,8 @@ class ReminderTask(Task):
         async def _():
             await app.send_group_message(self.target, Forward(nodes))
 
-        return _
+        self._task_func = _
+        return self._task_func
 
     def _as_dict(self) -> Dict:
         """
@@ -255,4 +266,38 @@ class TaskRegistry(object):
         """
         Remove all tasks from the task list.
         """
-        self._tasks = {}
+        self._tasks.clear()
+
+    def remove_task(self, target_info: str):
+        """
+        Remove a task from the internal task dictionary based on target_info.
+
+        Args:
+            target_info (str): The identifier of the task to be removed.
+        """
+        # Create a temporary dictionary to store the updated tasks
+        temp_dict: Dict[str, Dict[str, T_TASK]] = {}
+
+        # Iterate over the existing tasks
+        for crontab, tasks in self._tasks.items():
+            # Check if the current crontab matches the target_info
+            if crontab == target_info:
+                break
+
+            # Create a new dictionary to store the tasks that will survive
+            survived = {}
+
+            # Iterate over the tasks in the current crontab
+            for task_name, task in tasks.items():
+                # Exclude the task with the target_info from the surviving tasks
+                if task_name != target_info:
+                    survived[task_name] = task
+
+            # Add the surviving tasks to the temporary dictionary
+            temp_dict[crontab] = survived
+
+        # Clear the existing tasks dictionary
+        self._tasks.clear()
+
+        # Update the task dictionary with the temporary dictionary
+        self._tasks.update(temp_dict)
