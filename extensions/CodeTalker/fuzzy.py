@@ -33,11 +33,16 @@ class FuzzyDictionary:
             return None
 
     def save_to_json(self):
-        with open(self._save_path, "w") as file:
-            json.dump(self.dictionary, file, ensure_ascii=False, indent=2)
+        with open(self._save_path, "w", encoding="utf-8") as file:
+            json.dump(
+                self.dictionary,
+                file,
+                ensure_ascii=False,
+                indent=2,
+            )
 
     def load_from_json(self):
-        with open(self._save_path, "r") as file:
+        with open(self._save_path, "r", encoding="utf-8") as file:
             self.dictionary = json.load(file)
 
 

@@ -79,7 +79,7 @@ class CodeTalker(AbstractPlugin):
             decorators=[
                 ContainKeyword(keyword=self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD)),
             ],
-            dispatchers=[CoolDown(10)],
+            dispatchers=[CoolDown(1)],
         )
         async def talk(group: Group, message: MessageChain):
             """
@@ -100,8 +100,10 @@ class CodeTalker(AbstractPlugin):
             if not re.match(reg, string=words):
                 return
             compound = f"{self._config_registry.get_config(self.CONFIG_PRE_APPEND_PROMPT)}{words}"
-            search = fuzzy_dictionary.search(compound)
+            search: str = fuzzy_dictionary.search(compound)
+
             if search:
+                print(f"Use Cache: {search}")
                 response = search
             else:
                 response: str = sparkAPI.chat(compound)
@@ -110,5 +112,6 @@ class CodeTalker(AbstractPlugin):
                     fuzzy_dictionary.save_to_json()
                 else:
                     response = "a"
+                print(f"Request Response: {response}")
 
             await ariadne_app.send_group_message(group, response)

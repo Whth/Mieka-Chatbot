@@ -272,7 +272,7 @@ class ConfigRegistry(object):
 
         if not os.path.exists(config_path) or os.path.getsize(config_path) == 0:
             return
-        with open(config_path, mode="r") as f:
+        with open(config_path, mode="r", encoding="utf-8") as f:
             temp = load(f)
         for key in self._config_registry_table.keys():
             config = get_config(temp, registry_path_to_chain(key))
@@ -291,7 +291,7 @@ class ConfigRegistry(object):
         temp = {}
         for k, v in self._config_registry_table_proxy.items():
             make_config(temp, registry_path_to_chain(k), v)
-        with open(self._config_file_path, mode="w+") as f:
+        with open(self._config_file_path, mode="w+", encoding="utf-8") as f:
             dump(temp, f, indent=2, ensure_ascii=False)
 
     @property
