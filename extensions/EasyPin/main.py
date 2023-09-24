@@ -230,6 +230,8 @@ class EasyPin(AbstractPlugin):
                 # Schedule the task using the scheduler
                 scheduler.schedule(crontabify(task.crontab), cancelable=True)(await task.make(ariadne_app))
 
-                # Run the last scheduled task
-                await scheduler.schedule_tasks[-1].run()
-            print(f"{Fore.YELLOW}------------------------------\n{Fore.RESET}")
+            print(
+                f"{Fore.YELLOW}Fetched {len(scheduler.schedule_tasks)} tasks\n"
+                f"------------------------------\n{Fore.RESET}"
+            )
+            await scheduler.run()
