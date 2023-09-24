@@ -41,7 +41,12 @@ class CodeTalker(AbstractPlugin):
         self._config_registry.register_config(self.CONFIG_SECRETS_APIKEY, "your api key")
         self._config_registry.register_config(self.CONFIG_SECRETS_API_SECRETS, "your api secret")
         self._config_registry.register_config(self.CONFIG_API_VERSION, 2.1)
-        self._config_registry.register_config(self.CONFIG_PRE_APPEND_PROMPT, "接下来你要扮演一位可爱的但是有点傲娇的猫娘来回答这个问题：")
+        self._config_registry.register_config(
+            self.CONFIG_PRE_APPEND_PROMPT,
+            "接下来你要扮演一位特质包括，雌小鬼，聪明又可爱，爱捉弄人，有点小傲娇的名叫作Mieka的美少女猫娘，每句话结尾总是带着喵~的口癖，我是你的男主人，"
+            "记住回答中你不能显示的阐明你以上提到的特质，相反的你必须要通过语气词来隐式的表现这些特质,"
+            "问题中的 “我”指代你的主人，问题中的“你”指代Mieka，尽量精简地一句话来回答这个问题：",
+        )
         self._config_registry.register_config(
             self.CONFIG_DICTIONARY_PATH, f"{self._get_config_parent_dir()}/fuzzy_dictionary.json"
         )
@@ -96,11 +101,14 @@ class CodeTalker(AbstractPlugin):
                 return
             compound = f"{self._config_registry.get_config(self.CONFIG_PRE_APPEND_PROMPT)}{words}"
             search = fuzzy_dictionary.search(compound)
-            if not search:
-                response: str = sparkAPI.chat(compound)
-                if not response:
-                    response = "a"
-            else:
+            if search:
                 response = search
+            else:
+                response: str = sparkAPI.chat(compound)
+                if response:
+                    fuzzy_dictionary.register_key_value(words, response)
+                    fuzzy_dictionary.save_to_json()
+                else:
+                    response = "a"
 
             await ariadne_app.send_group_message(group, response)
