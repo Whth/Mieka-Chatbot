@@ -292,7 +292,7 @@ class ConfigRegistry(object):
         for k, v in self._config_registry_table_proxy.items():
             make_config(temp, registry_path_to_chain(k), v)
         with open(self._config_file_path, mode="w+") as f:
-            dump(temp, f, indent=2)
+            dump(temp, f, indent=2, ensure_ascii=False)
 
     @property
     def registered_configs(self) -> Tuple[str]:
