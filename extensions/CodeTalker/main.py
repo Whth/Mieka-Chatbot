@@ -13,6 +13,8 @@ class CodeTalker(AbstractPlugin):
     CONFIG_SECRETS_APIKEY = f"{CONFIG_SECRETS}/apiKey"
     CONFIG_SECRETS_API_SECRETS = f"{CONFIG_SECRETS}/apiSecrets"
     CONFIG_API_VERSION = "ApiVersion"
+    CONFIG_PRE_APPEND_PROMPT = "pre_append_prompt"
+    CONFIG_DICTIONARY_PATH = "dictionary_path"
 
     def _get_config_parent_dir(self) -> str:
         return os.path.abspath(os.path.dirname(__file__))
@@ -27,7 +29,7 @@ class CodeTalker(AbstractPlugin):
 
     @classmethod
     def get_plugin_version(cls) -> str:
-        return "0.0.1"
+        return "0.0.2"
 
     @classmethod
     def get_plugin_author(cls) -> str:
@@ -39,6 +41,10 @@ class CodeTalker(AbstractPlugin):
         self._config_registry.register_config(self.CONFIG_SECRETS_APIKEY, "your api key")
         self._config_registry.register_config(self.CONFIG_SECRETS_API_SECRETS, "your api secret")
         self._config_registry.register_config(self.CONFIG_API_VERSION, 2.1)
+        self._config_registry.register_config(self.CONFIG_PRE_APPEND_PROMPT, "接下来你要扮演一位可爱的但是有点傲娇的猫娘来回答这个问题：")
+        self._config_registry.register_config(
+            self.CONFIG_DICTIONARY_PATH, f"{self._get_config_parent_dir()}/fuzzy_dictionary.json"
+        )
 
     def install(self):
         from graia.ariadne.message.parser.base import ContainKeyword
@@ -46,6 +52,8 @@ class CodeTalker(AbstractPlugin):
         from graia.ariadne.model import Group
         from sparkdesk_api.core import SparkAPI
         from graia.ariadne.util.cooldown import CoolDown
+
+        from .fuzzy import FuzzyDictionary
 
         self.__register_all_config()
         self._config_registry.load_config()
@@ -59,6 +67,7 @@ class CodeTalker(AbstractPlugin):
             api_key=self._config_registry.get_config(self.CONFIG_SECRETS_APIKEY),
             version=self._config_registry.get_config(self.CONFIG_API_VERSION),
         )
+        fuzzy_dictionary = FuzzyDictionary(save_path=self._config_registry.get_config(self.CONFIG_DICTIONARY_PATH))
 
         @bord_cast.receiver(
             "GroupMessage",
@@ -85,9 +94,13 @@ class CodeTalker(AbstractPlugin):
 
             if not re.match(reg, string=words):
                 return
+            compound = f"{self._config_registry.get_config(self.CONFIG_PRE_APPEND_PROMPT)}{words}"
+            search = fuzzy_dictionary.search(compound)
+            if not search:
+                response: str = sparkAPI.chat(compound)
+                if not response:
+                    response = "a"
+            else:
+                response = search
 
-            response: str = sparkAPI.chat(words)
-
-            if not response:
-                response = "a"
             await ariadne_app.send_group_message(group, response)
