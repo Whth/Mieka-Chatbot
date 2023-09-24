@@ -1,5 +1,7 @@
 import os
+import random
 import re
+from typing import List
 
 from modules.plugin_base import AbstractPlugin
 
@@ -15,6 +17,7 @@ class CodeTalker(AbstractPlugin):
     CONFIG_API_VERSION = "ApiVersion"
     CONFIG_PRE_APPEND_PROMPT = "pre_append_prompt"
     CONFIG_DICTIONARY_PATH = "dictionary_path"
+    CONFIG_RE_GENERATE_PROBABILITY = "re_generate_probability"
 
     def _get_config_parent_dir(self) -> str:
         return os.path.abspath(os.path.dirname(__file__))
@@ -41,14 +44,19 @@ class CodeTalker(AbstractPlugin):
         self._config_registry.register_config(self.CONFIG_SECRETS_APIKEY, "your api key")
         self._config_registry.register_config(self.CONFIG_SECRETS_API_SECRETS, "your api secret")
         self._config_registry.register_config(self.CONFIG_API_VERSION, 2.1)
-        self._config_registry.register_config(self.CONFIG_PRE_APPEND_PROMPT, "接下来你要扮演一位可爱的但是有点傲娇的猫娘来回答这个问题：")
+        self._config_registry.register_config(
+            self.CONFIG_PRE_APPEND_PROMPT,
+            "接下来你要扮演一位特质包括，雌小鬼，聪明又可爱，爱捉弄人，有点小傲娇的名叫作Mieka的美少女猫娘，带着一些可爱的口癖，我是你的男主人，"
+            "问题中的 “我”指代你的主人，问题中的“你”指代你所扮演的Mieka，尽量精简地一句话来回答这个问题：",
+        )
         self._config_registry.register_config(
             self.CONFIG_DICTIONARY_PATH, f"{self._get_config_parent_dir()}/fuzzy_dictionary.json"
         )
+        self._config_registry.register_config(self.CONFIG_RE_GENERATE_PROBABILITY, 0.3)
 
     def install(self):
-        from graia.ariadne.message.parser.base import ContainKeyword
         from graia.ariadne.message.chain import MessageChain
+        from graia.ariadne.event.message import GroupMessage
         from graia.ariadne.model import Group
         from sparkdesk_api.core import SparkAPI
         from graia.ariadne.util.cooldown import CoolDown
@@ -59,7 +67,7 @@ class CodeTalker(AbstractPlugin):
         self._config_registry.load_config()
         ariadne_app = self._ariadne_app
         bord_cast = ariadne_app.broadcast
-        reg = re.compile(r"^(?=.*[^\s?])[^?]+[?？]$")
+        reg = re.compile(r"(^.*)[?？]$")
         # 默认api接口版本为1.5，开启v2.0版本只需指定 version=2.1 即可
         sparkAPI = SparkAPI(
             app_id=self._config_registry.get_config(self.CONFIG_SECRETS_APPID),
@@ -68,13 +76,11 @@ class CodeTalker(AbstractPlugin):
             version=self._config_registry.get_config(self.CONFIG_API_VERSION),
         )
         fuzzy_dictionary = FuzzyDictionary(save_path=self._config_registry.get_config(self.CONFIG_DICTIONARY_PATH))
+        print(f"Loading Fuzzy Dictionary Size:{len(fuzzy_dictionary.dictionary.keys())}")
 
         @bord_cast.receiver(
-            "GroupMessage",
-            decorators=[
-                ContainKeyword(keyword=self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD)),
-            ],
-            dispatchers=[CoolDown(10)],
+            GroupMessage,
+            dispatchers=[CoolDown(1)],
         )
         async def talk(group: Group, message: MessageChain):
             """
@@ -94,13 +100,20 @@ class CodeTalker(AbstractPlugin):
 
             if not re.match(reg, string=words):
                 return
-            compound = f"{self._config_registry.get_config(self.CONFIG_PRE_APPEND_PROMPT)}{words}"
-            search = fuzzy_dictionary.search(compound)
-            if not search:
+
+            search: List[str] = fuzzy_dictionary.search(words)
+
+            if random.random() <= self._config_registry.get_config(self.CONFIG_RE_GENERATE_PROBABILITY) or not search:
+                compound = f"{self._config_registry.get_config(self.CONFIG_PRE_APPEND_PROMPT)}{words}"
                 response: str = sparkAPI.chat(compound)
-                if not response:
+                if response:
+                    fuzzy_dictionary.register_key_value(words, response)
+                    fuzzy_dictionary.save_to_json()
+                else:
                     response = "a"
+                print(f"Request Response: {response}")
             else:
-                response = search
+                response = random.choice(search)
+                print(f"Use Cache: {response}")
 
             await ariadne_app.send_group_message(group, response)
