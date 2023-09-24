@@ -1,16 +1,20 @@
 import json
 import pathlib
 from difflib import get_close_matches
-from typing import Any
+from typing import Any, List, Dict
 
 
 class FuzzyDictionary:
     def __init__(self, save_path: str):
         self._save_path = save_path
 
-        self.dictionary = {}
+        self._dictionary: Dict[str, List[str]] = {}
         if pathlib.Path(self._save_path).exists():
             self.load_from_json()
+
+    @property
+    def dictionary(self) -> Dict[str, List[str]]:
+        return self._dictionary
 
     def register_key_value(self, key: str, value: Any):
         """
@@ -23,40 +27,37 @@ class FuzzyDictionary:
         Returns:
             None
         """
-        self.dictionary[key] = value
+        if key not in self._dictionary:
+            self._dictionary[key] = []
+        self._dictionary[key].append(value)
 
-    def search(self, key: str) -> Any:
-        matches = get_close_matches(key, self.dictionary.keys())
+    def search(self, key: str) -> List[str]:
+        matches = get_close_matches(key, list(self._dictionary.keys()), n=1)
         if matches:
-            return self.dictionary[matches[0]]
+            return self._dictionary.get(matches[0])
         else:
-            return None
+            return []
 
-    def save_to_json(self):
+    def save_to_json(self) -> None:
         with open(self._save_path, "w", encoding="utf-8") as file:
             json.dump(
-                self.dictionary,
+                self._dictionary,
                 file,
                 ensure_ascii=False,
                 indent=2,
             )
 
-    def load_from_json(self):
+    def load_from_json(self) -> None:
         with open(self._save_path, "r", encoding="utf-8") as file:
-            self.dictionary = json.load(file)
+            self._dictionary.update(json.load(file))
 
 
 if __name__ == "__main__":
     # 创建FuzzyDictionary对象
-    fuzzy_dict = FuzzyDictionary("dictionary.json")
-
-    # 注册键值对
-    fuzzy_dict.register_key_value("apple", "苹果")
-    fuzzy_dict.register_key_value("banana", "香蕉")
-    fuzzy_dict.register_key_value("orange", "橙子")
+    fuzzy_dict = FuzzyDictionary("./fuzzy_dictionary.json")
 
     # 模糊搜索键值
-    result = fuzzy_dict.search("app")
+    result = fuzzy_dict.search("我喜欢你！？")
     if result:
         print(result)  # 输出: "苹果"
     else:
