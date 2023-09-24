@@ -61,7 +61,7 @@ class StableDiffusionPlugin(AbstractPlugin):
 
     @classmethod
     def get_plugin_version(cls) -> str:
-        return "0.0.10"
+        return "0.1.0"
 
     @classmethod
     def get_plugin_author(cls) -> str:
@@ -192,7 +192,7 @@ class StableDiffusionPlugin(AbstractPlugin):
             GroupMessage,
             decorators=[ContainKeyword(keyword=self._config_registry.get_config(self.CONFIG_POS_KEYWORD))],
         )
-        async def group_diffusion(group: Group, message: MessageChain):
+        async def group_diffusion(group: Group, message: MessageChain, message_event: GroupMessage):
             """
             Generate an image and send it as a message in a group.
 
@@ -219,10 +219,21 @@ class StableDiffusionPlugin(AbstractPlugin):
                     styles=self._config_registry.get_config(self.CONFIG_STYLES),
                 )
             )
+
             if Image in message:
+                image_url = message[Image, 1][0].url
+            elif hasattr(message_event.quote, "origin"):
+                origin_message: MessageChain = (
+                    await ariadne_app.get_message_from_id(message_event.quote.id)
+                ).message_chain
+                # check if the message contains a picture
+                image_url = origin_message[Image, 1][0].url if origin_message[Image, 1] else None
+            else:
+                image_url = None
+            if image_url:
                 # Download the first image in the chain
-                print(f"Downloading image from: {message[Image, 1][0].url}\n")
-                img_path = await download_file(save_dir=temp_dir_path, url=message[Image, 1][0].url)
+                print(f"Downloading image from: {image_url}\n")
+                img_path = await download_file(save_dir=temp_dir_path, url=image_url)
                 img_base64 = img_to_base64(img_path)
                 cn_unit = None
                 if self._config_registry.get_config(self.CONFIG_ENABLE_CONTROLNET):
