@@ -186,7 +186,6 @@ class StableDiffusionPlugin(AbstractPlugin):
             processor=_shuffle_process,
             process_name="SHUFFLE",
         )
-        # TODO add quick async response
 
         @bord_cast.receiver(
             GroupMessage,
@@ -220,39 +219,9 @@ class StableDiffusionPlugin(AbstractPlugin):
                 )
             )
 
-            if Image in message:
-                image_url = message[Image, 1][0].url
-            elif hasattr(message_event.quote, "origin"):
-                origin_message: MessageChain = (
-                    await ariadne_app.get_message_from_id(message_event.quote.id)
-                ).message_chain
-                # check if the message contains a picture
-                image_url = origin_message[Image, 1][0].url if origin_message[Image, 1] else None
-            else:
-                image_url = None
+            image_url = await _get_image_url(message, message_event)
             if image_url:
-                # Download the first image in the chain
-                print(f"Downloading image from: {image_url}\n")
-                img_path = await download_file(save_dir=temp_dir_path, url=image_url)
-                img_base64 = img_to_base64(img_path)
-                cn_unit = None
-                if self._config_registry.get_config(self.CONFIG_ENABLE_CONTROLNET):
-                    module = self._config_registry.get_config(self.CONFIG_CONTROLNET_MODULE)
-                    model = self._config_registry.get_config(self.CONFIG_CONTROLNET_MODEL)
-
-                    if module in controlnet.modules and model in controlnet.models:
-                        cn_unit = ControlNetUnit(
-                            input_image=img_base64,
-                            module=module,
-                            model=model,
-                        )
-
-                send_result = await SD_app.img2img(
-                    image_base64=img_base64,
-                    output_dir=output_dir_path,
-                    diffusion_parameters=diffusion_paser,
-                    controlnet_parameters=cn_unit,
-                )
+                send_result = await _make_img2img(diffusion_paser, image_url)
             else:
                 # Generate the image using the diffusion parser
                 send_result = await SD_app.txt2img(
@@ -263,6 +232,43 @@ class StableDiffusionPlugin(AbstractPlugin):
 
             # Send the image as a message in the group
             await ariadne_app.send_message(group, MessageChain("") + Image(path=send_result[0]))
+
+        async def _get_image_url(message, message_event):
+            if Image in message:
+                image_url = message[Image, 1][0].url
+            elif hasattr(message_event.quote, "origin"):
+                origin_message: MessageChain = (
+                    await ariadne_app.get_message_from_id(message_event.quote.id)
+                ).message_chain
+                # check if the message contains a picture
+                image_url = origin_message[Image, 1][0].url if origin_message[Image, 1] else None
+            else:
+                image_url = None
+            return image_url
+
+        async def _make_img2img(diffusion_paser, image_url):
+            # Download the first image in the chain
+            print(f"Downloading image from: {image_url}\n")
+            img_path = await download_file(save_dir=temp_dir_path, url=image_url)
+            img_base64 = img_to_base64(img_path)
+            cn_unit = None
+            if self._config_registry.get_config(self.CONFIG_ENABLE_CONTROLNET):
+                module = self._config_registry.get_config(self.CONFIG_CONTROLNET_MODULE)
+                model = self._config_registry.get_config(self.CONFIG_CONTROLNET_MODEL)
+
+                if module in controlnet.modules and model in controlnet.models:
+                    cn_unit = ControlNetUnit(
+                        input_image=img_base64,
+                        module=module,
+                        model=model,
+                    )
+            send_result = await SD_app.img2img(
+                image_base64=img_base64,
+                output_dir=output_dir_path,
+                diffusion_parameters=diffusion_paser,
+                controlnet_parameters=cn_unit,
+            )
+            return send_result
 
 
 def de_assembly(
