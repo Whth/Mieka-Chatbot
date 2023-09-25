@@ -305,17 +305,24 @@ def convert_relative_to_abs(string: str) -> str:
     # Extract the groups from the first match
     groups: Sequence[Union[str, Any]] = matches[0]
     offset = int(groups[0])
-
+    # TODO add multiple offset calculation support
+    if groups[1]:
+        time_offset = timedelta(minutes=offset)
+    elif groups[2]:
+        time_offset = timedelta(hours=offset)
+    elif groups[3]:
+        time_offset = timedelta(days=offset)
+    elif groups[4]:
+        time_offset = timedelta(days=offset * 30)
+    else:
+        raise ValueError("should never arrive here!, since the reg expr will not let this happen")
     # Calculate the absolute values for month, day, hour, and minute
-    abs_month = datetime.today().month + offset if groups[4] else datetime.today().month
-    abs_day = datetime.today().day + offset if groups[3] else datetime.today().day
-    abs_hour = datetime.today().hour + offset if groups[2] else datetime.today().hour
-    abs_min = datetime.today().minute + offset if groups[1] else datetime.today().minute
 
+    abs_time = datetime.now() + time_offset
     # Replace the matched relative month string with the absolute month string
     return re.sub(
         pattern=reg_exp,
-        repl=f"{abs_month}月{abs_day}日{abs_hour}点{abs_min}分",
+        repl=f"{abs_time.month}月{abs_time.day}日{abs_time.hour}点{abs_time.minute}分",
         string=string,
         count=1,
     )
