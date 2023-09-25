@@ -31,7 +31,7 @@ class EasyPin(AbstractPlugin):
 
     @classmethod
     def get_plugin_version(cls) -> str:
-        return "0.0.2"
+        return "0.0.3"
 
     @classmethod
     def get_plugin_author(cls) -> str:
