@@ -109,7 +109,6 @@ class StableDiffusionPlugin(AbstractPlugin):
         )
         controlnet: Controlnet = Controlnet(host_url=self._config_registry.get_config(self.CONFIG_SD_HOST))
 
-        SD_app = StableDiffusionApp(host_url=self._config_registry.get_config(self.CONFIG_SD_HOST))
         gen = RandomPromptGenerator(
             wildcard_manager=WildcardManager(path=self._config_registry.get_config(self.CONFIG_WILDCARD_DIR_PATH))
         )
@@ -143,7 +142,9 @@ class StableDiffusionPlugin(AbstractPlugin):
         temp_dir_path = self._config_registry.get_config(self.CONFIG_IMG_TEMP_DIR_PATH)
         ariadne_app = self._ariadne_app
         bord_cast: Broadcast = ariadne_app.broadcast
-
+        SD_app = StableDiffusionApp(
+            host_url=self._config_registry.get_config(self.CONFIG_SD_HOST), cache_dir=temp_dir_path
+        )
         bord_cast.receiver(ApplicationLaunch)(controlnet.fetch_resources)
 
         def _dynamic_process(pos_prompt: str, neg_prompt: str) -> Tuple[str, str]:
@@ -233,6 +234,16 @@ class StableDiffusionPlugin(AbstractPlugin):
             # Send the image as a message in the group
             await ariadne_app.send_message(group, MessageChain("") + Image(path=send_result[0]))
 
+        @bord_cast.receiver(
+            GroupMessage,
+            decorators=[
+                ContainKeyword(keyword="sd ag"),
+            ],
+        )
+        async def group_diffusion_history(group: Group):
+            send_result = await SD_app.txt2img_history(output_dir_path)
+            await ariadne_app.send_message(group, MessageChain("") + Image(path=send_result[0]))
+
         async def _get_image_url(message, message_event):
             if Image in message:
                 image_url = message[Image, 1][0].url
@@ -253,8 +264,8 @@ class StableDiffusionPlugin(AbstractPlugin):
             img_base64 = img_to_base64(img_path)
             cn_unit = None
             if self._config_registry.get_config(self.CONFIG_ENABLE_CONTROLNET):
-                module = self._config_registry.get_config(self.CONFIG_CONTROLNET_MODULE)
-                model = self._config_registry.get_config(self.CONFIG_CONTROLNET_MODEL)
+                module: str = self._config_registry.get_config(self.CONFIG_CONTROLNET_MODULE)
+                model: str = self._config_registry.get_config(self.CONFIG_CONTROLNET_MODEL)
 
                 if module in controlnet.modules and model in controlnet.models:
                     cn_unit = ControlNetUnit(

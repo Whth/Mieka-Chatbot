@@ -67,8 +67,11 @@ class StableDiffusionApp(object):
     class that implements the basic diffusion api
     """
 
-    def __init__(self, host_url: str):
-        self._host_url = host_url
+    def __init__(self, host_url: str, cache_dir: str):
+        self._host_url: str = host_url
+        self._cache_dir: str = cache_dir
+        self._img2img_params: HistoryWatcher = HistoryWatcher()
+        self._txt2img_params: HistoryWatcher = HistoryWatcher()
 
     async def txt2img(
         self,
@@ -94,19 +97,20 @@ class StableDiffusionApp(object):
 
         """
 
-        pay_load: Dict = {}
+        self._txt2img_params.payload_init()
         alwayson_scripts: Dict = {ALWAYSON_SCRIPTS_KEY: {}}
-        pay_load.update(diffusion_parameters._asdict())
-        pay_load.update(HiRes_parameters._asdict())
+        self._txt2img_params.add_payload(diffusion_parameters._asdict())
+        self._txt2img_params.add_payload(HiRes_parameters._asdict())
 
         if controlnet_parameters:
             alwayson_scripts[ALWAYSON_SCRIPTS_KEY].update(make_cn_payload([controlnet_parameters]))
 
-        pay_load.update(alwayson_scripts)
+        self._txt2img_params.add_payload(alwayson_scripts)
         async with aiohttp.ClientSession() as session:
-            response = await session.post(f"{self._host_url}/{API_TXT2IMG}", json=pay_load)
-            response_payload: Dict = await response.json()
-
+            response_payload: Dict = await (
+                await session.post(f"{self._host_url}/{API_TXT2IMG}", json=self._txt2img_params.current)
+            ).json()
+        self._txt2img_params.store()
         img_base64: List[str] = extract_png_from_payload(response_payload)
 
         return save_base64_img_with_hash(img_base64_list=img_base64, output_dir=output_dir, host_url=self._host_url)
@@ -136,13 +140,13 @@ class StableDiffusionApp(object):
         """
 
         # Create the payload dictionary to be sent in the request
-        payload: Dict = {}
+        self._img2img_params.payload_init()
 
         # Create a dictionary to store the alwayson scripts
         alwayson_scripts: Dict = {ALWAYSON_SCRIPTS_KEY: {}}
 
         # Add the diffusion parameters to the payload
-        payload.update(diffusion_parameters._asdict())
+        self._img2img_params.add_payload(diffusion_parameters._asdict())
 
         if image_path:
             # Convert the input image to base64 and add it to the payload
@@ -151,19 +155,47 @@ class StableDiffusionApp(object):
             png_payload: Dict = {INIT_IMAGES_KEY: [image_base64]}
         else:
             raise ValueError("one of image_path and image_base64 must be specified!")
-        payload.update(png_payload)
+        self._img2img_params.add_payload(png_payload)
 
         # If controlnet parameters are provided, update the alwayson scripts with them
         if controlnet_parameters:
             alwayson_scripts[ALWAYSON_SCRIPTS_KEY].update(make_cn_payload([controlnet_parameters]))
 
         # Add the alwayson scripts to the payload
-        payload.update(alwayson_scripts)
+        self._img2img_params.add_payload(alwayson_scripts)
 
         # Send a POST request to the API with the payload and get the response
         async with aiohttp.ClientSession() as session:
-            response_payload: Dict = await (await session.post(f"{self._host_url}/{API_IMG2IMG}", json=payload)).json()
+            response_payload: Dict = await (
+                await session.post(f"{self._host_url}/{API_IMG2IMG}", json=self._img2img_params.current)
+            ).json()
 
+        self._img2img_params.store()
+        # Extract the generated images from the response payload
+        img_base64: List[str] = extract_png_from_payload(response_payload)
+
+        # Save the generated images to the output directory and return the list of file paths
+        return save_base64_img_with_hash(img_base64_list=img_base64, output_dir=output_dir, host_url=self._host_url)
+
+    async def img2img_history(self, output_dir: str) -> List[str]:
+        # Send a POST request to the API with the payload and get the response
+        async with aiohttp.ClientSession() as session:
+            response_payload: Dict = await (
+                await session.post(f"{self._host_url}/{API_IMG2IMG}", json=self._img2img_params.history)
+            ).json()
+
+        # Extract the generated images from the response payload
+        img_base64: List[str] = extract_png_from_payload(response_payload)
+
+        # Save the generated images to the output directory and return the list of file paths
+        return save_base64_img_with_hash(img_base64_list=img_base64, output_dir=output_dir, host_url=self._host_url)
+
+    async def txt2img_history(self, output_dir: str) -> List[str]:
+        # Send a POST request to the API with the payload and get the response
+        async with aiohttp.ClientSession() as session:
+            response_payload: Dict = await (
+                await session.post(f"{self._host_url}/{API_TXT2IMG}", json=self._txt2img_params.history)
+            ).json()
         # Extract the generated images from the response payload
         img_base64: List[str] = extract_png_from_payload(response_payload)
 
@@ -244,3 +276,28 @@ def get_image_ratio(image_path):
     img = Image.open(image_path)
     width, height = img.size
     return width / height
+
+
+class HistoryWatcher(object):
+    def __init__(self):
+        super().__init__()
+        self._current: Dict = {}
+        self._history: Dict = {}
+
+    def payload_init(self):
+        self._current = {}
+
+    def add_payload(self, payload: Dict):
+        self._current.update(payload)
+
+    def store(self):
+        self._history = {}
+        self._history.update(self._current)
+
+    @property
+    def history(self) -> Dict:
+        return self._history
+
+    @property
+    def current(self) -> Dict:
+        return self._current
