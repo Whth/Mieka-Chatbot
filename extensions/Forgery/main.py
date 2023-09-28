@@ -2,7 +2,7 @@ import os
 from typing import List, Tuple
 
 from graia.ariadne.event.message import GroupMessage
-from graia.ariadne.message.element import Plain, MultimediaElement, Forward
+from graia.ariadne.message.element import Plain, Forward, MultimediaElement
 
 from modules.plugin_base import AbstractPlugin
 
@@ -85,7 +85,7 @@ class Forgery(AbstractPlugin):
                 extract_multimedia_data = message.message_chain.get(MultimediaElement)
 
                 info_pack.insert(
-                    0, (extracted_data[0], MessageChain([Plain(extracted_data[1]), extract_multimedia_data]))
+                    0, (extracted_data[0], MessageChain([Plain(extracted_data[1])] + extract_multimedia_data))
                 )
 
             nodes = await make_forward(ariadne_app, info_pack)
