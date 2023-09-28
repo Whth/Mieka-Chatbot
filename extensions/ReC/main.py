@@ -1,4 +1,9 @@
 import os
+from typing import List, Optional, Sequence
+
+from graia.ariadne import Ariadne
+from graia.ariadne.event.message import GroupMessage
+from graia.ariadne.model import Group
 
 from modules.plugin_base import AbstractPlugin
 
@@ -22,7 +27,7 @@ class ReC(AbstractPlugin):
 
     @classmethod
     def get_plugin_version(cls) -> str:
-        return "0.0.1"
+        return "0.0.2"
 
     @classmethod
     def get_plugin_author(cls) -> str:
@@ -30,7 +35,7 @@ class ReC(AbstractPlugin):
 
     def __register_all_config(self):
         self._config_registry.register_config(self.CONFIG_DETECTED_KEYWORD, "recall")
-        self._config_registry.register_config(self.CONFIG_MAX_LOOK_BACK, 10)
+        self._config_registry.register_config(self.CONFIG_MAX_LOOK_BACK, 30)
 
     def install(self):
         from graia.ariadne.event.message import GroupMessage
@@ -59,38 +64,74 @@ class ReC(AbstractPlugin):
                 group (Group): The group where the recall action is triggered.
                 message_event (GroupMessage): The group message event triggering the recall action.
             """
-            this_message_id = message_event.id
+            last_message_id = message_event.id - 1
+            print(last_message_id)
+            messages_to_recall: List[GroupMessage] = []
+            if hasattr(message_event.quote, "origin"):
+                # Get the message to recall from the quote
+                messages_to_recall.append(await ariadne_app.get_message_from_id(message_event.quote.id, group))
 
             # Check if the message event has a quote
-            if not hasattr(message_event.quote, "origin"):
+            else:
                 print(f"{Fore.RED}No Quote")
                 print(f"{Fore.RED}Searching previous [{max_look_back}] messages{Fore.RESET}")
 
-                # Search for the previous messages in the group
-                for i in range(1, max_look_back + 1):
-                    temp: GroupMessage = await ariadne_app.get_message_from_id(this_message_id - i, group)
-
-                    # Check if the previous message is sent by the same account
-                    if temp.sender.id == ariadne_app.account:
-                        message_to_recall = temp
-                        print(f"{Fore.RED}Found Message-{temp.id}{Fore.RESET}")
-                        break
-                else:
-                    print(f"{Fore.RED}No message Found, Not execute recall action{Fore.RESET}")
-                    return
-
-            else:
-                # Get the message to recall from the quote
-                message_to_recall: GroupMessage = await ariadne_app.get_message_from_id(message_event.quote.id, group)
-
-            # Check if the message to recall is not sent by the same account
-            if message_to_recall.sender.id != ariadne_app.account:
-                print(
-                    f"{Fore.RED}Quote message is from {message_to_recall.sender.id}, not {ariadne_app.account}\n"
-                    f"Not execute recall action.{Fore.RED}"
+                messages_to_recall.extend(
+                    await search_messages(
+                        last_message_id=last_message_id,
+                        look_back=max_look_back,
+                        target_group=group,
+                        target_member_id=[ariadne_app.account],
+                    )
                 )
 
-            print(f"{Fore.GREEN}Recall Message-{message_to_recall.id} in Group-{group.id}{Fore.RESET}")
-
+            print(f"{Fore.RED}Execute recall on {len(messages_to_recall)} messages{Fore.RESET}")
             # Recall the message
-            await ariadne_app.recall_message(message_to_recall, group)
+            await recall_group_messages(ariadne_app, messages_to_recall, group)
+
+        async def search_messages(
+            last_message_id: int, look_back: int, target_group: Group, target_member_id: Optional[Sequence[int]]
+        ) -> List[GroupMessage]:
+            """
+            Search for previous messages in a group based on the last message ID, a look back interval, the target group, and optional target member IDs.
+
+            Parameters:
+                last_message_id (int): The ID of the last message from which to start searching.
+                look_back (int): The number of messages to look back from the last message ID.
+                target_group (Group): The target group in which to search for messages.
+                target_member_id (Optional[Sequence[int]]): Optional member IDs to filter the search. If None, all messages will be considered.
+
+            Returns:
+                List[GroupMessage]: A list of GroupMessage objects representing the found messages.
+
+            """
+            messages_to_recall: List[GroupMessage] = []
+            # Search for the previous messages in the group
+            for i in range(last_message_id, last_message_id - look_back, -1):
+                temp: GroupMessage = await ariadne_app.get_message_from_id(i, target_group)
+                # Check if the previous message is sent by the same account
+                if target_member_id is None or temp.sender.id in target_member_id:
+                    messages_to_recall.append(temp)
+                    print(f"{Fore.RED}Found Message-{temp.id}\n{temp.message_chain}{Fore.RESET}")
+            return messages_to_recall
+
+
+async def recall_group_messages(app: Ariadne, message: List[GroupMessage], group: Group):
+    """
+    Asynchronously recalls a list of group messages using the given Ariadne app.
+
+    Args:
+        app (Ariadne): The Ariadne app instance.
+        message (List[GroupMessage]): A list of group messages to be recalled.
+        group (Group): The group to which the messages belong.
+
+    Returns:
+        None
+    """
+    from graia.ariadne.exception import RemoteException
+
+    for msg in message:
+        try:
+            await app.recall_message(msg, group)
+        except RemoteException:
+            continue
