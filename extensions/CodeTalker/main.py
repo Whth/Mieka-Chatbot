@@ -10,7 +10,7 @@ __all__ = ["CodeTalker"]
 
 
 class CodeTalker(AbstractPlugin):
-    CONFIG_DETECTED_KEYWORD = "detected_keyword"
+    CONFIG_MATCH_PATTERN = "match_pattern"
     CONFIG_SECRETS = "secrets"
     CONFIG_SECRETS_APPID = f"{CONFIG_SECRETS}/appID"
     CONFIG_SECRETS_APIKEY = f"{CONFIG_SECRETS}/apiKey"
@@ -40,7 +40,7 @@ class CodeTalker(AbstractPlugin):
         return "whth"
 
     def __register_all_config(self):
-        self._config_registry.register_config(self.CONFIG_DETECTED_KEYWORD, "？")
+        self._config_registry.register_config(self.CONFIG_MATCH_PATTERN, r"(?:^ct\s+(.+)|(.+[?？]))")
         self._config_registry.register_config(self.CONFIG_SECRETS_APPID, "your appid")
         self._config_registry.register_config(self.CONFIG_SECRETS_APIKEY, "your api key")
         self._config_registry.register_config(self.CONFIG_SECRETS_API_SECRETS, "your api secret")
@@ -60,14 +60,13 @@ class CodeTalker(AbstractPlugin):
         from graia.ariadne.model import Group
         from sparkdesk_api.core import SparkAPI
         from graia.ariadne.util.cooldown import CoolDown
-
         from .fuzzy import FuzzyDictionary
 
         self.__register_all_config()
         self._config_registry.load_config()
         ariadne_app = self._ariadne_app
         bord_cast = ariadne_app.broadcast
-        reg = re.compile(r"(^.*)[?？]$")
+        reg = re.compile(self._config_registry.get_config(self.CONFIG_MATCH_PATTERN))
         # 默认api接口版本为1.5，开启v2.0版本只需指定 version=2.1 即可
         sparkAPI = SparkAPI(
             app_id=self._config_registry.get_config(self.CONFIG_SECRETS_APPID),
@@ -97,11 +96,16 @@ class CodeTalker(AbstractPlugin):
             Raises:
                 None
             """
-            words = str(message)
 
-            if not re.match(reg, string=words):
+            matched = re.match(reg, string=str(message))
+            if not matched:
                 return
-
+            for matched_group in matched.groups():
+                if matched_group:
+                    words = matched_group
+                    break
+            else:
+                raise RuntimeError("Should never arrive here")
             search: List[str] = fuzzy_dictionary.search(words)
 
             if random.random() <= self._config_registry.get_config(self.CONFIG_RE_GENERATE_PROBABILITY) or not search:
