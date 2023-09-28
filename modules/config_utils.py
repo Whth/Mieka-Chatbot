@@ -1,7 +1,7 @@
 import os
 import re
 from functools import singledispatch
-from inspect import signature
+from inspect import signature, iscoroutinefunction
 from json import load, dump
 from types import MappingProxyType
 from typing import Any, Dict, List, Union, TypeVar, Type
@@ -394,7 +394,7 @@ class CmdClient(object):
         if isinstance(cmd_options, Dict):
             return list(cmd_options.keys())
 
-    def interpret(self, cmd: str) -> Any:
+    async def interpret(self, cmd: str) -> Any:
         """
         Interprets a command and executes it.
 
@@ -437,7 +437,8 @@ class CmdClient(object):
                         hints[param_name].annotation(raw_param)
                         for param_name, raw_param in zip(params_name_list, raw_params)
                     )
-
+                    if iscoroutinefunction(temp):
+                        return await temp(*params_pack)
                     return temp(*params_pack)
                 else:
                     raise ValueError(f"expected {required_token_count} args, got {tokens_count}")
