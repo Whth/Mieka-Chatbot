@@ -42,6 +42,7 @@ class ReC(AbstractPlugin):
         from graia.ariadne.message.parser.base import ContainKeyword, MentionMe
         from graia.ariadne.model import Group
         from colorama import Fore
+        from graia.ariadne.exception import UnknownTarget
 
         self.__register_all_config()
         self._config_registry.load_config()
@@ -108,7 +109,10 @@ class ReC(AbstractPlugin):
             messages_to_recall: List[GroupMessage] = []
             # Search for the previous messages in the group
             for i in range(last_message_id, last_message_id - look_back, -1):
-                temp: GroupMessage = await ariadne_app.get_message_from_id(i, target_group)
+                try:
+                    temp: GroupMessage = await ariadne_app.get_message_from_id(i, target_group)
+                except UnknownTarget:
+                    continue
                 # Check if the previous message is sent by the same account
                 if target_member_id is None or temp.sender.id in target_member_id:
                     messages_to_recall.append(temp)
