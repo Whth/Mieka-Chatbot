@@ -96,7 +96,7 @@ class ChatBot(object):
                 None
             """
             try:
-                stdout = self._bot_client.interpret(str(message))
+                stdout = await self._bot_client.interpret(str(message))
             except KeyError:
                 return
             (await self._ariadne_app.send_message(target, message=stdout)) if stdout else None
