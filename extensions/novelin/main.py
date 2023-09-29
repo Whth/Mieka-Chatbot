@@ -3,10 +3,10 @@ import pathlib
 
 from modules.plugin_base import AbstractPlugin
 
-__all__ = ["TestPlugin"]
+__all__ = ["Novelin"]
 
 
-class TestPlugin(AbstractPlugin):
+class Novelin(AbstractPlugin):
     CONFIG_NOVEL_ASSET_PATH = "novel_asset_path"
     CONFIG_DETECTED_KEYWORD = "detected_keyword"
 
@@ -15,11 +15,11 @@ class TestPlugin(AbstractPlugin):
 
     @classmethod
     def get_plugin_name(cls) -> str:
-        return "test"
+        return "Novelin"
 
     @classmethod
     def get_plugin_description(cls) -> str:
-        return "test plugin"
+        return "sends random sampled string, like novel"
 
     @classmethod
     def get_plugin_version(cls) -> str:
