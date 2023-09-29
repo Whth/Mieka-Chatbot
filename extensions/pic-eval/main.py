@@ -1,4 +1,5 @@
 import os
+import pathlib
 import re
 from typing import List
 
@@ -44,9 +45,7 @@ class PicEval(AbstractPlugin):
         return "whth"
 
     def __register_all_config(self):
-        self._config_registry.register_config(
-            self.CONFIG_PICTURE_ASSET_PATH, [f"{self._get_config_parent_dir()}/asset"]
-        )
+        self._config_registry.register_config(self.CONFIG_PICTURE_ASSET_PATH, [])
         self._config_registry.register_config(self.CONFIG_PICTURE_IGNORED_DIRS, [])
         self._config_registry.register_config(self.CONFIG_DETECTED_KEYWORD, "eval")
         self._config_registry.register_config(self.CONFIG_RAND_KEYWORD, "ej")
@@ -84,14 +83,15 @@ class PicEval(AbstractPlugin):
             f"{self._get_config_parent_dir()}/images_registry.json",
             recycle_folder=self._config_registry.get_config(self.CONFIG_RECYCLE_FOLDER),
         )
-        asset_dir_path: List[str] = self._config_registry.get_config(self.CONFIG_PICTURE_ASSET_PATH)
         ignored: List[str] = self._config_registry.get_config(self.CONFIG_PICTURE_IGNORED_DIRS)
         cache_dir_path: str = self._config_registry.get_config(self.CONFIG_PICTURE_CACHE_DIR_PATH)
+        asset_dir_paths: List[str] = self._config_registry.get_config(self.CONFIG_PICTURE_ASSET_PATH)
         store_dir_path: str = self._config_registry.get_config(self.CONFIG_STORE_DIR_PATH)
+        pathlib.Path(store_dir_path).mkdir(parents=True, exist_ok=True)
         level_resolution: int = self._config_registry.get_config(self.CONFIG_LEVEL_RESOLUTION)
         max_batch_size: int = self._config_registry.get_config(self.CONFIG_MAX_BATCH_SIZE)
 
-        selector: Selector = Selector(asset_dirs=asset_dir_path, cache_dir=cache_dir_path, ignore_dirs=ignored)
+        selector: Selector = Selector(asset_dirs=asset_dir_paths, cache_dir=cache_dir_path, ignore_dirs=ignored)
         evaluator: Evaluate = Evaluate(store_dir_path=store_dir_path, level_resolution=level_resolution)
 
         # TODO decouple constant use config

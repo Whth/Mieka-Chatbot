@@ -94,10 +94,7 @@ class Selector(object):
         else:
             self._update_index()
 
-        if len(self._file_index) == 0:
-            raise FileNotFoundError("file_index is empty")
-        else:
-            print(f"Found {len(self._file_index)} files")
+        print(f"Found {len(self._file_index)} files")
 
     def _update_index(self):
         """
