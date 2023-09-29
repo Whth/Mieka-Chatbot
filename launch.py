@@ -1,3 +1,4 @@
+import pathlib
 from typing import List
 
 from graia.ariadne.connection.config import WebsocketClientConfig
@@ -40,6 +41,7 @@ class Mieka(object):
     """
 
     __NAME = "Mieka"
+    pathlib.Path(CONFIG_DIR).mkdir(parents=True, exist_ok=True)
     __config = ConfigRegistry(f"{CONFIG_DIR}/{__NAME}_{CONFIG_FILE_NAME}")
     __config.register_config(ACCOUNT_ID, 1234567890)
     __config.register_config(VERIFY_KEY, "INITKEYXBVCdNG0")
