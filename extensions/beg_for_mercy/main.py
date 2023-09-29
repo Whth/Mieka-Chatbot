@@ -1,8 +1,15 @@
 import os
+from typing import List
 
 from modules.plugin_base import AbstractPlugin
 
 __all__ = ["BegForMercy"]
+
+
+class CMD:
+    ROOT: str = "bfm"
+    ADD: str = "add"
+    LIST: str = "list"
 
 
 class BegForMercy(AbstractPlugin):
@@ -22,7 +29,7 @@ class BegForMercy(AbstractPlugin):
 
     @classmethod
     def get_plugin_version(cls) -> str:
-        return "0.0.1"
+        return "0.0.2"
 
     @classmethod
     def get_plugin_author(cls) -> str:
@@ -49,6 +56,21 @@ class BegForMercy(AbstractPlugin):
         bord_cast = ariadne_app.broadcast
 
         gif_dir_path = self._config_registry.get_config(self.CONFIG_BEGGING_GIF_ASSET_PATH)
+
+        def _add_new_keyword(new_kw: str) -> str:
+            kw_list: List[str] = self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD_LIST)
+            kw_list.append(new_kw)
+            kw_list = list(set(kw_list))
+            self._config_registry.set_config(self.CONFIG_DETECTED_KEYWORD_LIST, kw_list)
+            return f"add [{new_kw}], now kw_list sizes {len(kw_list)}"
+
+        def _list_kws() -> str:
+            kw_list: List[str] = self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD_LIST)
+
+            return "\n".join(kw_list)
+
+        tree = {CMD.ROOT: {CMD.ADD: _add_new_keyword, CMD.LIST: _list_kws}}
+        self._cmd_client.register(tree)
 
         @bord_cast.receiver(
             "GroupMessage",

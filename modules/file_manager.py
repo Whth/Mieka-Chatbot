@@ -1,9 +1,11 @@
 import base64
 import hashlib
+import json
 import os
+import pathlib
 import time
 from pathlib import Path
-from typing import List, Sequence
+from typing import List, Sequence, Dict, Optional
 from typing import Tuple
 
 import aiohttp
@@ -289,3 +291,32 @@ def rename_image_with_hash(image_path: str) -> str:
 
     # Return the renamed image path
     return new_image_path
+
+
+class ConteneCacher:
+    __CACHE_REGISTRY_FNAME = "cache_registry.json"
+
+    def __init__(self, cache_dir: str):
+        pathlib.Path(cache_dir).mkdir(parents=True, exist_ok=True)
+        self._cache_dir = cache_dir
+        self._registry: Dict[str, str] = {}
+        if pathlib.Path(f"{self._cache_dir}/{self.__CACHE_REGISTRY_FNAME}").exists():
+            self.load()
+
+    def register(self, key: str, content: str):
+        if key in self._registry:
+            raise KeyError(f"Key {key} already exists")
+        self._registry[key] = content
+
+    def get(self, key: str, default: Optional[str] = None) -> str:
+        if key not in self._registry:
+            return default
+        return self._registry[key]
+
+    def save(self):
+        with open(os.path.join(self._cache_dir, self.__CACHE_REGISTRY_FNAME), "w") as f:
+            json.dump(self._registry, f, ensure_ascii=False, indent=2)
+
+    def load(self):
+        with open(os.path.join(self._cache_dir, self.__CACHE_REGISTRY_FNAME), "r") as f:
+            self._registry.update(json.load(f))
