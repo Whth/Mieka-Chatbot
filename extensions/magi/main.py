@@ -48,16 +48,17 @@ class Magi(AbstractPlugin):
         self._config_registry.register_config(self.CONFIG_DETECTED_KEYWORD, "magi")
 
     def install(self):
+        from graia.ariadne.app import Ariadne
         from graia.ariadne.message.element import Image
         from graia.ariadne.message.parser.base import ContainKeyword
         from graia.ariadne.model import Group
+
+        from graia.ariadne.event.message import GroupMessage
         from modules.file_manager import explore_folder
         from .gif_factory import GifFactory
 
         self.__register_all_config()
         self._config_registry.load_config()
-        ariadne_app = self._ariadne_app
-        bord_cast = ariadne_app.broadcast
 
         gif_dir_path: str = self._config_registry.get_config(self.CONFIG_GIF_ASSET_PATH)
         temp_dir_path: str = self._config_registry.get_config(self.CONFIG_TEMP_DIR_PATH)
@@ -69,11 +70,7 @@ class Magi(AbstractPlugin):
         jpg_count: int = self._config_registry.get_config(self.CONFIG_PASS_FRAME_COUNT)
         duration: int = self._config_registry.get_config(self.CONFIG_RESULT_FRAME_DURATION)
 
-        @bord_cast.receiver(
-            "GroupMessage",
-            decorators=[ContainKeyword(keyword=self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD))],
-        )
-        async def MAGI_SYS_DECISION_MAKING(group: Group):
+        async def MAGI_SYS_DECISION_MAKING(app: Ariadne, group: Group):
             """
             random send a gif in a day
             :param group:
@@ -88,4 +85,10 @@ class Magi(AbstractPlugin):
                 output_path=temp_file_path,
                 duration=duration,
             )
-            await ariadne_app.send_message(group, Image(path=temp_file_path))
+            await app.send_message(group, Image(path=temp_file_path))
+
+        self.receiver(
+            MAGI_SYS_DECISION_MAKING,
+            GroupMessage,
+            decorators=[ContainKeyword(keyword=self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD))],
+        )

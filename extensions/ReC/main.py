@@ -46,18 +46,9 @@ class ReC(AbstractPlugin):
 
         self.__register_all_config()
         self._config_registry.load_config()
-        ariadne_app = self._ariadne_app
-        bord_cast = ariadne_app.broadcast
         max_look_back: int = self._config_registry.get_config(self.CONFIG_MAX_LOOK_BACK)
 
-        @bord_cast.receiver(
-            GroupMessage,
-            decorators=[
-                MentionMe(),
-                ContainKeyword(keyword=self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD)),
-            ],
-        )
-        async def recall_handler(group: Group, message_event: GroupMessage):
+        async def recall_handler(app: Ariadne, group: Group, message_event: GroupMessage):
             """
             Handle the recall action for a group message event.
 
@@ -70,7 +61,7 @@ class ReC(AbstractPlugin):
             messages_to_recall: List[GroupMessage] = []
             if hasattr(message_event.quote, "origin"):
                 # Get the message to recall from the quote
-                messages_to_recall.append(await ariadne_app.get_message_from_id(message_event.quote.id, group))
+                messages_to_recall.append(await app.get_message_from_id(message_event.quote.id, group))
 
             # Check if the message event has a quote
             else:
@@ -79,19 +70,33 @@ class ReC(AbstractPlugin):
 
                 messages_to_recall.extend(
                     await search_messages(
+                        app=app,
                         last_message_id=last_message_id,
                         look_back=max_look_back,
                         target_group=group,
-                        target_member_id=[ariadne_app.account],
+                        target_member_id=[app.account],
                     )
                 )
 
             print(f"{Fore.RED}Execute recall on {len(messages_to_recall)} messages{Fore.RESET}")
             # Recall the message
-            await recall_group_messages(ariadne_app, messages_to_recall, group)
+            await recall_group_messages(app, messages_to_recall, group)
+
+        self.receiver(
+            recall_handler,
+            GroupMessage,
+            decorators=[
+                MentionMe(),
+                ContainKeyword(keyword=self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD)),
+            ],
+        )
 
         async def search_messages(
-            last_message_id: int, look_back: int, target_group: Group, target_member_id: Optional[Sequence[int]]
+            app: Ariadne,
+            last_message_id: int,
+            look_back: int,
+            target_group: Group,
+            target_member_id: Optional[Sequence[int]],
         ) -> List[GroupMessage]:
             """
             Search for previous messages in a group based on the last message ID, a look back interval, the target group, and optional target member IDs.
@@ -110,7 +115,7 @@ class ReC(AbstractPlugin):
             # Search for the previous messages in the group
             for i in range(last_message_id, last_message_id - look_back, -1):
                 try:
-                    temp: GroupMessage = await ariadne_app.get_message_from_id(i, target_group)
+                    temp: GroupMessage = await app.get_message_from_id(i, target_group)
                 except UnknownTarget:
                     continue
                 # Check if the previous message is sent by the same account

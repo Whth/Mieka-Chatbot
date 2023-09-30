@@ -64,8 +64,7 @@ class CodeTalker(AbstractPlugin):
 
         self.__register_all_config()
         self._config_registry.load_config()
-        ariadne_app = self._ariadne_app
-        bord_cast = ariadne_app.broadcast
+
         reg = re.compile(self._config_registry.get_config(self.CONFIG_MATCH_PATTERN))
         # 默认api接口版本为1.5，开启v2.0版本只需指定 version=2.1 即可
         sparkAPI = SparkAPI(
@@ -78,11 +77,9 @@ class CodeTalker(AbstractPlugin):
         print(f"Loading Fuzzy Dictionary Size:{len(fuzzy_dictionary.dictionary.keys())}")
         history = copy.deepcopy(self._config_registry.get_config(self.CONFIG_PRE_APPEND_HISTORY))
 
-        @bord_cast.receiver(
-            GroupMessage,
-            dispatchers=[CoolDown(1)],
-        )
-        async def talk(group: Group, message: MessageChain):
+        from graia.ariadne import Ariadne
+
+        async def talk(app: Ariadne, group: Group, message: MessageChain):
             """
             Asynchronous function that handles group messages.
 
@@ -120,4 +117,6 @@ class CodeTalker(AbstractPlugin):
                 response = random.choice(search)
                 print(f"Use Cache: {response}")
 
-            await ariadne_app.send_group_message(group, response)
+            await app.send_group_message(group, response)
+
+        self.receiver(talk, GroupMessage, dispatchers=[CoolDown(1)])

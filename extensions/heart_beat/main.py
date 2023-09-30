@@ -35,18 +35,18 @@ class HeartBeat(AbstractPlugin):
     def install(self):
         self.__register_all_config()
         self._config_registry.load_config()
+        from graia.ariadne.app import Ariadne
         from graia.scheduler import GraiaScheduler, timers
         from datetime import datetime
 
-        ariadne_app = self._ariadne_app
-        scheduler: GraiaScheduler = ariadne_app.create(GraiaScheduler)
+        scheduler: GraiaScheduler = Ariadne.current().create(GraiaScheduler)
 
         interval = self._config_registry.get_config(self.CONFIG_HEART_BEAT_INTERVAL)
 
         if interval > 0:
 
             @scheduler.schedule(timer=timers.every_custom_minutes(interval))
-            async def heart_beat():
+            async def heart_beat(app: Ariadne):
                 """
                 Asynchronous function that sends a heart beat message.
 
@@ -58,8 +58,8 @@ class HeartBeat(AbstractPlugin):
                 Returns:
                     None.
                 """
-                await ariadne_app.send_friend_message(
-                    ariadne_app.account,
+                await app.send_friend_message(
+                    app.account,
                     message=f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n'
                     f"HEART BEAT\n"
                     f"CODE: {generate_random_string(10)}",

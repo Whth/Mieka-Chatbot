@@ -74,10 +74,6 @@ class PicEval(AbstractPlugin):
 
         self.__register_all_config()
         self._config_registry.load_config()
-        ariadne_app = self._ariadne_app
-        from graia.broadcast import Broadcast
-
-        bord_cast: Broadcast = ariadne_app.broadcast
 
         img_registry = ImageRegistry(
             f"{self._get_config_parent_dir()}/images_registry.json",
@@ -94,11 +90,9 @@ class PicEval(AbstractPlugin):
         selector: Selector = Selector(asset_dirs=asset_dir_paths, cache_dir=cache_dir_path, ignore_dirs=ignored)
         evaluator: Evaluate = Evaluate(store_dir_path=store_dir_path, level_resolution=level_resolution)
 
-        # TODO decouple constant use config
-        @bord_cast.receiver(
-            GroupMessage,
-        )
-        async def evaluate(group: Group, message: MessageChain, event: MessageEvent):
+        from graia.ariadne import Ariadne
+
+        async def evaluate(app: Ariadne, group: Group, message: MessageChain, event: MessageEvent):
             """
             Asynchronous function that evaluates a message in a group chat and assigns a score to it.
 
@@ -128,11 +122,9 @@ class PicEval(AbstractPlugin):
             except ValueError:
                 return
             try:
-                origin_message: GroupMessage = await ariadne_app.get_message_from_id(
-                    message=event.quote.id, target=group
-                )
+                origin_message: GroupMessage = await app.get_message_from_id(message=event.quote.id, target=group)
             except UnknownTarget:
-                await ariadne_app.send_group_message(group, "a, 这次不行")
+                await app.send_group_message(group, "a, 这次不行")
                 return
             origin_chain: MessageChain = origin_message.message_chain
             if Image in origin_chain:
@@ -146,19 +138,14 @@ class PicEval(AbstractPlugin):
 
             print(f"{Fore.GREEN}eval {score} at {path}")
             evaluator.mark(path, score)
-            await ariadne_app.send_group_message(group, f"Evaluated pic as {score}")
+            await app.send_group_message(group, f"Evaluated pic as {score}")
 
         activate_keyword: str = self._config_registry.get_config(self.CONFIG_RAND_KEYWORD)
         reg = re.compile(rf"^{activate_keyword}(?:$|\s+(\d+)$)")
 
-        @bord_cast.receiver(
-            GroupMessage,
-            decorators=[
-                ContainKeyword(keyword=activate_keyword),
-            ],
-            dispatchers=[CoolDown(5)],
-        )
-        async def rand_picture(group: Group, message: MessageChain):
+        self.receiver(evaluate, GroupMessage)
+
+        async def rand_picture(app: Ariadne, group: Group, message: MessageChain):
             """
             An asynchronous function that is decorated as a receiver for the "GroupMessage" event.
             This function is triggered when a group message is received and contains a keyword
@@ -193,11 +180,17 @@ class PicEval(AbstractPlugin):
                 )
                 print(f"Compress to {quality}")
 
-                await ariadne_app.send_group_message(group, Image(path=output_path) + Plain(picture))
+                await app.send_group_message(group, Image(path=output_path) + Plain(picture))
 
-        @bord_cast.receiver(
-            ActiveGroupMessage,
+        self.receiver(
+            rand_picture,
+            GroupMessage,
+            decorators=[
+                ContainKeyword(keyword=activate_keyword),
+            ],
+            dispatchers=[CoolDown(5)],
         )
+
         async def watcher(message: ActiveGroupMessage):
             chain = message.message_chain
             plain_ele = chain.get(Plain, 1)
@@ -209,14 +202,18 @@ class PicEval(AbstractPlugin):
 
                 print(f"registered {message.id}, Current len = {len(img_registry.images_registry)}")
 
-        @bord_cast.receiver(
+        self.receiver(watcher, ActiveGroupMessage)
+
+        async def rm_picture(app: Ariadne, group: Group, event: MessageEvent):
+            if not hasattr(event.quote, "origin"):
+                return
+            success = img_registry.remove(event.quote.id, save=True)
+            await app.send_group_message(group, f"Remove id-{event.quote.id}\nSuccess = {success}")
+
+        self.receiver(
+            rm_picture,
             GroupMessage,
             decorators=[
                 ContainKeyword("rm"),
             ],
         )
-        async def rm_picture(group: Group, event: MessageEvent):
-            if not hasattr(event.quote, "origin"):
-                return
-            success = img_registry.remove(event.quote.id, save=True)
-            await ariadne_app.send_group_message(group, f"Remove id-{event.quote.id}\nSuccess = {success}")

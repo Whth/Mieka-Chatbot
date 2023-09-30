@@ -4,7 +4,7 @@ from types import MappingProxyType
 from typing import List, Dict, Type, Sequence
 
 from colorama import Fore, Back, Style
-from graia.ariadne import Ariadne
+from graia.broadcast import Broadcast
 
 from constant import REQUIREMENTS_FILE_NAME, MAIN
 from modules.config_utils import CmdClient
@@ -40,12 +40,13 @@ class ExtensionManager:
         """
         return MappingProxyType(self._plugins)
 
-    def install_all_extensions(self, app: Ariadne, bot_client: CmdClient, proxy: PluginsView) -> None:
+    def install_all_extensions(self, broadcast: Broadcast, bot_client: CmdClient, proxy: PluginsView) -> None:
         """
         Installs all extensions for the given app and bot client.
 
         Args:
-            app (Ariadne): The Ariadne app instance.
+
+            broadcast ():
             bot_client (CmdClient): The bot client instance.
             proxy (MappingProxyType[str, AbstractPlugin]): The proxy mapping of plugin names to plugin instances.
 
@@ -78,13 +79,13 @@ class ExtensionManager:
             if plugin.get_plugin_name() in self._black_list:
                 continue
             print(Fore.LIGHTRED_EX)
-            self.install_plugin(plugin, app, bot_client, proxy)
+            self.install_plugin(plugin, broadcast, bot_client, proxy)
             print(Fore.RESET)
 
     def install_plugin(
         self,
         plugin: Type[AbstractPlugin],
-        app: Ariadne,
+        broadcast: Broadcast,
         bot_client: CmdClient,
         proxy: PluginsView,
     ) -> None:
@@ -93,7 +94,7 @@ class ExtensionManager:
 
         Args:
             plugin (Type[AbstractPlugin]): The plugin class to be installed.
-            app (Ariadne): The Ariadne instance.
+
             bot_client (CmdClient): The bot client instance.
             proxy (MappingProxyType[str, AbstractPlugin]): The proxy object for accessing other plugins.
 
@@ -105,7 +106,7 @@ class ExtensionManager:
         """
         if plugin.get_plugin_name in self._plugins:
             raise ValueError("Plugin already registered")
-        plugin_instance = plugin(app, proxy, bot_client)
+        plugin_instance = plugin(proxy, bot_client, broadcast)
 
         plugin_instance.install()
         self._plugins[plugin.get_plugin_name()] = plugin_instance

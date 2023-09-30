@@ -38,23 +38,26 @@ class RandomMeme(AbstractPlugin):
         from graia.ariadne.message.element import Image
         from graia.ariadne.message.parser.base import ContainKeyword
         from graia.ariadne.model import Group
+        from graia.ariadne.event.message import GroupMessage
 
         self.__register_all_config()
         self._config_registry.load_config()
 
-        ariadne_app = self._ariadne_app
-        bord_cast = ariadne_app.broadcast
-
         gif_dir_path = self._config_registry.get_config(self.GIF_ASSET_PATH)
 
-        @bord_cast.receiver(
-            "GroupMessage", decorators=[ContainKeyword(keyword=self._config_registry.get_config(self.DETECTED_KEYWORD))]
-        )
-        async def random_emoji(group: Group):
+        from graia.ariadne import Ariadne
+
+        async def random_emoji(app: Ariadne, group: Group):
             """
             random send a gif in a day
             :param group:
             :return:
             """
 
-            await ariadne_app.send_message(group, Image(path=random.choice(explore_folder(gif_dir_path))))
+            await app.send_message(group, Image(path=random.choice(explore_folder(gif_dir_path))))
+
+        self.receiver(
+            random_emoji,
+            GroupMessage,
+            decorators=[ContainKeyword(keyword=self._config_registry.get_config(self.DETECTED_KEYWORD))],
+        )

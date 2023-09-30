@@ -5,8 +5,7 @@ from abc import ABC, abstractmethod
 from types import MappingProxyType
 from typing import final, Callable, Type, List
 
-from graia.ariadne import Ariadne
-from graia.broadcast import Namespace, Broadcast, BaseDispatcher, Decorator, Dispatchable
+from graia.broadcast import Namespace, BaseDispatcher, Decorator, Dispatchable, Broadcast
 
 from constant import CONFIG_FILE_NAME
 from modules.config_utils import ConfigRegistry, CmdClient
@@ -20,15 +19,12 @@ class AbstractPlugin(ABC):
     @final
     def __init__(
         self,
-        ariadne_app: Ariadne,
         plugins_viewer: MappingProxyType[str, "AbstractPlugin"],
         cmd_client: CmdClient,
-        priority: int = 8,
+        broadcast: Broadcast,
     ):
-        self._ariadne_app: Ariadne = ariadne_app
-        self._broadcast: Broadcast = self._ariadne_app.broadcast
-        self._namespace: Namespace = self._broadcast.createNamespace(name=self.get_plugin_name(), priority=priority)
-
+        self._receiver = broadcast.receiver
+        self._namespace: Namespace = broadcast.createNamespace(name=self.get_plugin_name())
         self._plugin_view: MappingProxyType[str, "AbstractPlugin"] = plugins_viewer
         self._config_registry: ConfigRegistry = ConfigRegistry(f"{self._get_config_parent_dir()}/{CONFIG_FILE_NAME}")
         self._cmd_client: CmdClient = cmd_client
@@ -57,7 +53,7 @@ class AbstractPlugin(ABC):
         Returns:
             None: This function does not return anything.
         """
-        self._broadcast.receiver(
+        self._receiver(
             event=event, priority=priority, dispatchers=dispatchers, decorators=decorators, namespace=self._namespace
         )(func)
 
@@ -133,7 +129,6 @@ class AbstractPlugin(ABC):
         Uninstall the plugin
         """
         self._namespace.disabled = True
-        self._broadcast.removeNamespace(self._namespace.name)
 
 
 PluginsView: Type = MappingProxyType[str, AbstractPlugin]
