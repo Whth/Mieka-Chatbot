@@ -136,4 +136,4 @@ class AbstractPlugin(ABC):
         self._broadcast.removeNamespace(self._namespace.name)
 
 
-PluginsView = MappingProxyType[str, AbstractPlugin]
+PluginsView: Type = MappingProxyType[str, AbstractPlugin]
