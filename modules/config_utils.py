@@ -1,3 +1,4 @@
+import inspect
 import os
 import re
 from functools import singledispatch
@@ -38,9 +39,6 @@ def get_signature(func) -> List[str]:
     sig = inspect.signature(func)
     params = [param for param in sig.parameters]
     return params
-
-
-import inspect
 
 
 def get_signature_with_annotations(func) -> Dict[str, Any]:

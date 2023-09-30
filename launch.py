@@ -1,3 +1,4 @@
+import pathlib
 from typing import List
 
 from graia.ariadne.connection.config import WebsocketClientConfig
@@ -12,7 +13,7 @@ VERIFY_KEY = "verify_key"
 
 ACCOUNT_ID = "account_id"
 ACCEPTED_MESSAGE_TYPES = "accepted_message_types"
-__version__ = "v0.3.3"
+__version__ = "v0.3.4"
 
 
 def make_help_cmd(client: CmdClient):
@@ -40,6 +41,7 @@ class Mieka(object):
     """
 
     __NAME = "Mieka"
+    pathlib.Path(CONFIG_DIR).mkdir(parents=True, exist_ok=True)
     __config = ConfigRegistry(f"{CONFIG_DIR}/{__NAME}_{CONFIG_FILE_NAME}")
     __config.register_config(ACCOUNT_ID, 1234567890)
     __config.register_config(VERIFY_KEY, "INITKEYXBVCdNG0")
@@ -79,16 +81,23 @@ class Mieka(object):
     __bot.client.register(updated_tree, True)
 
     @classmethod
+    def init(cls):
+        cls.__bot.init_utils()
+
+    @classmethod
     def run(cls):
         """
         run the bot, save config on exit
         Returns:
 
         """
+
         cls.__bot.run()
         cls.__config.save_all_configs()
 
 
 if __name__ == "__main__":
     bot = Mieka()
+
+    bot.init()
     bot.run()
