@@ -38,7 +38,7 @@ class BaiduTranslater(AbstractPlugin):
         self._config_registry.register_config(self.CONFIG_APP_ID, "replace with baidu translate app_id")
         self._config_registry.register_config(self.CONFIG_APP_KEY, "replace with baidu translate app_key")
         self._config_registry.register_config(self.CONFIG_API_URL, "http://api.fanyi.baidu.com/api/trans/vip/translate")
-        self._config_registry.register_config(self.CONFIG_TRANSLATE_KEYWORD, "翻译")
+        self._config_registry.register_config(self.CONFIG_TRANSLATE_KEYWORD, "trans")
 
     def install(self):
         from .translater import Translater
