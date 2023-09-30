@@ -110,6 +110,18 @@ class ChatBot(object):
         return self._extensions.plugins_view
 
     def init_utils(self) -> None:
+        """
+        Initializes the utilities for the class.
+
+        This function installs all the required dependencies using `install_all_requirements()` method from the `_extensions` object.
+        It also installs all the extensions for the app, bot client, and proxy using `install_all_extensions()` method from the `_extensions` object.
+
+        Parameters:
+            None
+
+        Returns:
+            None
+        """
         self._extensions.install_all_requirements()
         self._extensions.install_all_extensions(
             app=self._ariadne_app, bot_client=self._bot_client, proxy=self._extensions.plugins_view
