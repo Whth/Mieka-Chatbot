@@ -5,6 +5,7 @@ from graia.ariadne.connection.config import WebsocketClientConfig
 from graia.ariadne.entry import config
 from graia.ariadne.message.chain import MessageChain
 from graia.ariadne.model import Group, Friend, Member, Stranger
+from graia.ariadne.model.util import AriadneOptions
 
 from modules.config_utils import CmdClient
 from modules.extension_manager import ExtensionManager
@@ -73,7 +74,7 @@ class ChatBot(object):
         self._ariadne_app: Ariadne = Ariadne(
             config(bot_info.account_id, bot_connection_config.verify_key, bot_connection_config.websocket_config)
         )
-
+        Ariadne.options = AriadneOptions(default_account=bot_info.account_id)
         self._bot_name: str = bot_info.bot_name
         self._bot_client: CmdClient = CmdClient(bot_config.syntax_tree)
 
@@ -124,7 +125,7 @@ class ChatBot(object):
         """
         self._extensions.install_all_requirements()
         self._extensions.install_all_extensions(
-            app=self._ariadne_app, bot_client=self._bot_client, proxy=self._extensions.plugins_view
+            broadcast=self._ariadne_app.broadcast, bot_client=self._bot_client, proxy=self._extensions.plugins_view
         )
 
     def run(self) -> None:
