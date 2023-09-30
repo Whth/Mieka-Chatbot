@@ -443,7 +443,7 @@ class CmdClient(object):
 
         raise KeyError("Bad syntax tree, please check")
 
-    def register(self, syntax_tree: Dict[str, Any], logging: bool = False) -> None:
+    def register(self, syntax_tree: Dict[str, Any], logging: bool = True) -> None:
         """Register a new syntax tree for a command.
 
         Parameters:
