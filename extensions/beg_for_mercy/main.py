@@ -73,6 +73,7 @@ class BegForMercy(AbstractPlugin):
 
         from graia.ariadne import Ariadne
 
+        @self.receiver(event=GroupMessage, decorators=[MentionMe()])
         async def begging_for_mercy(app: Ariadne, group: Group, message: MessageChain):
             """
             A decorator that receives `GroupMessage` events and checks if they contain certain keywords.
@@ -107,5 +108,3 @@ class BegForMercy(AbstractPlugin):
             file = choice(explore_folder(gif_dir_path))
             print(f"{Back.BLUE}BEG_FOR_MERCY: Sending file at [{file}]{Back.RESET}")
             await app.send_message(group, Image(path=file))
-
-        self.receiver(func=begging_for_mercy, event=GroupMessage, decorators=[MentionMe()])

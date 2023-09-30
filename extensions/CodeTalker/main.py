@@ -79,44 +79,41 @@ class CodeTalker(AbstractPlugin):
 
         from graia.ariadne import Ariadne
 
+        @self.receiver(GroupMessage, dispatchers=[CoolDown(1)])
         async def talk(app: Ariadne, group: Group, message: MessageChain):
-            """
-            Asynchronous function that handles group messages.
-
-            Args:
-                group (Group): The group object representing the group where the message was sent.
-                message (MessageChain): The message chain object representing the message received.
-
-            Returns:
-                None
-
-            Raises:
-                None
-            """
-
+            # Extract the words from the message using a regular expression
             matched = re.match(reg, string=str(message))
             if not matched:
                 return
+
+            # Find the first non-empty group from the regular expression match
+            # and assign it to the variable "words"
             for matched_group in matched.groups():
                 if matched_group:
                     words = matched_group
                     break
             else:
                 raise RuntimeError("Should never arrive here")
+
+            # Search for similar words in the fuzzy dictionary
             search: List[str] = fuzzy_dictionary.search(words)
 
+            # If the random number is less than or equal to the re-generate probability
+            # or no similar words are found in the dictionary
             if random.random() <= self._config_registry.get_config(self.CONFIG_RE_GENERATE_PROBABILITY) or not search:
+                # Generate a response using the Spark API
                 response: str = sparkAPI.chat(query=words, history=history, max_tokens=40)
                 if response:
+                    # Register the generated response in the fuzzy dictionary
                     fuzzy_dictionary.register_key_value(words, response)
                     fuzzy_dictionary.save_to_json()
                 else:
                     response = "a"
                 print(f"Request Response: {response}")
             else:
+                # Select a random response from the search results
                 response = random.choice(search)
                 print(f"Use Cache: {response}")
 
+            # Send the response to the group
             await app.send_group_message(group, response)
-
-        self.receiver(talk, GroupMessage, dispatchers=[CoolDown(1)])

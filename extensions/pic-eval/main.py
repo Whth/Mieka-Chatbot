@@ -92,6 +92,7 @@ class PicEval(AbstractPlugin):
 
         from graia.ariadne import Ariadne
 
+        @self.receiver(GroupMessage)
         async def evaluate(app: Ariadne, group: Group, message: MessageChain, event: MessageEvent):
             """
             Asynchronous function that evaluates a message in a group chat and assigns a score to it.
@@ -143,8 +144,13 @@ class PicEval(AbstractPlugin):
         activate_keyword: str = self._config_registry.get_config(self.CONFIG_RAND_KEYWORD)
         reg = re.compile(rf"^{activate_keyword}(?:$|\s+(\d+)$)")
 
-        self.receiver(evaluate, GroupMessage)
-
+        @self.receiver(
+            GroupMessage,
+            decorators=[
+                ContainKeyword(keyword=activate_keyword),
+            ],
+            dispatchers=[CoolDown(5)],
+        )
         async def rand_picture(app: Ariadne, group: Group, message: MessageChain):
             """
             An asynchronous function that is decorated as a receiver for the "GroupMessage" event.
@@ -182,15 +188,7 @@ class PicEval(AbstractPlugin):
 
                 await app.send_group_message(group, Image(path=output_path) + Plain(picture))
 
-        self.receiver(
-            rand_picture,
-            GroupMessage,
-            decorators=[
-                ContainKeyword(keyword=activate_keyword),
-            ],
-            dispatchers=[CoolDown(5)],
-        )
-
+        @self.receiver(ActiveGroupMessage)
         async def watcher(message: ActiveGroupMessage):
             chain = message.message_chain
             plain_ele = chain.get(Plain, 1)
@@ -202,18 +200,14 @@ class PicEval(AbstractPlugin):
 
                 print(f"registered {message.id}, Current len = {len(img_registry.images_registry)}")
 
-        self.receiver(watcher, ActiveGroupMessage)
-
-        async def rm_picture(app: Ariadne, group: Group, event: MessageEvent):
-            if not hasattr(event.quote, "origin"):
-                return
-            success = img_registry.remove(event.quote.id, save=True)
-            await app.send_group_message(group, f"Remove id-{event.quote.id}\nSuccess = {success}")
-
-        self.receiver(
-            rm_picture,
+        @self.receiver(
             GroupMessage,
             decorators=[
                 ContainKeyword("rm"),
             ],
         )
+        async def rm_picture(app: Ariadne, group: Group, event: MessageEvent):
+            if not hasattr(event.quote, "origin"):
+                return
+            success = img_registry.remove(event.quote.id, save=True)
+            await app.send_group_message(group, f"Remove id-{event.quote.id}\nSuccess = {success}")

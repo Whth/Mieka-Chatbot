@@ -145,6 +145,7 @@ class EasyPin(AbstractPlugin):
 
         self._cmd_client.register(tree, True)
 
+        @self.receiver(GroupMessage)
         async def pin_operator(app: Ariadne, group: Group, message: GroupMessage):
             """
             Asynchronous pin operator function that receives a GroupMessage object and performs various operations based on the command and arguments provided.
@@ -210,8 +211,7 @@ class EasyPin(AbstractPlugin):
             # Run the last scheduled task
             await scheduler.schedule_tasks[-1].run()
 
-        self.receiver(pin_operator, GroupMessage)
-
+        @self.receiver(ApplicationLaunch)
         async def fetch_tasks():
             """
             Fetches tasks and schedules them using the scheduler.
@@ -233,5 +233,3 @@ class EasyPin(AbstractPlugin):
                 f"------------------------------\n{Fore.RESET}"
             )
             await scheduler.run()
-
-        self.receiver(fetch_tasks, ApplicationLaunch)

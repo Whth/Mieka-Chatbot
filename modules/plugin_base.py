@@ -32,12 +32,11 @@ class AbstractPlugin(ABC):
     @final
     def receiver(
         self,
-        func: Callable,
         event: str | Type[Dispatchable],
         priority: int = 16,
         dispatchers: List[Type[BaseDispatcher] | BaseDispatcher] | None = None,
         decorators: list[Decorator] | None = None,
-    ) -> None:
+    ) -> Callable:
         """
         Registers a function as a receiver for a specific event.
 
@@ -53,9 +52,9 @@ class AbstractPlugin(ABC):
         Returns:
             None: This function does not return anything.
         """
-        self._receiver(
+        return self._receiver(
             event=event, priority=priority, dispatchers=dispatchers, decorators=decorators, namespace=self._namespace
-        )(func)
+        )
 
     @final
     @property

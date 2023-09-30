@@ -70,6 +70,10 @@ class Magi(AbstractPlugin):
         jpg_count: int = self._config_registry.get_config(self.CONFIG_PASS_FRAME_COUNT)
         duration: int = self._config_registry.get_config(self.CONFIG_RESULT_FRAME_DURATION)
 
+        @self.receiver(
+            GroupMessage,
+            decorators=[ContainKeyword(keyword=self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD))],
+        )
         async def MAGI_SYS_DECISION_MAKING(app: Ariadne, group: Group):
             """
             random send a gif in a day
@@ -86,9 +90,3 @@ class Magi(AbstractPlugin):
                 duration=duration,
             )
             await app.send_message(group, Image(path=temp_file_path))
-
-        self.receiver(
-            MAGI_SYS_DECISION_MAKING,
-            GroupMessage,
-            decorators=[ContainKeyword(keyword=self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD))],
-        )

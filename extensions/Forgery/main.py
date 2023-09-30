@@ -59,6 +59,7 @@ class Forgery(AbstractPlugin):
 
         from graia.ariadne import Ariadne
 
+        @self.receiver(GroupMessage)
         async def fake(app: Ariadne, group: Group, message_event: GroupMessage):
             """
             random send a gif in a day
@@ -89,5 +90,3 @@ class Forgery(AbstractPlugin):
             nodes = await make_forward(app, info_pack)
 
             await app.send_group_message(group, Forward(nodes))
-
-        self.receiver(fake, GroupMessage)

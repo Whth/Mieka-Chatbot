@@ -48,6 +48,13 @@ class ReC(AbstractPlugin):
         self._config_registry.load_config()
         max_look_back: int = self._config_registry.get_config(self.CONFIG_MAX_LOOK_BACK)
 
+        @self.receiver(
+            GroupMessage,
+            decorators=[
+                MentionMe(),
+                ContainKeyword(keyword=self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD)),
+            ],
+        )
         async def recall_handler(app: Ariadne, group: Group, message_event: GroupMessage):
             """
             Handle the recall action for a group message event.
@@ -81,15 +88,6 @@ class ReC(AbstractPlugin):
             print(f"{Fore.RED}Execute recall on {len(messages_to_recall)} messages{Fore.RESET}")
             # Recall the message
             await recall_group_messages(app, messages_to_recall, group)
-
-        self.receiver(
-            recall_handler,
-            GroupMessage,
-            decorators=[
-                MentionMe(),
-                ContainKeyword(keyword=self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD)),
-            ],
-        )
 
         async def search_messages(
             app: Ariadne,

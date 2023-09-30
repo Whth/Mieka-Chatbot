@@ -47,6 +47,10 @@ class RandomMeme(AbstractPlugin):
 
         from graia.ariadne import Ariadne
 
+        @self.receiver(
+            GroupMessage,
+            decorators=[ContainKeyword(keyword=self._config_registry.get_config(self.DETECTED_KEYWORD))],
+        )
         async def random_emoji(app: Ariadne, group: Group):
             """
             random send a gif in a day
@@ -55,9 +59,3 @@ class RandomMeme(AbstractPlugin):
             """
 
             await app.send_message(group, Image(path=random.choice(explore_folder(gif_dir_path))))
-
-        self.receiver(
-            random_emoji,
-            GroupMessage,
-            decorators=[ContainKeyword(keyword=self._config_registry.get_config(self.DETECTED_KEYWORD))],
-        )
