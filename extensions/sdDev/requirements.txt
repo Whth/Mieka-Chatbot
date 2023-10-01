@@ -1,5 +1,0 @@
-Pillow
-requests
-python-slugify
-dynamicprompts
-aiohttp
