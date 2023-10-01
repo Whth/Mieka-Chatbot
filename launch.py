@@ -81,16 +81,23 @@ class Mieka(object):
     __bot.client.register(updated_tree, True)
 
     @classmethod
+    def init(cls):
+        cls.__bot.init_utils()
+
+    @classmethod
     def run(cls):
         """
         run the bot, save config on exit
         Returns:
 
         """
+
         cls.__bot.run()
         cls.__config.save_all_configs()
 
 
 if __name__ == "__main__":
     bot = Mieka()
+
+    bot.init()
     bot.run()

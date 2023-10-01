@@ -92,7 +92,6 @@ class StableDiffusionPlugin(AbstractPlugin):
         from graia.ariadne.message.parser.base import ContainKeyword
         from graia.ariadne.event.message import GroupMessage
         from graia.ariadne.event.lifecycle import ApplicationLaunch
-        from graia.broadcast import Broadcast
         from graia.ariadne.model import Group
         from dynamicprompts.wildcards import WildcardManager
         from dynamicprompts.generators import RandomPromptGenerator
@@ -140,12 +139,11 @@ class StableDiffusionPlugin(AbstractPlugin):
             translate: StableDiffusionPlugin.__TRANSLATE_METHOD_TYPE = getattr(translater, self.__TRANSLATE_METHOD_NAME)
         output_dir_path = self._config_registry.get_config(self.CONFIG_OUTPUT_DIR_PATH)
         temp_dir_path = self._config_registry.get_config(self.CONFIG_IMG_TEMP_DIR_PATH)
-        ariadne_app = self._ariadne_app
-        bord_cast: Broadcast = ariadne_app.broadcast
+
         SD_app = StableDiffusionApp(
             host_url=self._config_registry.get_config(self.CONFIG_SD_HOST), cache_dir=temp_dir_path
         )
-        bord_cast.receiver(ApplicationLaunch)(controlnet.fetch_resources)
+        self.receiver(ApplicationLaunch)(controlnet.fetch_resources)
 
         def _dynamic_process(pos_prompt: str, neg_prompt: str) -> Tuple[str, str]:
             pos_interpreted = gen.generate(template=pos_prompt)
@@ -188,19 +186,26 @@ class StableDiffusionPlugin(AbstractPlugin):
             process_name="SHUFFLE",
         )
 
-        @bord_cast.receiver(
+        from graia.ariadne import Ariadne
+
+        @self.receiver(
             GroupMessage,
             decorators=[ContainKeyword(keyword=self._config_registry.get_config(self.CONFIG_POS_KEYWORD))],
         )
-        async def group_diffusion(group: Group, message: MessageChain, message_event: GroupMessage):
+        async def group_diffusion(app: Ariadne, group: Group, message: MessageChain, message_event: GroupMessage):
             """
-            Generate an image and send it as a message in a group.
+            An asynchronous function that handles group diffusion messages.
 
             Args:
-                group (Group): The group to send the message to.
-                message (MessageChain): The message chain to process.
+                app (Ariadne): The Ariadne instance.
+                group (Group): The group where the message was sent.
+                message (MessageChain): The message content.
+                message_event (GroupMessage): The group message event.
 
             Returns:
+                None
+
+            Raises:
                 None
             """
             # Extract positive and negative prompts from the message
@@ -220,7 +225,7 @@ class StableDiffusionPlugin(AbstractPlugin):
                 )
             )
 
-            image_url = await _get_image_url(message, message_event)
+            image_url = await _get_image_url(app, message, message_event)
             if image_url:
                 send_result = await _make_img2img(diffusion_paser, image_url)
             else:
@@ -232,25 +237,32 @@ class StableDiffusionPlugin(AbstractPlugin):
                 )
 
             # Send the image as a message in the group
-            await ariadne_app.send_message(group, MessageChain("") + Image(path=send_result[0]))
+            await app.send_message(group, MessageChain("") + Image(path=send_result[0]))
 
-        @bord_cast.receiver(
+        @self.receiver(
             GroupMessage,
-            decorators=[
-                ContainKeyword(keyword="sd ag"),
-            ],
+            decorators=[ContainKeyword(keyword="sd ag")],
         )
-        async def group_diffusion_history(group: Group):
-            send_result = await SD_app.txt2img_history(output_dir_path)
-            await ariadne_app.send_message(group, MessageChain("") + Image(path=send_result[0]))
+        async def group_diffusion_history(app: Ariadne, group: Group):
+            """
+            This function is a receiver for GroupMessage events with the decorator "ContainKeyword(keyword='sd ag')".
+            It takes in two parameters:
+                - "app" which is of type Ariadne
+                - "group" which is of type Group
 
-        async def _get_image_url(message, message_event):
+            This function is responsible for sending the result of the "txt2img_history" method of the "SD_app" object,
+            which is an asynchronous method that returns an output directory path. The result is sent as a message to the
+            group using the "send_message" method of the "app" object. The message contains an empty MessageChain
+            concatenated with an Image object, which is created using the first path in the "send_result" list.
+            """
+            send_result = await SD_app.txt2img_history(output_dir_path)
+            await app.send_message(group, MessageChain("") + Image(path=send_result[0]))
+
+        async def _get_image_url(app: Ariadne, message: MessageChain, message_event: GroupMessage):
             if Image in message:
                 image_url = message[Image, 1][0].url
             elif hasattr(message_event.quote, "origin"):
-                origin_message: MessageChain = (
-                    await ariadne_app.get_message_from_id(message_event.quote.id)
-                ).message_chain
+                origin_message: MessageChain = (await app.get_message_from_id(message_event.quote.id)).message_chain
                 # check if the message contains a picture
                 image_url = origin_message[Image, 1][0].url if origin_message[Image, 1] else None
             else:

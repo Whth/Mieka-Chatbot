@@ -64,8 +64,7 @@ class CodeTalker(AbstractPlugin):
 
         self.__register_all_config()
         self._config_registry.load_config()
-        ariadne_app = self._ariadne_app
-        bord_cast = ariadne_app.broadcast
+
         reg = re.compile(self._config_registry.get_config(self.CONFIG_MATCH_PATTERN))
         # 默认api接口版本为1.5，开启v2.0版本只需指定 version=2.1 即可
         sparkAPI = SparkAPI(
@@ -78,46 +77,43 @@ class CodeTalker(AbstractPlugin):
         print(f"Loading Fuzzy Dictionary Size:{len(fuzzy_dictionary.dictionary.keys())}")
         history = copy.deepcopy(self._config_registry.get_config(self.CONFIG_PRE_APPEND_HISTORY))
 
-        @bord_cast.receiver(
-            GroupMessage,
-            dispatchers=[CoolDown(1)],
-        )
-        async def talk(group: Group, message: MessageChain):
-            """
-            Asynchronous function that handles group messages.
+        from graia.ariadne import Ariadne
 
-            Args:
-                group (Group): The group object representing the group where the message was sent.
-                message (MessageChain): The message chain object representing the message received.
-
-            Returns:
-                None
-
-            Raises:
-                None
-            """
-
+        @self.receiver(GroupMessage, dispatchers=[CoolDown(1)])
+        async def talk(app: Ariadne, group: Group, message: MessageChain):
+            # Extract the words from the message using a regular expression
             matched = re.match(reg, string=str(message))
             if not matched:
                 return
+
+            # Find the first non-empty group from the regular expression match
+            # and assign it to the variable "words"
             for matched_group in matched.groups():
                 if matched_group:
                     words = matched_group
                     break
             else:
                 raise RuntimeError("Should never arrive here")
+
+            # Search for similar words in the fuzzy dictionary
             search: List[str] = fuzzy_dictionary.search(words)
 
+            # If the random number is less than or equal to the re-generate probability
+            # or no similar words are found in the dictionary
             if random.random() <= self._config_registry.get_config(self.CONFIG_RE_GENERATE_PROBABILITY) or not search:
+                # Generate a response using the Spark API
                 response: str = sparkAPI.chat(query=words, history=history, max_tokens=40)
                 if response:
+                    # Register the generated response in the fuzzy dictionary
                     fuzzy_dictionary.register_key_value(words, response)
                     fuzzy_dictionary.save_to_json()
                 else:
                     response = "a"
                 print(f"Request Response: {response}")
             else:
+                # Select a random response from the search results
                 response = random.choice(search)
                 print(f"Use Cache: {response}")
 
-            await ariadne_app.send_group_message(group, response)
+            # Send the response to the group
+            await app.send_group_message(group, response)

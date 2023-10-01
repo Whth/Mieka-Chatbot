@@ -46,14 +46,13 @@ class BegForMercy(AbstractPlugin):
         from graia.ariadne.message.chain import MessageChain
         from graia.ariadne.message.element import Image
         from graia.ariadne.message.parser.base import MentionMe
+        from graia.ariadne.event.message import GroupMessage
         from graia.ariadne.model import Group
         from colorama import Back
         from modules.file_manager import explore_folder
 
         self.__register_all_config()
         self._config_registry.load_config()
-        ariadne_app = self._ariadne_app
-        bord_cast = ariadne_app.broadcast
 
         gif_dir_path = self._config_registry.get_config(self.CONFIG_BEGGING_GIF_ASSET_PATH)
 
@@ -72,11 +71,10 @@ class BegForMercy(AbstractPlugin):
         tree = {CMD.ROOT: {CMD.ADD: _add_new_keyword, CMD.LIST: _list_kws}}
         self._cmd_client.register(tree)
 
-        @bord_cast.receiver(
-            "GroupMessage",
-            decorators=[MentionMe()],
-        )
-        async def begging_for_mercy(group: Group, message: MessageChain):
+        from graia.ariadne import Ariadne
+
+        @self.receiver(event=GroupMessage, decorators=[MentionMe()])
+        async def begging_for_mercy(app: Ariadne, group: Group, message: MessageChain):
             """
             A decorator that receives `GroupMessage` events and checks if they contain certain keywords.
             If the message contains any of the specified keywords, the `begging_for_mercy` function is triggered.
@@ -109,4 +107,4 @@ class BegForMercy(AbstractPlugin):
                 return
             file = choice(explore_folder(gif_dir_path))
             print(f"{Back.BLUE}BEG_FOR_MERCY: Sending file at [{file}]{Back.RESET}")
-            await ariadne_app.send_message(group, Image(path=file))
+            await app.send_message(group, Image(path=file))

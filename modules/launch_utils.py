@@ -112,3 +112,28 @@ def run_pip_install(command: str, desc: str, live: bool = True) -> str:
         err_desc=f"Couldn't install {desc}",
         live=live,
     )
+
+
+def install_requirements(
+    requirement_file_path: str,
+):
+    """
+    Install the requirements specified in the given requirement file.
+
+    Args:
+        requirement_file_path (str): The path to the requirement file.
+
+    Returns:
+        None
+
+    """
+    dirname = os.path.dirname(requirement_file_path)
+    if requirements_met(requirement_file_path):
+        print(f"requirements for {dirname} is already satisfied")
+        return
+    print(
+        run_pip_install(
+            command=f"install -r {requirement_file_path}",
+            desc=f"requirements for {dirname}",
+        )
+    )

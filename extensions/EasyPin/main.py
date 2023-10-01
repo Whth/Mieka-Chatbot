@@ -45,20 +45,18 @@ class EasyPin(AbstractPlugin):
     def install(self):
         from graia.scheduler import GraiaScheduler
         from graia.scheduler.timers import crontabify
-        from graia.broadcast import Broadcast
         from graia.ariadne.event.message import GroupMessage
         from graia.ariadne.event.lifecycle import ApplicationLaunch
-        from graia.ariadne.message.parser.base import ContainKeyword
 
+        from graia.ariadne import Ariadne
         from graia.ariadne.model import Group
         from .analyze import Preprocessor, DEFAULT_PRESET, TO_DATETIME_PRESET, DATETIME_TO_CRONTAB_PRESET
         from .task import TaskRegistry, ReminderTask, T_TASK
 
         self.__register_all_config()
         self._config_registry.load_config()
-        ariadne_app = self._ariadne_app
-        broad_cast: Broadcast = ariadne_app.broadcast
-        scheduler: GraiaScheduler = self._ariadne_app.create(GraiaScheduler)
+
+        scheduler: GraiaScheduler = Ariadne.current().create(GraiaScheduler)
         to_datetime_processor = Preprocessor(TO_DATETIME_PRESET)
         datetime_to_crontab_processor = Preprocessor(DATETIME_TO_CRONTAB_PRESET)
         full_processor = Preprocessor(DEFAULT_PRESET)
@@ -147,8 +145,8 @@ class EasyPin(AbstractPlugin):
 
         self._cmd_client.register(tree, True)
 
-        @broad_cast.receiver(GroupMessage, decorators=[ContainKeyword(self.__TASK_CMD)])
-        async def pin_operator(group: Group, message: GroupMessage):
+        @self.receiver(GroupMessage)
+        async def pin_operator(app: Ariadne, group: Group, message: GroupMessage):
             """
             Asynchronous pin operator function that receives a GroupMessage object and performs various operations based on the command and arguments provided.
 
@@ -205,15 +203,15 @@ class EasyPin(AbstractPlugin):
             task_registry.save_tasks()
 
             # Send a message to the group with the details of the scheduled task
-            await ariadne_app.send_message(group, f"Schedule new task:\n {task.task_name} | {crontab}")
+            await app.send_message(group, f"Schedule new task:\n {task.task_name} | {crontab}")
 
             # Schedule the task using the scheduler
-            scheduler.schedule(crontabify(crontab), cancelable=True)(await task.make(ariadne_app))
+            scheduler.schedule(crontabify(crontab), cancelable=True)(await task.make(app))
 
             # Run the last scheduled task
             await scheduler.schedule_tasks[-1].run()
 
-        @broad_cast.receiver(ApplicationLaunch)
+        @self.receiver(ApplicationLaunch)
         async def fetch_tasks():
             """
             Fetches tasks and schedules them using the scheduler.
@@ -228,7 +226,7 @@ class EasyPin(AbstractPlugin):
             for task in task_registry.task_list:
                 print(f"{Fore.MAGENTA}Retrieve Task {task.crontab}|{task.task_name} ")
                 # Schedule the task using the scheduler
-                scheduler.schedule(crontabify(task.crontab), cancelable=True)(await task.make(ariadne_app))
+                scheduler.schedule(crontabify(task.crontab), cancelable=True)(await task.make(Ariadne.current()))
 
             print(
                 f"{Fore.YELLOW}Fetched {len(scheduler.schedule_tasks)} tasks\n"

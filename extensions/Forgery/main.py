@@ -44,11 +44,10 @@ class Forgery(AbstractPlugin):
 
         self.__register_all_config()
         self._config_registry.load_config()
-        ariadne_app = self._ariadne_app
-        bord_cast = ariadne_app.broadcast
+
         reg = re.compile(rf"{CMD.ROOT}\s+(\d+)")
 
-        extract_reg = re.compile(rf"(\d+)(?:(\s+.+)?|$)")
+        extract_reg = re.compile(r"(\d+)(?:(\s+.+)?|$)")
 
         def extract_info(plain_txt: str) -> Tuple[int, str] | None:
             matched = re.match(extract_reg, string=plain_txt)
@@ -58,8 +57,10 @@ class Forgery(AbstractPlugin):
                 return int(matched_groups[0]), matched_groups[1] if matched_groups[1] else ""
             return None
 
-        @bord_cast.receiver("GroupMessage")
-        async def fake(group: Group, message_event: GroupMessage):
+        from graia.ariadne import Ariadne
+
+        @self.receiver(GroupMessage)
+        async def fake(app: Ariadne, group: Group, message_event: GroupMessage):
             """
             random send a gif in a day
             :param group:
@@ -72,9 +73,7 @@ class Forgery(AbstractPlugin):
             this_message_id: int = message_event.id
             batch_size = int(matched.groups()[0])
 
-            retrieved_messages: List[GroupMessage] = await get_messages(
-                ariadne_app, group, batch_size, this_message_id - 1
-            )
+            retrieved_messages: List[GroupMessage] = await get_messages(app, group, batch_size, this_message_id - 1)
 
             info_pack = []
             for message in retrieved_messages:
@@ -88,6 +87,6 @@ class Forgery(AbstractPlugin):
                     0, (extracted_data[0], MessageChain([Plain(extracted_data[1])] + extract_multimedia_data))
                 )
 
-            nodes = await make_forward(ariadne_app, info_pack)
+            nodes = await make_forward(app, info_pack)
 
-            await ariadne_app.send_group_message(group, Forward(nodes))
+            await app.send_group_message(group, Forward(nodes))
