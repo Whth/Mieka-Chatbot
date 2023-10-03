@@ -1,36 +1,84 @@
-from typing import Set, FrozenSet, Optional
+from pydantic import Field, validator, PrivateAttr
+from typing import Tuple, Type, List
 
 from .permissions import Permission
+from .utils import AuthBaseModel, manager_factory, ManagerBase
 
 
-class Role(object):
-    def __init__(self, role_id: int, role_name: str, permissions: Optional[Set[Permission]] = None):
-        self._permissions: Set[Permission] = permissions if permissions else set()
-        self._id: int = role_id
-        self._name: str = role_name
+class Role(AuthBaseModel):
+    permissions: List[Permission] = Field(default_factory=list, unique_items=True, allow_mutation=False)
+    __role_activated__: bool = PrivateAttr(default=False)
 
-    @property
-    def id(self) -> int:
-        return self._id
+    class Config:
+        allow_mutation = True
 
-    @property
-    def name(self) -> str:
-        return self._name
+    # TODO this role enter restrict strategy is not good enough, since only one user at a time can have a role
+    @validator("permissions", each_item=True)
+    def validate_permissions(cls, permission: Permission) -> Permission:
+        """
+        Validates the permissions.
+
+        Args:
+            cls (type): The class of the validator.
+            permission (Permission): The permission to validate.
+
+        Returns:
+            Permission: The validated permission.
+
+        Raises:
+            ValueError: If the permission is not an instance of Permission.
+        """
+        if isinstance(permission, Permission):
+            return permission
+        raise ValueError(f"Permission {permission} is not an instance of Permission")
 
     def add_permission(self, permission: Permission):
-        self._permissions.add(permission)
+        """
+        Adds a permission to the role.
+
+        Args:
+            permission (Permission): The permission to be added.
+
+        Raises:
+            KeyError: If the permission is already present in the role.
+
+        Returns:
+            None
+        """
+
+        if permission in self.permissions:
+            raise KeyError(f"Role {self.name} already has permission {permission}")
+        self.permissions.append(permission)
 
     def remove_permission(self, permission: Permission):
-        if permission not in self._permissions:
-            raise KeyError(f"Role {self._name} does not have permission {permission}")
-        self._permissions.remove(permission)
+        """
+        Remove a permission from the role.
 
-    def __enter__(self) -> FrozenSet[Permission]:
-        return frozenset(self._permissions)
+        Args:
+            permission (Permission): The permission to remove from the role.
 
-    # TODO try to write something to eliminate nested "with" statements, let only one role be entered
+        Raises:
+            KeyError: If the role does not have the specified permission.
+
+        Returns:
+            None
+        """
+
+        if permission not in self.permissions:
+            raise KeyError(f"Role {self.name} does not have permission {permission}")
+        self.permissions.remove(permission)
+
+    def __enter__(self) -> Tuple[Permission]:
+        if self.__role_activated__:
+            raise ValueError(f"Role {self.name} is already activated")
+        self.__role_activated__ = True
+        return tuple(self.permissions)
+
     def __exit__(self, exc_type, exc_val, exc_tb):
-        return
+        self.__role_activated__ = False
 
     def __contains__(self, item: Permission) -> bool:
-        return item in self._permissions
+        return item in self.permissions
+
+
+RoleManager: Type[ManagerBase] = manager_factory(Role)

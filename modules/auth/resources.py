@@ -1,137 +1,149 @@
 import copy
-from typing import Any, FrozenSet, Iterable, NamedTuple, Set, Callable
+from pydantic import Field, PrivateAttr
+from typing import Any, List, Callable, Unpack, Iterable
 
-from modules.auth.permissions import Permission, ReadPermission, ModifyPermission, DeletePermission, ExecutePermission
-
-
-class RequiredPermissions(NamedTuple):
-    read_permissions: FrozenSet[Permission] = frozenset([ReadPermission])
-    modify_permissions: FrozenSet[Permission] = frozenset([ModifyPermission])
-    execute_permissions: FrozenSet[Permission] = frozenset([ExecutePermission])
-    delete_permissions: FrozenSet[Permission] = frozenset([DeletePermission])
+from .permissions import Permission, auth_check
+from .utils import AuthBaseModel
 
 
-class ResourceInfo(NamedTuple):
-    name: str
-    id: int
-    label: str
+class RequiredPermission(AuthBaseModel):
+    read: List[Permission] = Field(default_factory=list, unique_items=True)
+    modify: List[Permission] = Field(default_factory=list, unique_items=True)
+    execute: List[Permission] = Field(default_factory=list, unique_items=True)
+    delete: List[Permission] = Field(default_factory=list, unique_items=True)
 
 
-class Resource(object):
-    __resource_labels: Set[str] = set()
+class Resource(AuthBaseModel):
+    """
+    Resource object.
+    seal some kind of source, add permissions check when try to access it
+    if **ANY** of the required permissions are present, return the access, raise a PermissionError otherwise
+    """
 
-    def __init__(
-        self,
-        source: Any,
-        resource_info: ResourceInfo,
-        required_permissions: RequiredPermissions = RequiredPermissions(),
-    ):
-        if resource_info.label in self.__resource_labels:
-            raise ValueError(f"Resource label {resource_info.label} is already defined")
-        self.__resource_labels.add(resource_info.label)
-        self._source: Any = copy.copy(source)
-        self._resource_name: str = resource_info.name
-        self._resource_id: int = resource_info.id
-        self._resource_label: str = resource_info.label
+    source: Any | None = Field(allow_mutation=True, exclude=True)
+    required_permissions: RequiredPermission
+    _source: Any = PrivateAttr(default=None)
 
-        self._required_permissions: RequiredPermissions = required_permissions
-        self._full_permissions: FrozenSet[Permission] = frozenset(set().union(*required_permissions))
+    class Config:
+        allow_mutation = True
 
-    @property
-    def name(self) -> str:
-        return self._resource_name
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._source = self.source
+        delattr(self, "source")
 
-    @property
-    def id(self) -> int:
-        return self._resource_id
-
-    def get_source(self, permissions: Iterable[Permission]) -> Any | None:
+    def get_read(self, permissions: Iterable[Permission]) -> Any:
         """
-        Return the source of the object if the permissions passed as argument
-        are a superset of the object's full permissions.
+        Returns a copy of the source if any of the read permissions are present in the provided permissions.
+        Otherwise, raises a PermissionError.
 
-        Parameters:
-            permissions (Iterable[Permission]): The permissions to check against.
+        Args:
+            permissions (Iterable[Permission]): An iterable of Permission objects.
 
         Returns:
-            Any | None: The source of the object if permissions are valid, otherwise None.
-        """
-        if self._full_permissions.issubset(permissions):
-            return self._source
+            Any: A copy of the source if read permissions are present.
 
-    def get_read_access(self, permissions: Iterable[Permission]) -> Any | None:
+        Raises:
+            PermissionError: If no read permissions are present.
         """
-        Check if the given permissions allow read access and return a deepcopy of the source if they do.
-
-        Parameters:
-            permissions (Iterable[Permission]): The permissions to check against.
-
-        Returns:
-            Any | None: A deepcopy of the source if the permissions allow read access, None otherwise.
-        """
-        if self._required_permissions.read_permissions.issubset(permissions):
+        if not self.required_permissions.read or any(
+            read_perm in permissions for read_perm in self.required_permissions.read
+        ):
             return copy.deepcopy(self._source)
+        raise PermissionError("Illegal Read operation")
 
-    def get_modify_access(self, permissions: Iterable[Permission], operation: Callable[[Any], Any]) -> Any | None:
+    def get_modify(self, permissions: Iterable[Permission], operation: Callable) -> Any:
         """
-        Check if the given permissions allow modification and apply the specified operation on the source.
+        Returns the result of performing a modify operation on the source object, if the user has the required permissions.
 
         Parameters:
-            permissions (Iterable[Permission]): The permissions to check against.
-            operation (Callable[[Any], Any]): The operation to apply on the source.
+            permissions (Iterable[Permission]): The permissions available to the user.
+            operation (Callable): The modify operation to be performed on the source object.
 
         Returns:
-            Any | None: The result of the operation, or None if the permissions do not allow modification.
+            Any: The result of the modify operation on the source object.
 
         Raises:
-            RuntimeError: If the source address or type changes during the modification.
+            PermissionError: If the user does not have the required permissions for the modify operation.
         """
-        if not self._required_permissions.modify_permissions.issubset(permissions):
-            return
-        addr_before_modify = id(self._source)
-        source_type_before_modify = type(self._source)
-        operation_result = operation(self._source)
-        addr_after_modify = id(self._source)
-        source_type_after_modify = type(self._source)
-        if addr_before_modify != addr_after_modify:
-            raise RuntimeError(
-                f"Source address changed during modification: {addr_before_modify} -> {addr_after_modify}"
-            )
-        elif source_type_before_modify != source_type_after_modify:
-            raise RuntimeError(
-                f"Source type changed during modification: {source_type_before_modify} -> {source_type_after_modify}"
-            )
-        else:
-            return operation_result
+        if auth_check(self.required_permissions.modify, permissions):
+            source_bak = copy.deepcopy(self._source)
+            id_before_op = id(source_bak)
+            type_before_op = type(source_bak)
+            operation(source_bak)
+            if id(source_bak) == id_before_op and type(source_bak) == type_before_op:
+                return operation(self._source)
+        raise PermissionError("Illegal Modify operation")
 
-    def get_execute_access(self, permissions: Iterable[Permission]) -> Any | None:
+    def get_execute(self, permissions: Iterable[Permission], **execute_params: Unpack) -> Any:
         """
-        Checks if the user has execute access based on the given permissions.
+        Executes the given function if it is callable and the user has the required permissions.
 
         Args:
-            permissions (Iterable[Permission]): The permissions to check against.
+            permissions (Iterable[Permission]): The permissions required to execute the function.
+            **execute_params (Unpack): The parameters to be passed to the function.
 
         Returns:
-            Any | None: The result of executing the source function if the user has execute access,
-            None otherwise.
+            Any: The result of executing the function.
 
         Raises:
-            TypeError: If the source function is not callable.
+            PermissionError: If the user does not have the required permissions to execute the function.
         """
-        if self._required_permissions.execute_permissions.issubset(permissions):
-            if callable(self._source):
-                return self._source()
-            raise TypeError(f"{self._source} is not callable")
+        if callable(self._source) and auth_check(self.required_permissions.execute, permissions):
+            return self._source(**execute_params)
+        raise PermissionError("Illegal Execute operation")
 
-    def get_delete_access(self, permissions: Iterable[Permission]) -> None:
+    def get_delete(self, permissions: Iterable[Permission]) -> Any:
         """
-        Determines if the user has delete access based on the given permissions.
+        Get the delete operation based on the given permissions.
 
-        Args:
-            permissions (Iterable[Permission]): The permissions to check against.
+        Parameters:
+            permissions (Iterable[Permission]): The permissions to check.
 
         Returns:
-            None: If the user has delete access, the source is set to None.
+            Any: The result of the delete operation.
+
+        Raises:
+            PermissionError: If the delete operation is not allowed.
         """
-        if self._required_permissions.delete_permissions.issubset(permissions):
+        if auth_check(self.required_permissions.delete, permissions):
             self._source = None
+        raise PermissionError("Illegal Delete operation")
+
+    def get_full_access(self, permissions: Iterable[Permission]) -> Any:
+        """
+        Check if the given permissions allow full access to the resource.
+
+        Parameters:
+            permissions (Iterable[Permission]): The permissions to be checked.
+
+        Returns:
+            Any: The resource if the permissions allow full access.
+
+        Raises:
+            PermissionError: If the permissions do not allow full access.
+        """
+        if all(
+            [
+                auth_check(self.required_permissions.read, permissions),
+                auth_check(self.required_permissions.modify, permissions),
+                auth_check(self.required_permissions.execute, permissions),
+                auth_check(self.required_permissions.delete, permissions),
+            ]
+        ):
+            return self._source
+        raise PermissionError("Illegal Full Access operation")
+
+    def update_source(self, permissions: Iterable[Permission], source: Any):
+        """
+        Updates the source of the object if the user has full access.
+
+        Args:
+            permissions (Iterable[Permission]): The permissions of the user.
+            source (Any): The new source to update.
+
+        Returns:
+            None
+        """
+        if self.get_full_access(permissions):
+            self._source = source

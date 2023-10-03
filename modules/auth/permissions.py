@@ -1,68 +1,78 @@
-from abc import ABCMeta
-from typing import TypeVar, Set, final
+from pydantic import validator, root_validator
+from typing import Dict, Any, Set, Type, Iterable
+
+from .utils import AuthBaseModel, manager_factory, ManagerBase
 
 
-class PermissionBase(metaclass=ABCMeta):
-    _id: int
+class Permission(AuthBaseModel):
+    __permission_categories__: Dict[int, str] = {
+        1: "ReadPermission",
+        2: "ExecutePermission",
+        4: "ModifyPermission",
+        8: "DeletePermission",
+        16: "SpecialPermission",
+    }
 
-    __permission_names: Set[str] = set()
+    # TODO such unique validator is not good enough
+    __permission_names__: Set[str] = set()
 
-    @final
-    def __init__(self, target_name: str):
-        self._name = f"{target_name}-{self.__class__.__name__}"
-        if self._name in self.__permission_names:
-            raise ValueError(f"Permission name {self._name} is already defined")
-        self.__permission_names.add(self._name)
-
-    @final
-    @property
-    def id(self) -> int:
+    @root_validator()
+    def validate_all(cls, params: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Returns the ID of the object.
+        A root validator function that validates all the parameters and returns a dictionary of validated parameters.
+
+        Args:
+            cls (Type): The class object.
+            params (Dict[str, Any]): A dictionary of parameters to be validated.
 
         Returns:
-            An integer representing the ID of the object.
+            Dict[str, Any]: A dictionary of validated parameters.
 
         Raises:
-            AttributeError: If the object does not have an attribute names '_id'.
+            None
         """
-        if not hasattr(self, "_id"):
-            raise AttributeError(f"{self.__class__.__name__} has no attribute '_id', you must define it.")
-        return self._id
+        suffix = f'{cls.__permission_categories__[params["id"]]}'
+        true_name: str = f"{params['name']}{suffix}" if suffix not in params["name"] else params["name"]
+        params["name"] = true_name
+        return params
 
-    @final
-    @property
-    def name(self) -> str:
+    @validator("name")
+    def validate_name(cls, name: str) -> str:
         """
-        Returns the name of the object.
+        Validates the given name.
+
+        Args:
+            cls (Type): The class that the method is defined on.
+            name (str): The name to be validated.
 
         Returns:
-            A string representing the name of the object.
-
-        Raises:
-            AttributeError: If the object does not have an attribute names '_name'.
+            str: The validated name.
         """
-        return self._name
+        if name not in cls.__permission_names__:
+            cls.__permission_names__.add(name)
 
-    @final
-    def __eq__(self, other: "PermissionBase") -> bool:
-        return self._id == other._id and self._name == other._name
-
-
-Permission = TypeVar("Permission", bound=PermissionBase)
+        return name
 
 
-class ReadPermission(PermissionBase):
-    _id = 1
+PermissionManager: Type[ManagerBase] = manager_factory(Permission)
 
 
-class ModifyPermission(PermissionBase):
-    _id = 2
+def auth_check(
+    required_permissions: Iterable[Permission], query_permissions: Iterable[Permission], all_required: bool = False
+) -> bool:
+    """
+    Check if the given query permissions match the required permissions.
 
+    Args:
+        required_permissions (Iterable[Permission]): The required permissions.
+        query_permissions (Iterable[Permission]): The query permissions to check.
+        all_required (bool, optional): Whether all the required permissions are needed. Defaults to False.
 
-class DeletePermission(PermissionBase):
-    _id = 4
+    Returns:
+        bool: True if the query permissions match the required permissions, False otherwise.
+    Notes:
+        if the required permissions are empty, will immediately return True
+    """
 
-
-class ExecutePermission(PermissionBase):
-    _id = 8
+    operator = all if all_required else any
+    return not required_permissions or operator(read_perm in query_permissions for read_perm in required_permissions)
