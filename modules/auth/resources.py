@@ -104,7 +104,7 @@ class Resource(object):
         else:
             return operation_result
 
-    def get_excute_access(self, permissions: Iterable[Permission]) -> Any | None:
+    def get_execute_access(self, permissions: Iterable[Permission]) -> Any | None:
         """
         Checks if the user has execute access based on the given permissions.
 
