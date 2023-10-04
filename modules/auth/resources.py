@@ -1,8 +1,9 @@
 import copy
+import random
 from pydantic import Field, PrivateAttr
-from typing import Any, List, Callable, Unpack, Iterable
+from typing import Any, List, Callable, Unpack, Iterable, Optional
 
-from .permissions import Permission, auth_check
+from .permissions import Permission, auth_check, PermissionCode
 from .utils import AuthBaseModel
 
 
@@ -11,6 +12,56 @@ class RequiredPermission(AuthBaseModel):
     modify: List[Permission] = Field(default_factory=list, unique_items=True)
     execute: List[Permission] = Field(default_factory=list, unique_items=True)
     delete: List[Permission] = Field(default_factory=list, unique_items=True)
+
+
+def random_digits(digits: int) -> int:
+    """
+    Generate a random integer with the specified number of digits.
+
+    Parameters:
+    - digits (int): The number of digits in the generated random integer.
+
+    Returns:
+    - int: The randomly generated integer.
+
+    Example:
+    - random_digits(3) returns 547
+    """
+    return int("".join([str(random.randint(0, 9)) for _ in range(digits)]))
+
+
+def required_perm_generator(
+    target_resource_name: str,
+    extra_permissions: Optional[List[Permission]] = None,
+    required_perm_name: Optional[str] = None,
+    required_perm_id: Optional[int] = random_digits(5),
+) -> RequiredPermission:
+    """
+    Generate a RequiredPermission object based on the given parameters.
+
+    This function takes in the following parameters:
+    - target_resource_name: A string representing the name of the target resource.
+    - extra_permissions(optional): A list of Permission objects representing any additional permissions.
+    - required_perm_name (optional): A string representing the name of the required permission. If not provided, it will be generated based on the target_resource_name.
+    - required_perm_id (optional): An integer representing the ID of the required permission. If not provided, it will be randomly generated using the random_digits function.
+
+    The function returns a RequiredPermission object that contains the following attributes:
+    - id: An integer representing the ID of the required permission.
+    - name: A string representing the name of the required permission.
+    - read: A list of Permission objects representing the read permissions.
+    - modify: A list of Permission objects representing the modify permissions.
+    - execute: A list of Permission objects representing the execute permissions.
+    - delete: A list of Permission objects representing the delete permissions.
+    """
+    extra_permissions = extra_permissions or []
+    return RequiredPermission(
+        id=required_perm_id,
+        name=required_perm_name or f"{target_resource_name}RequiredPermission",
+        read=[Permission(id=PermissionCode.Read.value, name=target_resource_name)] + extra_permissions,
+        modify=[Permission(id=PermissionCode.Modify.value, name=target_resource_name)] + extra_permissions,
+        execute=[Permission(id=PermissionCode.Execute.value, name=target_resource_name)] + extra_permissions,
+        delete=[Permission(id=PermissionCode.Delete.value, name=target_resource_name)] + extra_permissions,
+    )
 
 
 class Resource(AuthBaseModel):

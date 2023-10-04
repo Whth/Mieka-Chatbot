@@ -6,20 +6,20 @@ from .utils import AuthBaseModel, manager_factory, ManagerBase
 
 
 class PermissionCode(Enum):
-    ReadPermission: int = 1
-    ExecutePermission: int = 2
-    ModifyPermission: int = 4
-    DeletePermission: int = 8
-    SpecialPermission: int = 16
+    Read: int = 1
+    Execute: int = 2
+    Modify: int = 4
+    Delete: int = 8
+    Special: int = 16
 
 
 class Permission(AuthBaseModel):
     __permission_categories__: Dict[int, str] = {
-        PermissionCode.ReadPermission: "ReadPermission",
-        PermissionCode.ExecutePermission: "ExecutePermission",
-        PermissionCode.ModifyPermission: "ModifyPermission",
-        PermissionCode.DeletePermission: "DeletePermission",
-        PermissionCode.SpecialPermission: "SpecialPermission",
+        PermissionCode.Read.value: "ReadPermission",
+        PermissionCode.Execute.value: "ExecutePermission",
+        PermissionCode.Modify.value: "ModifyPermission",
+        PermissionCode.Delete.value: "DeletePermission",
+        PermissionCode.Special.value: "SpecialPermission",
     }
 
     # TODO such unique validator is not good enough
