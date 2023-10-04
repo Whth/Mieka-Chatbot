@@ -98,9 +98,7 @@ class Resource(AuthBaseModel):
         Raises:
             PermissionError: If no read permissions are present.
         """
-        if not self.required_permissions.read or any(
-            read_perm in permissions for read_perm in self.required_permissions.read
-        ):
+        if auth_check(self.required_permissions.read, permissions):
             return copy.deepcopy(self._source)
         raise PermissionError("Illegal Read operation")
 
@@ -123,7 +121,9 @@ class Resource(AuthBaseModel):
             id_before_op = id(source_bak)
             type_before_op = type(source_bak)
             operation(source_bak)
-            if id(source_bak) == id_before_op and type(source_bak) == type_before_op:
+            if id(source_bak) != id_before_op or type(source_bak) != type_before_op:
+                raise RuntimeError("Illegal Modify operation, you shouldn't change the type or the id of the source")
+            else:
                 return operation(self._source)
         raise PermissionError("Illegal Modify operation")
 
@@ -141,7 +141,8 @@ class Resource(AuthBaseModel):
         Raises:
             PermissionError: If the user does not have the required permissions to execute the function.
         """
-        if callable(self._source) and auth_check(self.required_permissions.execute, permissions):
+
+        if auth_check(self.required_permissions.execute, permissions):
             return self._source(**execute_params)
         raise PermissionError("Illegal Execute operation")
 
@@ -162,6 +163,7 @@ class Resource(AuthBaseModel):
             del self._source
             self._source = None
             self._is_deleted = True
+            return
         raise PermissionError("Illegal Delete operation")
 
     def get_full_access(self, permissions: Iterable[Permission]) -> Any:
@@ -201,3 +203,4 @@ class Resource(AuthBaseModel):
         """
         if self.get_full_access(permissions):
             self._source = source
+            self._is_deleted = False

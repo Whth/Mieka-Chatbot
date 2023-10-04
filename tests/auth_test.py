@@ -62,6 +62,13 @@ class TestAuth(unittest.TestCase):
     def test_save_object_list(self):
         self.user_manager.save_object_list()
 
+    def test_delete_object(self):
+        self.res_1.get_delete([])
+        with self.assertRaises(PermissionError):
+            self.res_1.get_delete([])
+
+        self.res_1.get_execute([self.permission])
+
 
 class ToolsTest(unittest.TestCase):
     def setUp(self):
