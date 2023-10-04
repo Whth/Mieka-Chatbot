@@ -104,29 +104,25 @@ class Resource(AuthBaseModel):
             return copy.deepcopy(self._source)
         raise PermissionError("Illegal Read operation")
 
-    def get_modify(self, permissions: Iterable[Permission], operation: Callable) -> Any:
+    def get_modify(self, permissions: Iterable[Permission], operation: Callable, **modify_params: Unpack) -> None:
         """
-        Returns the result of performing a modify operation on the source object, if the user has the required permissions.
+        Get and modify the source object using the given operation and modify parameters.
 
         Parameters:
-            permissions (Iterable[Permission]): The permissions available to the user.
-            operation (Callable): The modify operation to be performed on the source object.
+            permissions (Iterable[Permission]): The permissions required to perform the modify operation.
+            operation (Callable): The operation to be performed on the source object.
+            **modify_params (Unpack): Additional parameters for the modify operation.
 
         Returns:
-            Any: The result of the modify operation on the source object.
+
 
         Raises:
-            PermissionError: If the user does not have the required permissions for the modify operation.
+            PermissionError: If the required permissions are not satisfied.
         """
+
         if auth_check(self.required_permissions.modify, permissions):
-            source_bak = copy.deepcopy(self._source)
-            id_before_op = id(source_bak)
-            type_before_op = type(source_bak)
-            operation(source_bak)
-            if id(source_bak) != id_before_op or type(source_bak) != type_before_op:
-                raise RuntimeError("Illegal Modify operation, you shouldn't change the type or the id of the source")
-            else:
-                return operation(self._source)
+            operation(self._source, **modify_params)
+            return
         raise PermissionError("Illegal Modify operation")
 
     def get_execute(self, permissions: Iterable[Permission], **execute_params: Unpack) -> Any:
