@@ -1,10 +1,10 @@
 import copy
 import random
 from pydantic import Field, PrivateAttr
-from typing import Any, List, Callable, Unpack, Iterable, Optional
+from typing import Any, List, Callable, Unpack, Iterable, Optional, Type, Dict
 
 from .permissions import Permission, auth_check, PermissionCode
-from .utils import AuthBaseModel
+from .utils import AuthBaseModel, ManagerBase
 
 
 class RequiredPermission(AuthBaseModel):
@@ -202,3 +202,18 @@ class Resource(AuthBaseModel):
         if self.get_full_access(permissions):
             self._source = source
             self._is_deleted = False
+
+
+class ResourceManager(ManagerBase):
+    ele_type: Type[Resource] = Field(default=Resource, exclude=True, const=True)
+    object_dict: Dict[str, Resource] = Field(default_factory=dict, const=True)
+
+    def _make_object_instance(self, **kwargs) -> Resource:
+        return self.ele_type(**kwargs)
+
+    def _make_json_dict(self) -> Dict:
+        return {self._root_key: [object_instance.dict() for object_instance in self.object_dict.values()]}
+
+    def update_sources(self, su_permissions: Iterable[Permission], source_dict: Dict[str, Any]):
+        for key, value in source_dict.items():
+            self.object_dict[key].update_source(su_permissions, value)

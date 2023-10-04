@@ -3,7 +3,7 @@ from pathlib import Path
 
 from constant import CONFIG_DIR
 from modules.auth.permissions import Permission
-from modules.auth.resources import Resource, RequiredPermission, required_perm_generator
+from modules.auth.resources import Resource, RequiredPermission, required_perm_generator, ResourceManager
 from modules.auth.roles import Role
 from modules.auth.users import User, UserManager
 
@@ -78,6 +78,22 @@ class ToolsTest(unittest.TestCase):
         extra = Permission(id=16, name="su")
         req = required_perm_generator(target_resource_name="test", extra_permissions=[extra])
         print(req.dict())
+
+
+class ResourceManagerTest(unittest.TestCase):
+    def setUp(self):
+        self.manager = ResourceManager(id=1, name="resourceManager", config_file_path=f"../{CONFIG_DIR}/test.json")
+
+    def test(self):
+        p = Resource(
+            source=hello_world,
+            id=1,
+            name="testRes",
+            required_permissions=required_perm_generator(target_resource_name="testRes"),
+        )
+        self.manager.add_object(p)
+        print(self.manager.dict())
+        self.manager.save_object_list()
 
 
 if __name__ == "__main__":
