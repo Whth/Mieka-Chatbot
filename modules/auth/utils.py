@@ -41,7 +41,8 @@ class ManagerBase(AuthBaseModel):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-
+        if self.ele_type is None:
+            raise ValueError("ele_type cannot be None")
         # use setattr here is to silent the warning, use '=' to set it is fine, too
         setattr(self, "_root_key", f"{self.ele_type.__name__}s")
 
@@ -105,28 +106,83 @@ class ManagerBase(AuthBaseModel):
         del self.object_dict[target.unique_label]
 
     @abstractmethod
+    def _make_json_dict(self) -> Dict:
+        """
+        A method that should be implemented by subclasses. It is responsible for creating a JSON dictionary.
+
+        :return: A dictionary representing the JSON data.
+        :rtype: Dict
+        """
+        pass
+
+    @final
     def save_object_list(self):
         """
-        A method that is responsible for saving a list of objects.
+        Save the object list to a JSON file.
 
-        This method does not have any parameters.
+        This function reads the existing JSON file, if it exists, and loads its contents into a temporary
+        dictionary.
+        It then updates the dictionary with the contents of the object list by calling the
+        _make_json_dict() method.
+        Finally, it writes the updated dictionary to the JSON file, overwriting its
+        previous contents.
 
-        This method does not return any value.
+        Parameters:
+
+
+        Returns:
+            None
         """
-        pass
+        temp = {}
+        if pathlib.Path(self.config_file_path).exists():
+            with open(self.config_file_path, "r", encoding="utf-8") as f:
+                temp = json.load(f)
+        temp.update(self._make_json_dict())
+        with open(self.config_file_path, "w+", encoding="utf-8") as f:
+            json.dump(temp, f, indent=2, ensure_ascii=False)
 
     @abstractmethod
-    def load_object_list(self):
+    def _make_object_instance(self, **kwargs) -> AuthBaseModel:
         """
-        A description of the entire function, its parameters, and its return types.
+        Creates an instance of `AuthBaseModel` with the provided keyword arguments.
+
+        Parameters:
+            **kwargs: Additional keyword arguments to be passed to the constructor of `AuthBaseModel`.
+
+        Returns:
+            AuthBaseModel: An instance of `AuthBaseModel` with the specified keyword arguments.
         """
         pass
+
+    @final
+    def load_object_list(self):
+        """
+        Load the object list from the config file.
+
+        This function opens the config file specified by `config_file_path` in read mode,
+        and loads the object list from it. The object list is stored under the `_root_key` key
+        in the JSON file.
+
+        Parameters:
+            self (ClassName): The instance of the class.
+
+        Returns:
+            None
+        """
+        with open(self.config_file_path, "r", encoding="utf-8") as f:
+            temp: List[Dict] = json.load(f)[self._root_key]
+
+        temp_object_list = [self._make_object_instance(**data) for data in temp]
+        for temp_object in temp_object_list:
+            self.add_object(temp_object)
 
 
 T_AUTH_BASE_MODEL = TypeVar("T_AUTH_BASE_MODEL", bound=AuthBaseModel)
 
+T_Manager = TypeVar("T_Manager", bound=ManagerBase)
 
-def manager_factory(T_type: Type[T_AUTH_BASE_MODEL]) -> Type[ManagerBase]:
+
+def manager_factory(T_type: Type[T_AUTH_BASE_MODEL]) -> Type[T_Manager]:
     """
     Returns a dynamically generated manager class based on the provided type.
 
@@ -141,42 +197,12 @@ def manager_factory(T_type: Type[T_AUTH_BASE_MODEL]) -> Type[ManagerBase]:
         ele_type: Type = Field(default=T_type, exclude=True, const=True)
         object_dict: Dict[str, T_type] = Field(default_factory=dict, const=True)
 
-        def _make_json_dict(self):
-            return {self._root_key: [data.dict() for data in self.object_dict.values()]}
+        @override
+        def _make_json_dict(self) -> Dict:
+            return {self._root_key: [object_instance.dict() for object_instance in self.object_dict.values()]}
 
         @override
-        def save_object_list(self):
-            """
-            Save the object list to a JSON file.
-
-            This function reads the existing JSON file, if it exists, and loads its contents into a temporary
-            dictionary.
-            It then updates the dictionary with the contents of the object list by calling the
-            _make_json_dict() method.
-            Finally, it writes the updated dictionary to the JSON file, overwriting its
-            previous contents.
-
-            Parameters:
-
-
-            Returns:
-                None
-            """
-            temp = {}
-            if pathlib.Path(self.config_file_path).exists():
-                with open(self.config_file_path, "r", encoding="utf-8") as f:
-                    temp = json.load(f)
-            temp.update(self._make_json_dict())
-            with open(self.config_file_path, "w+", encoding="utf-8") as f:
-                json.dump(temp, f, indent=2, ensure_ascii=False)
-
-        @override
-        def load_object_list(self):
-            with open(self.config_file_path, "r", encoding="utf-8") as f:
-                temp: List[Dict] = json.load(f)[self._root_key]
-
-            temp_object_list = [T_type(**data) for data in temp]
-            for temp_object in temp_object_list:
-                self.add_object(temp_object)
+        def _make_object_instance(self, **kwargs) -> T_type:
+            return T_type(**kwargs)
 
     return GenericManager
