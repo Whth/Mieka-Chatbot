@@ -146,8 +146,29 @@ def manager_factory(T_type: Type[T_AUTH_BASE_MODEL]) -> Type[ManagerBase]:
 
         @override
         def save_object_list(self):
+            """
+            Save the object list to a JSON file.
+
+            This function reads the existing JSON file, if it exists, and loads its contents into a temporary
+            dictionary.
+            It then updates the dictionary with the contents of the object list by calling the
+            _make_json_dict() method.
+            Finally, it writes the updated dictionary to the JSON file, overwriting its
+            previous contents.
+
+            Parameters:
+
+
+            Returns:
+                None
+            """
+            temp = {}
+            if pathlib.Path(self.config_file_path).exists():
+                with open(self.config_file_path, "r", encoding="utf-8") as f:
+                    temp = json.load(f)
+            temp.update(self._make_json_dict())
             with open(self.config_file_path, "w+", encoding="utf-8") as f:
-                json.dump(self._make_json_dict(), f, indent=2, ensure_ascii=False)
+                json.dump(temp, f, indent=2, ensure_ascii=False)
 
         @override
         def load_object_list(self):
