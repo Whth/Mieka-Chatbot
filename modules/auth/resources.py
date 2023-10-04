@@ -71,17 +71,19 @@ class Resource(AuthBaseModel):
     if **ANY** of the required permissions are present, return the access, raise a PermissionError otherwise
     """
 
-    source: Any | None = Field(allow_mutation=True, exclude=True)
+    source: Any | None = Field(default=None, allow_mutation=True, exclude=True)
     required_permissions: RequiredPermission
     _source: Any = PrivateAttr(default=None)
-    _is_deleted: bool = PrivateAttr(default=False)
+    _is_deleted: bool = PrivateAttr(default=True)
 
     class Config:
         allow_mutation = True
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._source = self.source
+        if self.source:
+            self._is_deleted = False
+            self._source = self.source
         delattr(self, "source")
 
     def get_read(self, permissions: Iterable[Permission]) -> Any:
