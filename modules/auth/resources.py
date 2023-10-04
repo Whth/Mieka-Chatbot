@@ -74,6 +74,7 @@ class Resource(AuthBaseModel):
     source: Any | None = Field(allow_mutation=True, exclude=True)
     required_permissions: RequiredPermission
     _source: Any = PrivateAttr(default=None)
+    _is_deleted: bool = PrivateAttr(default=False)
 
     class Config:
         allow_mutation = True
@@ -157,8 +158,10 @@ class Resource(AuthBaseModel):
         Raises:
             PermissionError: If the delete operation is not allowed.
         """
-        if auth_check(self.required_permissions.delete, permissions):
+        if not self._is_deleted and auth_check(self.required_permissions.delete, permissions):
+            del self._source
             self._source = None
+            self._is_deleted = True
         raise PermissionError("Illegal Delete operation")
 
     def get_full_access(self, permissions: Iterable[Permission]) -> Any:
