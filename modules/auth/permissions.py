@@ -1,16 +1,25 @@
+from enum import Enum
 from pydantic import validator, root_validator
 from typing import Dict, Any, Set, Type, Iterable
 
 from .utils import AuthBaseModel, manager_factory, ManagerBase
 
 
+class PermissionCode(Enum):
+    ReadPermission: int = 1
+    ExecutePermission: int = 2
+    ModifyPermission: int = 4
+    DeletePermission: int = 8
+    SpecialPermission: int = 16
+
+
 class Permission(AuthBaseModel):
     __permission_categories__: Dict[int, str] = {
-        1: "ReadPermission",
-        2: "ExecutePermission",
-        4: "ModifyPermission",
-        8: "DeletePermission",
-        16: "SpecialPermission",
+        PermissionCode.ReadPermission: "ReadPermission",
+        PermissionCode.ExecutePermission: "ExecutePermission",
+        PermissionCode.ModifyPermission: "ModifyPermission",
+        PermissionCode.DeletePermission: "DeletePermission",
+        PermissionCode.SpecialPermission: "SpecialPermission",
     }
 
     # TODO such unique validator is not good enough
@@ -31,6 +40,11 @@ class Permission(AuthBaseModel):
         Raises:
             None
         """
+        if params["id"] not in cls.__permission_categories__:
+            raise KeyError(
+                f"{params['id']} is not a valid permission category,"
+                f" must be one of {list[cls.__permission_categories__.keys()]}"
+            )
         suffix = f'{cls.__permission_categories__[params["id"]]}'
         true_name: str = f"{params['name']}{suffix}" if suffix not in params["name"] else params["name"]
         params["name"] = true_name
