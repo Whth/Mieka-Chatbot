@@ -185,7 +185,11 @@ class ManagerBase(AuthBaseModel):
             None
         """
         with open(self.config_file_path, "r", encoding="utf-8") as f:
-            temp: List[Dict] = json.load(f)[self._root_key]
+            read = json.load(f)
+        if self._root_key not in read:
+            # root key not found in the JSON file,indicate that the object list is empty
+            return
+        temp: List[Dict] = read[self._root_key]
 
         temp_object_list = [self._make_object_instance(**data) for data in temp]
         for temp_object in temp_object_list:
