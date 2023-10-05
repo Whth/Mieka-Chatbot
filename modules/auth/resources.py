@@ -223,5 +223,7 @@ class ResourceManager(ManagerBase):
         return {self._root_key: [object_instance.dict() for object_instance in self.object_dict.values()]}
 
     def update_sources(self, su_permissions: Iterable[Permission], source_dict: Dict[str, Any]):
+        if any(key not in self.object_dict for key in source_dict):
+            raise KeyError("Invalid update, some Key(s) not found in object_dict")
         for key, value in source_dict.items():
             self.object_dict[key].update_source(su_permissions, value)
