@@ -27,6 +27,11 @@ class Permission(AuthBaseModel):
     __cache__: Dict[FrozenSet, "Permission"] = {}
 
     def __new__(cls, **kwargs) -> "Permission":
+        if not kwargs:
+            # TODO never figured out why this is needed, the process of Instantiate this class seems need call this
+            #  method twice, first with kwargs, then with no args
+            # Note the cache is do working as expected, how strange:(
+            return super().__new__(cls)
         key = frozenset(kwargs.values())
         if key not in cls.__cache__:
             cls.__cache__[key] = super().__new__(cls)
