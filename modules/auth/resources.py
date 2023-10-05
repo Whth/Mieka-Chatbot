@@ -12,6 +12,7 @@ class RequiredPermission(AuthBaseModel):
     modify: List[Permission] = Field(default_factory=list, unique_items=True)
     execute: List[Permission] = Field(default_factory=list, unique_items=True)
     delete: List[Permission] = Field(default_factory=list, unique_items=True)
+    super: List[Permission] = Field(default_factory=list, unique_items=True)
 
 
 def random_digits(digits: int) -> int:
@@ -32,7 +33,7 @@ def random_digits(digits: int) -> int:
 
 def required_perm_generator(
     target_resource_name: str,
-    extra_permissions: Optional[List[Permission]] = None,
+    super_permissions: Optional[List[Permission]] = None,
     required_perm_name: Optional[str] = None,
     required_perm_id: Optional[int] = random_digits(5),
 ) -> RequiredPermission:
@@ -53,14 +54,15 @@ def required_perm_generator(
     - execute: A list of Permission objects representing the execute permissions.
     - delete: A list of Permission objects representing the delete permissions.
     """
-    extra_permissions = extra_permissions or []
+    super_permissions = super_permissions or []
     return RequiredPermission(
         id=required_perm_id,
         name=required_perm_name or f"{target_resource_name}RequiredPermission",
-        read=[Permission(id=PermissionCode.Read.value, name=target_resource_name)] + extra_permissions,
-        modify=[Permission(id=PermissionCode.Modify.value, name=target_resource_name)] + extra_permissions,
-        execute=[Permission(id=PermissionCode.Execute.value, name=target_resource_name)] + extra_permissions,
-        delete=[Permission(id=PermissionCode.Delete.value, name=target_resource_name)] + extra_permissions,
+        read=[Permission(id=PermissionCode.Read.value, name=target_resource_name)],
+        modify=[Permission(id=PermissionCode.Modify.value, name=target_resource_name)],
+        execute=[Permission(id=PermissionCode.Execute.value, name=target_resource_name)],
+        delete=[Permission(id=PermissionCode.Delete.value, name=target_resource_name)],
+        super=super_permissions,
     )
 
 
@@ -88,19 +90,23 @@ class Resource(AuthBaseModel):
 
     def get_read(self, permissions: Iterable[Permission]) -> Any:
         """
-        Returns a copy of the source if any of the read permissions are present in the provided permissions.
-        Otherwise, raises a PermissionError.
+        Get the read permission for the object.
 
-        Args:
-            permissions (Iterable[Permission]): An iterable of Permission objects.
+        Parameters:
+            permissions (Iterable[Permission]): The permissions to check.
 
         Returns:
-            Any: A copy of the source if read permissions are present.
+            Any: The read permission if it is allowed.
 
         Raises:
-            PermissionError: If no read permissions are present.
+            PermissionError: If the read operation is not allowed.
+        Note:
+            if the source is callable, it will never be returned
         """
-        if auth_check(self.required_permissions.read, permissions):
+
+        if not callable(self.source) and auth_check(
+            self.required_permissions.read + self.required_permissions.super, permissions
+        ):
             return copy.deepcopy(self._source)
         raise PermissionError("Illegal Read operation")
 
@@ -120,7 +126,7 @@ class Resource(AuthBaseModel):
             PermissionError: If the required permissions are not satisfied.
         """
 
-        if auth_check(self.required_permissions.modify, permissions):
+        if auth_check(self.required_permissions.modify + self.required_permissions.super, permissions):
             operation(self._source, **modify_params)
             return
         raise PermissionError("Illegal Modify operation")
@@ -140,7 +146,7 @@ class Resource(AuthBaseModel):
             PermissionError: If the user does not have the required permissions to execute the function.
         """
 
-        if auth_check(self.required_permissions.execute, permissions):
+        if auth_check(self.required_permissions.execute + self.required_permissions.super, permissions):
             return self._source(**execute_params)
         raise PermissionError("Illegal Execute operation")
 
@@ -157,7 +163,9 @@ class Resource(AuthBaseModel):
         Raises:
             PermissionError: If the delete operation is not allowed.
         """
-        if not self._is_deleted and auth_check(self.required_permissions.delete, permissions):
+        if not self._is_deleted and auth_check(
+            self.required_permissions.delete + self.required_permissions.super, permissions
+        ):
             del self._source
             self._source = None
             self._is_deleted = True
@@ -177,7 +185,7 @@ class Resource(AuthBaseModel):
         Raises:
             PermissionError: If the permissions do not allow full access.
         """
-        if all(
+        if auth_check(self.required_permissions.super, permissions) or all(
             [
                 auth_check(self.required_permissions.read, permissions),
                 auth_check(self.required_permissions.modify, permissions),

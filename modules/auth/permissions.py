@@ -11,6 +11,7 @@ class PermissionCode(Enum):
     Modify: int = 4
     Delete: int = 8
     Special: int = 16
+    Super: int = 32
 
 
 class Permission(AuthBaseModel):
@@ -20,6 +21,7 @@ class Permission(AuthBaseModel):
         PermissionCode.Modify.value: "ModifyPermission",
         PermissionCode.Delete.value: "DeletePermission",
         PermissionCode.Special.value: "SpecialPermission",
+        PermissionCode.Super.value: "SuperPermission",
     }
 
     # TODO such unique validator is not good enough
