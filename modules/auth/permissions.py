@@ -1,6 +1,6 @@
 from enum import Enum
 from pydantic import root_validator
-from typing import Dict, Any, Set, Type, Iterable
+from typing import Dict, Any, Type, Iterable, FrozenSet
 
 from .utils import AuthBaseModel, manager_factory, ManagerBase
 
@@ -24,8 +24,13 @@ class Permission(AuthBaseModel):
         PermissionCode.Super.value: "SuperPermission",
     }
 
-    # TODO such unique validator is not good enough
-    __permission_names__: Set[str] = set()
+    __cache__: Dict[FrozenSet, "Permission"] = {}
+
+    def __new__(cls, **kwargs) -> "Permission":
+        key = frozenset(kwargs.values())
+        if key not in cls.__cache__:
+            cls.__cache__[key] = super().__new__(cls)
+        return cls.__cache__[key]
 
     @root_validator()
     def validate_all(cls, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -50,9 +55,6 @@ class Permission(AuthBaseModel):
             )
         suffix = f'{cls.__permission_categories__[params["id"]]}'
         true_name: str = f"{params['name']}{suffix}" if suffix not in params["name"] else params["name"]
-        if true_name in cls.__permission_names__:
-            raise ValueError(f"{true_name} is already in use")
-        cls.__permission_names__.add(true_name)
         params["name"] = true_name
         return params
 

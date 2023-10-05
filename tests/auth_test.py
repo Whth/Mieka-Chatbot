@@ -38,6 +38,14 @@ class TestAuth(unittest.TestCase):
         self.user.add_role(self.role)
         self.user_manager.add_object(self.user)
 
+    def test_role_perm(self):
+        perm = Permission(id=4, name="test")
+        perm_2 = Permission(id=4, name="test")
+        print(id(perm), id(perm_2))
+        role = Role(id=1, name="test", permissions=[perm])
+        new_role = Role(**role.dict())
+        print(new_role.dict())
+
     def test_resource_read(self):
         print("this is resource")
         print(self.res_1.dict())
