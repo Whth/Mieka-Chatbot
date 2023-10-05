@@ -42,8 +42,9 @@ class TestAuth(unittest.TestCase):
     def test_resource_read(self):
         print("this is resource")
         print(self.res_1.dict())
-        print(self.res_1.get_read([]))
-        assert id(self.res_1.get_read([])) == id(hello_world)
+        with self.assertRaises(PermissionError):
+            # should raise PermissionError, since read is not allowed for callable
+            self.res_1.get_read([])
 
     def test_user_manager_to_dict(self):
         print("user manager dict")
@@ -63,21 +64,45 @@ class TestAuth(unittest.TestCase):
         self.user_manager.save_object_list()
 
     def test_delete_object(self):
+        self.res_1.get_execute([self.permission])  # should work
         self.res_1.get_delete([])
         with self.assertRaises(PermissionError):
+            # not allowed to delete a resource twice
             self.res_1.get_delete([])
-
-        self.res_1.get_execute([self.permission])
+        with self.assertRaises(TypeError):
+            # invalid call, since the source is already deleted
+            self.res_1.get_execute([self.permission])
 
 
 class ToolsTest(unittest.TestCase):
     def setUp(self):
-        pass
+        self.su = Permission(id=32, name="su")
 
     def test_req_perm_creator(self):
-        extra = Permission(id=16, name="su")
-        req = required_perm_generator(target_resource_name="test", extra_permissions=[extra])
+        with self.assertRaises(KeyError):
+            # should raise KeyError, since the id is illegal
+            Permission(id=52, name="su")
+
+        req = required_perm_generator(target_resource_name="test", super_permissions=[self.su])
         print(req.dict())
+
+    def test_resource_creator(self):
+        new_src = [12, 35]
+        src = Resource(
+            source=hello_world,
+            id=1,
+            name="testRes",
+            required_permissions=required_perm_generator(target_resource_name="testRes", super_permissions=[self.su]),
+        )
+        with self.assertRaises(PermissionError):
+            # should raise PermissionError, since the insufficient permissions
+            src.get_read([])
+        with self.assertRaises(PermissionError):
+            # should raise PermissionError, since the callable resource cannot be read
+            src.get_read([self.su])
+        src.get_execute([self.su])  # should work
+        src.update_source([self.su], new_src)  # should work
+        print(src.get_read([self.su]))
 
 
 class ResourceManagerTest(unittest.TestCase):
