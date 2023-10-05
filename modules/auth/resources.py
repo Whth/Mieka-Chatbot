@@ -108,7 +108,7 @@ class Resource(AuthBaseModel):
 
         if auth_check(self.required_permissions.read + self.required_permissions.super, permissions):
             return copy.deepcopy(self._source)
-        raise PermissionError("Illegal Read operation")
+        raise PermissionError("Illegal Read operation, insufficient permissions")
 
     def get_modify(self, permissions: Iterable[Permission], operation: Callable, **modify_params: Unpack) -> None:
         """
@@ -223,6 +223,19 @@ class ResourceManager(ManagerBase):
         return {self._root_key: [object_instance.dict() for object_instance in self.object_dict.values()]}
 
     def update_sources(self, su_permissions: Iterable[Permission], source_dict: Dict[str, Any]):
+        """
+        Update the sources in the object dictionary with the given permissions and source dictionary.
+
+        Parameters:
+            su_permissions (Iterable[Permission]): The permissions required to update the sources.
+            source_dict (Dict[str, Any]): The dictionary containing the sources to be updated.
+
+        Raises:
+            KeyError: If any key in the source dictionary is not found in the object dictionary.
+
+        Returns:
+            None
+        """
         if any(key not in self.object_dict for key in source_dict):
             raise KeyError("Invalid update, some Key(s) not found in object_dict")
         for key, value in source_dict.items():
