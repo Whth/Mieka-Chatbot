@@ -7,6 +7,10 @@ from typing import TypeVar, Type, Dict, List, final, Any
 from typing_extensions import override
 
 
+def make_label(id: int, name: str) -> str:
+    return f"{id}-{name}"
+
+
 class AuthBaseModel(BaseModel):
     id: PositiveInt
 
@@ -14,7 +18,7 @@ class AuthBaseModel(BaseModel):
 
     @property
     def unique_label(self) -> str:
-        return f"{self.id}-{self.name}"
+        return make_label(self.id, self.name)
 
     @final
     def __hash__(self):
@@ -90,7 +94,7 @@ class ManagerBase(AuthBaseModel):
         return True
 
     @final
-    def remove_object(self, target: AuthBaseModel):
+    def remove_object(self, target: AuthBaseModel | str):
         """
         Remove an object from the object list.
 
@@ -103,9 +107,15 @@ class ManagerBase(AuthBaseModel):
         Returns:
             None
         """
-        if target.unique_label not in self.object_dict:
-            raise KeyError(f"[<{target.id}>-{target.name}] is not in the object list")
-        del self.object_dict[target.unique_label]
+        if isinstance(target, str):
+            label = target
+        elif isinstance(target, AuthBaseModel):
+            label = target.unique_label
+        else:
+            raise TypeError("target must be str or AuthBaseModel")
+        if label not in self.object_dict:
+            raise KeyError(f"[{label}] is not in the object list")
+        del self.object_dict[label]
 
     @abstractmethod
     def _make_json_dict(self) -> Dict:
