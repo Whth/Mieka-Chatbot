@@ -3,12 +3,15 @@ import pathlib
 import warnings
 from abc import abstractmethod
 from pydantic import BaseModel, PositiveInt, validator, Field, PrivateAttr
-from typing import TypeVar, Type, Dict, List, final, Any
+from typing import TypeVar, Type, Dict, List, final, Any, TypeAlias
 from typing_extensions import override
 
 
 def make_label(id: int, name: str) -> str:
     return f"{id}-{name}"
+
+
+UniqueLabel: TypeAlias = str
 
 
 class AuthBaseModel(BaseModel):
@@ -17,7 +20,7 @@ class AuthBaseModel(BaseModel):
     name: str = Field(regex="^[a-zA-Z_]+$")
 
     @property
-    def unique_label(self) -> str:
+    def unique_label(self) -> UniqueLabel:
         return make_label(self.id, self.name)
 
     @final
