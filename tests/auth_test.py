@@ -1,6 +1,7 @@
 import unittest
 
 from constant import CONFIG_DIR
+from modules.auth.core import AuthorizationManager
 from modules.auth.permissions import Permission
 from modules.auth.resources import Resource, RequiredPermission, required_perm_generator, ResourceManager
 from modules.auth.roles import Role
@@ -126,6 +127,34 @@ class ResourceManagerTest(unittest.TestCase):
         self.manager.add_object(p)
         print(self.manager.dict())
         self.manager.save_object_list()
+
+
+class AuthCoreTest(unittest.TestCase):
+    def setUp(self):
+        self.manager = AuthorizationManager(id=1, name="authManager", config_file_path=f"../{CONFIG_DIR}/auth.json")
+        self.resource_list = [[12, 35], {14: 16, 17: 18}, lambda x: x + 1]
+        self.perms = [Permission(id=1, name="hall"), Permission(id=2, name="hall"), Permission(id=4, name="hall")]
+
+    def test_add_resource(self):
+        self.manager.add_resource(resource_id=3, resource_name="testRes", source=self.resource_list[0])
+        self.manager.add_resource(resource_id=1, resource_name="testRes", source=self.resource_list[1])
+        self.manager.add_resource(resource_id=2, resource_name="testRes", source=self.resource_list[2])
+        print(self.manager.dict())
+
+    def test_add_perm(self):
+        self.manager.add_perm(self.perms[0].id, self.perms[0].name)
+        self.manager.add_perm(self.perms[1].id, self.perms[1].name)
+        self.manager.add_perm(self.perms[2].id, self.perms[2].name)
+        print(self.manager.dict())
+
+    def test_add_role(self):
+        self.manager.add_perm(self.perms[0].id, self.perms[0].name)
+        self.manager.add_perm(self.perms[1].id, self.perms[1].name)
+        self.manager.add_perm(self.perms[2].id, self.perms[2].name)
+        print(self.manager.add_role(role_id=1, role_name="hall", role_perms=[self.perms[0].unique_label]))
+        print(self.manager.add_role(role_id=2, role_name="hall", role_perms=[self.perms[1].unique_label]))
+        print(self.manager.add_role(role_id=4, role_name="hall", role_perms=[self.perms[2].unique_label]))
+        print(self.manager.dict())
 
 
 if __name__ == "__main__":
