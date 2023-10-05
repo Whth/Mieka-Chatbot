@@ -2,7 +2,7 @@ import json
 import pathlib
 import warnings
 from abc import abstractmethod
-from pydantic import BaseModel, PositiveInt, validator, Field, PrivateAttr
+from pydantic import BaseModel, validator, Field, PrivateAttr, NonNegativeInt
 from typing import TypeVar, Type, Dict, List, final, Any, TypeAlias
 from typing_extensions import override
 
@@ -15,7 +15,7 @@ UniqueLabel: TypeAlias = str
 
 
 class AuthBaseModel(BaseModel):
-    id: PositiveInt
+    id: NonNegativeInt
 
     name: str = Field(regex="^[a-zA-Z_]+$")
 
