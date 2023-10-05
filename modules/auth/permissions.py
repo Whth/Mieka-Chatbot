@@ -66,7 +66,7 @@ class Permission(AuthBaseModel):
         """
         if name not in cls.__permission_names__:
             cls.__permission_names__.add(name)
-
+        # TODO such unique validator may unnecessary, since the unique check is already done in the manager level
         return name
 
 
