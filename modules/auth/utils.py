@@ -46,7 +46,7 @@ class ManagerBase(AuthBaseModel):
             raise ValueError("ele_type cannot be None")
         # use setattr here is to silent the warning, use '=' to set it is fine, too
         setattr(self, "_root_key", f"{self.ele_type.__name__}s")
-        self.load_object_list() if self.load_on_init else None
+        self.load_object_list() if pathlib.Path(self.config_file_path).exists() and self.load_on_init else None
 
     @property
     def root_key(self) -> str:
