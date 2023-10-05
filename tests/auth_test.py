@@ -1,5 +1,4 @@
 import unittest
-from pathlib import Path
 
 from constant import CONFIG_DIR
 from modules.auth.permissions import Permission
@@ -29,7 +28,7 @@ class TestAuth(unittest.TestCase):
         self.res_2 = Resource(source=this_is_resource, id=2, name="testResthis", required_permissions=self.req)
         self.res_3 = Resource(source=add_one, id=3, name="testResAddOne", required_permissions=self.req)
         self.user_manager = UserManager(id=1, name="testUserManager", config_file_path=self.config_file_path)
-        self.user_manager.load_object_list() if Path("test.json").exists() else None
+
         self.user = User(id=5, name="testUser")
 
         self.role = Role(id=1, name="testRole")

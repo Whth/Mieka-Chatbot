@@ -37,6 +37,7 @@ class ManagerBase(AuthBaseModel):
     ele_type: Type
     config_file_path: pathlib.Path | str
     object_dict: Dict[str, Any]
+    load_on_init: bool = True
     _root_key: str = PrivateAttr("root")
 
     def __init__(self, **kwargs):
@@ -45,6 +46,7 @@ class ManagerBase(AuthBaseModel):
             raise ValueError("ele_type cannot be None")
         # use setattr here is to silent the warning, use '=' to set it is fine, too
         setattr(self, "_root_key", f"{self.ele_type.__name__}s")
+        self.load_object_list() if self.load_on_init else None
 
     @property
     def root_key(self) -> str:
