@@ -1,8 +1,11 @@
+import json
+import pathlib
 import unittest
+from colorama import Fore, Back
 
 from constant import CONFIG_DIR
 from modules.auth.core import AuthorizationManager
-from modules.auth.permissions import Permission
+from modules.auth.permissions import Permission, PermissionCode
 from modules.auth.resources import Resource, RequiredPermission, required_perm_generator, ResourceManager
 from modules.auth.roles import Role
 from modules.auth.users import User, UserManager
@@ -115,25 +118,48 @@ class ToolsTest(unittest.TestCase):
 
 class ResourceManagerTest(unittest.TestCase):
     def setUp(self):
-        self.manager = ResourceManager(id=1, name="resourceManager", config_file_path=f"../{CONFIG_DIR}/test.json")
+        self._config_file_path = f"../{CONFIG_DIR}/test.json"
+        self.manager = ResourceManager(id=1, name="resourceManager", config_file_path=self._config_file_path)
+
+    def tearDown(self):
+        pathlib.Path(self._config_file_path).unlink()
 
     def test(self):
         p = Resource(
             source=hello_world,
             id=1,
             name="testRes",
-            required_permissions=required_perm_generator(target_resource_name="testRes"),
+            required_permissions=required_perm_generator(target_resource_name="va"),
         )
+        # print(required_perm_generator(target_resource_name="k").dict())
         self.manager.add_object(p)
         print(self.manager.dict())
         self.manager.save_object_list()
+        print("------------------")
+        target_resource_name = "hiag"
+        a = RequiredPermission(
+            id=1,
+            name="sc",
+            read=[Permission(id=PermissionCode.Read.value, name=target_resource_name)],
+            modify=[Permission(id=PermissionCode.Modify.value, name=target_resource_name)],
+            execute=[Permission(id=PermissionCode.Execute.value, name=target_resource_name)],
+            delete=[Permission(id=PermissionCode.Delete.value, name=target_resource_name)],
+        )
 
 
 class AuthCoreTest(unittest.TestCase):
     def setUp(self):
-        self.manager = AuthorizationManager(id=1, name="authManager", config_file_path=f"../{CONFIG_DIR}/auth.json")
+        self.config_file_path = f"../{CONFIG_DIR}/auth.json"
+        self.manager = AuthorizationManager(id=1, name="authManager", config_file_path=self.config_file_path)
         self.resource_list = [[12, 35], {14: 16, 17: 18}, lambda x: x + 1]
         self.perms = [Permission(id=1, name="hall"), Permission(id=2, name="hall"), Permission(id=4, name="hall")]
+
+    def tearDown(self):
+        self.manager.save()
+        with open(self.config_file_path, "r") as f:
+            temp = json.load(f)
+        print(f"the result json is\n\n{Fore.RED}{Back.BLACK}{temp}{Fore.RESET}{Back.RESET}")
+        pathlib.Path(self.config_file_path).unlink()
 
     def test_add_resource(self):
         self.manager.add_resource(resource_id=3, resource_name="testRes", source=self.resource_list[0])
@@ -155,6 +181,11 @@ class AuthCoreTest(unittest.TestCase):
         print(self.manager.add_role(role_id=2, role_name="hall", role_perms=[self.perms[1].unique_label]))
         print(self.manager.add_role(role_id=4, role_name="hall", role_perms=[self.perms[2].unique_label]))
         print(self.manager.dict())
+
+    def test_add_user(self):
+        self.manager.add_user(user_id=1, user_name="testUser")
+        print(self.manager.dict())
+        self.manager.save()
 
 
 if __name__ == "__main__":
