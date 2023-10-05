@@ -103,10 +103,10 @@ class Resource(AuthBaseModel):
         Note:
             if the source is callable, it will never be returned
         """
+        if callable(self._source):
+            raise PermissionError("Illegal Read operation, executable resource cannot be accessed in read")
 
-        if not callable(self.source) and auth_check(
-            self.required_permissions.read + self.required_permissions.super, permissions
-        ):
+        if auth_check(self.required_permissions.read + self.required_permissions.super, permissions):
             return copy.deepcopy(self._source)
         raise PermissionError("Illegal Read operation")
 
@@ -129,7 +129,7 @@ class Resource(AuthBaseModel):
         if auth_check(self.required_permissions.modify + self.required_permissions.super, permissions):
             operation(self._source, **modify_params)
             return
-        raise PermissionError("Illegal Modify operation")
+        raise PermissionError("Illegal Modify operation, insufficient permissions")
 
     def get_execute(self, permissions: Iterable[Permission], **execute_params: Unpack) -> Any:
         """
@@ -148,7 +148,7 @@ class Resource(AuthBaseModel):
 
         if auth_check(self.required_permissions.execute + self.required_permissions.super, permissions):
             return self._source(**execute_params)
-        raise PermissionError("Illegal Execute operation")
+        raise PermissionError("Illegal Execute operation, insufficient permissions")
 
     def get_delete(self, permissions: Iterable[Permission]) -> Any:
         """
@@ -163,14 +163,14 @@ class Resource(AuthBaseModel):
         Raises:
             PermissionError: If the delete operation is not allowed.
         """
-        if not self._is_deleted and auth_check(
-            self.required_permissions.delete + self.required_permissions.super, permissions
-        ):
+        if self._is_deleted:
+            raise PermissionError("Illegal Delete operation, resource already deleted")
+        if auth_check(self.required_permissions.delete + self.required_permissions.super, permissions):
             del self._source
             self._source = None
             self._is_deleted = True
             return
-        raise PermissionError("Illegal Delete operation")
+        raise PermissionError("Illegal Delete operation, insufficient permissions")
 
     def get_full_access(self, permissions: Iterable[Permission]) -> Any:
         """
@@ -194,7 +194,7 @@ class Resource(AuthBaseModel):
             ]
         ):
             return self._source
-        raise PermissionError("Illegal Full Access operation")
+        raise PermissionError("Illegal Full Access operation, insufficient permissions")
 
     def update_source(self, permissions: Iterable[Permission], source: Any):
         """
