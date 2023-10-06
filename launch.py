@@ -11,7 +11,7 @@ from modules.config_utils import ConfigRegistry
 
 class DefaultConfig(Enum):
     WEBSOCKET_HOST = "http://127.0.0.1:8080"
-    AUTH_CONFIG_FILE_NAME: str = "auth.json"
+    AUTH_CONFIG_FILE_NAME: str = f"{CONFIG_DIR}/auth.json"
     VERIFY_KEY = "INITKEYXBVCdNG0"
     ACCOUNT_ID = 1234567890
     ACCEPTED_MESSAGE_TYPES = ["GroupMessage"]

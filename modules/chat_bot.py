@@ -6,6 +6,7 @@ from graia.ariadne.model import Group, Friend, Member, Stranger
 from graia.ariadne.model.util import AriadneOptions
 from typing import Dict, List, NamedTuple, Any, Union
 
+from modules.auth.core import AuthorizationManager, Root
 from modules.cmd import CmdClient
 from modules.extension_manager import ExtensionManager
 from modules.plugin_base import PluginsView
@@ -50,6 +51,7 @@ class BotConfig(NamedTuple):
     """
 
     extension_dir: str
+    auth_config_file_path: str
     syntax_tree: Dict[str, Any]
     accepted_message_types: List[str] = ["GroupMessage"]
 
@@ -70,6 +72,9 @@ class ChatBot(object):
         return self._bot_client
 
     def __init__(self, bot_info: BotInfo, bot_config: BotConfig, bot_connection_config: BotConnectionConfig):
+        self._auth_manager: AuthorizationManager = AuthorizationManager(
+            **(Root()._asdict()), config_file_path=bot_config.auth_config_file_path
+        )
         self._ariadne_app: Ariadne = Ariadne(
             config(bot_info.account_id, bot_connection_config.verify_key, bot_connection_config.websocket_config)
         )
@@ -155,6 +160,8 @@ class ChatBot(object):
 
         except KeyboardInterrupt:
             self.stop()
+        finally:
+            self._auth_manager.save()
 
     def stop(self) -> None:
         """
