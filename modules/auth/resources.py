@@ -14,6 +14,10 @@ class RequiredPermission(AuthBaseModel):
     delete: List[Permission] = Field(default_factory=list, unique_items=True)
     super: List[Permission] = Field(default_factory=list, unique_items=True)
 
+    def add_permission(self, permission: Permission, category_name: str) -> None:
+        perm_list: List[Permission] = getattr(self, category_name)
+        perm_list.append(permission)
+
 
 def random_digits(digits: int) -> int:
     """

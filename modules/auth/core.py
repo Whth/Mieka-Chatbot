@@ -144,6 +144,15 @@ class AuthorizationManager(AuthBaseModel):
         except KeyError:
             return False
 
+    def grant_perm_to_resource(self, perm_label: str, resource_label: str, category_name: str) -> bool:
+        try:
+            source: Resource = self._resources.object_dict[resource_label]
+            perm_to_grant: Permission = self._permissions.object_dict[perm_label]
+            source.required_permissions.add_permission(perm_to_grant, category_name)
+            return True
+        except KeyError:
+            return False
+
     def grant_perm_to_role(self, perm_label: str, role_label: str) -> bool:
         try:
             self._roles.object_dict.get(role_label).add_permission(self._permissions.object_dict.get(perm_label))

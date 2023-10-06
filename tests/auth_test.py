@@ -5,7 +5,7 @@ from colorama import Fore, Back
 
 from constant import CONFIG_DIR
 from modules.auth.core import AuthorizationManager
-from modules.auth.permissions import Permission, PermissionCode
+from modules.auth.permissions import Permission
 from modules.auth.resources import Resource, RequiredPermission, required_perm_generator, ResourceManager
 from modules.auth.roles import Role
 from modules.auth.users import User, UserManager
@@ -137,20 +137,11 @@ class ResourceManagerTest(unittest.TestCase):
             name="testRes",
             required_permissions=required_perm_generator(target_resource_name="va"),
         )
-        # print(required_perm_generator(target_resource_name="k").dict())
+
         self.manager.add_object(p)
         print(self.manager.dict())
         self.manager.save_object_list()
         print("------------------")
-        target_resource_name = "hiag"
-        a = RequiredPermission(
-            id=1,
-            name="sc",
-            read=[Permission(id=PermissionCode.ReadPermission.value, name=target_resource_name)],
-            modify=[Permission(id=PermissionCode.ModifyPermission.value, name=target_resource_name)],
-            execute=[Permission(id=PermissionCode.ExecutePermission.value, name=target_resource_name)],
-            delete=[Permission(id=PermissionCode.DeletePermission.value, name=target_resource_name)],
-        )
 
 
 class AuthCoreTest(unittest.TestCase):
@@ -192,6 +183,16 @@ class AuthCoreTest(unittest.TestCase):
         self.manager.add_user(user_id=1, user_name="testUser")
         print(self.manager.dict())
         self.manager.save()
+
+    def test_grant_perm_to_resource(self):
+        self.test_add_resource()
+        self.test_add_perm()
+        self.assertEqual(
+            True,
+            self.manager.grant_perm_to_resource(
+                self.perms[0].unique_label, resource_label="3-testRes", category_name="execute"
+            ),
+        )
 
 
 if __name__ == "__main__":
