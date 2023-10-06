@@ -1,14 +1,24 @@
 import json
 import pathlib
+import re
 import warnings
 from abc import abstractmethod
 from pydantic import BaseModel, validator, Field, PrivateAttr, NonNegativeInt
-from typing import TypeVar, Type, Dict, List, final, Any, TypeAlias
+from typing import TypeVar, Type, Dict, List, final, Any, TypeAlias, Tuple
 from typing_extensions import override
+
+label_pattern = re.compile(r"^(\d+)-([a-zA-Z_]+)$")
 
 
 def make_label(id: int, name: str) -> str:
     return f"{id}-{name}"
+
+
+def extract_label(label: str) -> Tuple[int, str]:
+    match = label_pattern.match(label)
+    if match:
+        return int(match[1]), match[2]
+    raise ValueError(f"Invalid label: {label}")
 
 
 UniqueLabel: TypeAlias = str

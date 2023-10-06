@@ -58,10 +58,10 @@ def required_perm_generator(
     return RequiredPermission(
         id=required_perm_id,
         name=required_perm_name or f"{target_resource_name}RequiredPermission",
-        read=[Permission(id=PermissionCode.Read.value, name=target_resource_name)],
-        modify=[Permission(id=PermissionCode.Modify.value, name=target_resource_name)],
-        execute=[Permission(id=PermissionCode.Execute.value, name=target_resource_name)],
-        delete=[Permission(id=PermissionCode.Delete.value, name=target_resource_name)],
+        read=[Permission(id=PermissionCode.ReadPermission.value, name=target_resource_name)],
+        modify=[Permission(id=PermissionCode.ModifyPermission.value, name=target_resource_name)],
+        execute=[Permission(id=PermissionCode.ExecutePermission.value, name=target_resource_name)],
+        delete=[Permission(id=PermissionCode.DeletePermission.value, name=target_resource_name)],
         super=super_permissions,
     )
 

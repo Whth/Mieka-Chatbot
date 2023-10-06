@@ -18,7 +18,7 @@ class AuthorizationManager(AuthBaseModel):
     class Config:
         allow_mutation = True
 
-    __su_permission__: Permission = PrivateAttr(default=Permission(id=PermissionCode.Super.value, name="su"))
+    __su_permission__: Permission = PrivateAttr(default=Permission(id=PermissionCode.SuperPermission.value, name="su"))
 
     # TODO add root user ,and add to the managers,
     # TODO remove the exception raise when re-add

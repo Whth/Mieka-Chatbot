@@ -9,6 +9,7 @@ from modules.auth.permissions import Permission, PermissionCode
 from modules.auth.resources import Resource, RequiredPermission, required_perm_generator, ResourceManager
 from modules.auth.roles import Role
 from modules.auth.users import User, UserManager
+from modules.auth.utils import make_label, extract_label
 
 
 def hello_world():
@@ -89,6 +90,11 @@ class ToolsTest(unittest.TestCase):
     def setUp(self):
         self.su = Permission(id=32, name="su")
 
+    def test_label_tool(self):
+        t_id = 1
+        t_name = "test"
+        print(extract_label(make_label(t_id, t_name)))
+
     def test_req_perm_creator(self):
         with self.assertRaises(KeyError):
             # should raise KeyError, since the id is illegal
@@ -140,10 +146,10 @@ class ResourceManagerTest(unittest.TestCase):
         a = RequiredPermission(
             id=1,
             name="sc",
-            read=[Permission(id=PermissionCode.Read.value, name=target_resource_name)],
-            modify=[Permission(id=PermissionCode.Modify.value, name=target_resource_name)],
-            execute=[Permission(id=PermissionCode.Execute.value, name=target_resource_name)],
-            delete=[Permission(id=PermissionCode.Delete.value, name=target_resource_name)],
+            read=[Permission(id=PermissionCode.ReadPermission.value, name=target_resource_name)],
+            modify=[Permission(id=PermissionCode.ModifyPermission.value, name=target_resource_name)],
+            execute=[Permission(id=PermissionCode.ExecutePermission.value, name=target_resource_name)],
+            delete=[Permission(id=PermissionCode.DeletePermission.value, name=target_resource_name)],
         )
 
 

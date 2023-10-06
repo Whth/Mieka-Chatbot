@@ -6,23 +6,16 @@ from .utils import AuthBaseModel, manager_factory, ManagerBase
 
 
 class PermissionCode(Enum):
-    Read: int = 1
-    Execute: int = 2
-    Modify: int = 4
-    Delete: int = 8
-    Special: int = 16
-    Super: int = 32
+    ReadPermission: int = 1
+    ExecutePermission: int = 2
+    ModifyPermission: int = 4
+    DeletePermission: int = 8
+    SpecialPermission: int = 16
+    SuperPermission: int = 32
 
 
 class Permission(AuthBaseModel):
-    __permission_categories__: Dict[int, str] = {
-        PermissionCode.Read.value: "ReadPermission",
-        PermissionCode.Execute.value: "ExecutePermission",
-        PermissionCode.Modify.value: "ModifyPermission",
-        PermissionCode.Delete.value: "DeletePermission",
-        PermissionCode.Special.value: "SpecialPermission",
-        PermissionCode.Super.value: "SuperPermission",
-    }
+    __permission_categories__: Dict[int, str] = {v.value: v.name for v in PermissionCode}
 
     __cache__: Dict[FrozenSet, "Permission"] = {}
 
