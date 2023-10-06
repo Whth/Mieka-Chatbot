@@ -1,11 +1,11 @@
 import pathlib
-from typing import List
-
 from graia.ariadne.connection.config import WebsocketClientConfig
+from typing import List
 
 from constant import CONFIG_FILE_NAME, CONFIG_DIR, EXTENSION_DIR
 from modules.chat_bot import ChatBot, BotInfo, BotConfig, BotConnectionConfig
-from modules.config_utils import ConfigRegistry, CmdClient
+from modules.cmd import CmdClient
+from modules.config_utils import ConfigRegistry
 
 WEBSOCKET_HOST = "websocket_host"
 

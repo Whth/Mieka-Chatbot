@@ -2,13 +2,13 @@
 plugin_base that is used in create a standard plugin
 """
 from abc import ABC, abstractmethod
+from graia.broadcast import Namespace, BaseDispatcher, Decorator, Dispatchable, Broadcast
 from types import MappingProxyType
 from typing import final, Callable, Type, List
 
-from graia.broadcast import Namespace, BaseDispatcher, Decorator, Dispatchable, Broadcast
-
 from constant import CONFIG_FILE_NAME
-from modules.config_utils import ConfigRegistry, CmdClient
+from modules.cmd import CmdClient
+from modules.config_utils import ConfigRegistry
 
 
 class AbstractPlugin(ABC):

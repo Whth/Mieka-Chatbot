@@ -1,13 +1,12 @@
-from typing import Dict, List, NamedTuple, Any, Union
-
 from graia.ariadne.app import Ariadne
 from graia.ariadne.connection.config import WebsocketClientConfig
 from graia.ariadne.entry import config
 from graia.ariadne.message.chain import MessageChain
 from graia.ariadne.model import Group, Friend, Member, Stranger
 from graia.ariadne.model.util import AriadneOptions
+from typing import Dict, List, NamedTuple, Any, Union
 
-from modules.config_utils import CmdClient
+from modules.cmd import CmdClient
 from modules.extension_manager import ExtensionManager
 from modules.plugin_base import PluginsView
 

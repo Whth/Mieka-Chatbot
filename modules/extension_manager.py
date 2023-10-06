@@ -1,13 +1,13 @@
-import pathlib
 from importlib import import_module
+
+import pathlib
+from colorama import Fore, Back, Style
+from graia.broadcast import Broadcast
 from types import MappingProxyType
 from typing import List, Dict, Type, Sequence
 
-from colorama import Fore, Back, Style
-from graia.broadcast import Broadcast
-
 from constant import REQUIREMENTS_FILE_NAME, MAIN
-from modules.config_utils import CmdClient
+from modules.cmd import CmdClient
 from modules.file_manager import get_all_sub_dirs
 from modules.launch_utils import install_requirements
 from modules.plugin_base import AbstractPlugin, PluginsView
