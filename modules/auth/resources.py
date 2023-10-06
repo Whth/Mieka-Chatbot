@@ -1,13 +1,17 @@
 import copy
 import random
-from pydantic import Field, PrivateAttr
+from pydantic import Field, PrivateAttr, BaseModel
 from typing import Any, List, Callable, Unpack, Iterable, Optional, Type, Dict
 
 from .permissions import Permission, auth_check, PermissionCode
 from .utils import AuthBaseModel, ManagerBase
 
 
-class RequiredPermission(AuthBaseModel):
+class RequiredPermission(BaseModel):
+    class Config:
+        allow_mutation = False
+        validate_assignment = True
+
     read: List[Permission] = Field(default_factory=list, unique_items=True)
     modify: List[Permission] = Field(default_factory=list, unique_items=True)
     execute: List[Permission] = Field(default_factory=list, unique_items=True)

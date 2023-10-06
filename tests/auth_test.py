@@ -28,7 +28,7 @@ class TestAuth(unittest.TestCase):
     def setUp(self):
         self.config_file_path = f"../{CONFIG_DIR}/test.json"
         self.permission = Permission(id=1, name="hello")
-        self.req = RequiredPermission(id=1, name="srcPerm", execute=[self.permission])
+        self.req = RequiredPermission(execute=[self.permission])
         self.res_1 = Resource(source=hello_world, id=1, name="testRes", required_permissions=self.req)
         self.res_2 = Resource(source=this_is_resource, id=2, name="testResthis", required_permissions=self.req)
         self.res_3 = Resource(source=add_one, id=3, name="testResAddOne", required_permissions=self.req)

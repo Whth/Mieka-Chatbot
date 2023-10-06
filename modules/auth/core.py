@@ -232,8 +232,6 @@ class AuthorizationManager(AuthBaseModel):
                     name=resource_name,
                     source=source,
                     required_permissions=RequiredPermission(
-                        id=resource_id,
-                        name=resource_name,
                         super=[self.__su_permission__],
                     ),
                 )
