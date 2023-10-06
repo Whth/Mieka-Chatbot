@@ -70,8 +70,6 @@ class AuthorizationManager(AuthBaseModel):
 
     __su_permission__: Permission = PrivateAttr(default=Permission(id=PermissionCode.SuperPermission.value, name="su"))
 
-    # TODO add root user ,and add to the managers,
-    # TODO remove the exception raise when re-add
     config_file_path: pathlib.Path | str
     _users: UserManager = PrivateAttr()
     _roles: RoleManager = PrivateAttr()
@@ -101,6 +99,17 @@ class AuthorizationManager(AuthBaseModel):
 
     @final_handler("save", KeyError)
     def add_user(self, user_id: int, user_name: str, user_roles: Optional[Iterable[UniqueLabel]] = None) -> bool:
+        """
+        Adds a user to the system.
+
+        Args:
+            user_id (int): The ID of the user.
+            user_name (str): The name of the user.
+            user_roles (Optional[Iterable[UniqueLabel]]): The roles of the user. Defaults to None.
+
+        Returns:
+            bool: True if the user was added successfully, False otherwise.
+        """
         if user_roles:
             user_roles: List[Role] = [self._roles.object_dict[label] for label in user_roles]
         else:
@@ -109,11 +118,32 @@ class AuthorizationManager(AuthBaseModel):
 
     @final_handler("save", KeyError)
     def remove_user(self, user_id: int, user_name: str) -> bool:
+        """
+        Removes a user from the list of users.
+
+        Parameters:
+            user_id (int): The ID of the user to be removed.
+            user_name (str): The name of the user to be removed.
+
+        Returns:
+            bool: True if the user was successfully removed, False otherwise.
+        """
         self._users.remove_object(make_label(user_id, user_name))
         return True
 
     @final_handler("save", KeyError)
     def add_role(self, role_id: int, role_name: str, role_perms: Optional[Iterable[UniqueLabel]] = None) -> bool:
+        """
+        Adds a role to the RoleManager.
+
+        Parameters:
+            role_id (int): The ID of the role.
+            role_name (str): The name of the role.
+            role_perms (Optional[Iterable[UniqueLabel]]): The permissions of the role. Defaults to None.
+
+        Returns:
+            bool: True if the role was successfully added, False otherwise.
+        """
         if role_perms:
             role_perms: List[Permission] = [self._permissions.object_dict[label] for label in role_perms]
         else:
@@ -123,15 +153,45 @@ class AuthorizationManager(AuthBaseModel):
 
     @final_handler("save", KeyError)
     def remove_role(self, role_id: int, role_name: str) -> bool:
+        """
+        Remove a role from the list of roles.
+
+        Parameters:
+            role_id (int): The ID of the role to be removed.
+            role_name (str): The name of the role to be removed.
+
+        Returns:
+            bool: True if the role was successfully removed, False otherwise.
+        """
         self._roles.remove_object(make_label(role_id, role_name))
         return True
 
     @final_handler("save", KeyError)
     def add_perm(self, perm_id: int, perm_name: str) -> bool:
+        """
+        Adds a permission to the object.
+
+        Args:
+            perm_id (int): The ID of the permission.
+            perm_name (str): The name of the permission.
+
+        Returns:
+            bool: True if the permission was successfully added, False otherwise.
+        """
         return self._permissions.add_object(Permission(id=perm_id, name=perm_name))
 
     @final_handler("save", KeyError)
     def remove_perm(self, perm_id: int, perm_name: str) -> bool:
+        """
+        Removes a permission from the object.
+
+        Args:
+            perm_id (int): The ID of the permission to be removed.
+            perm_name (str): The name of the permission to be removed.
+
+        Returns:
+            bool: True if the permission was successfully removed, False otherwise.
+        """
         self._permissions.remove_object(make_label(perm_id, perm_name))
         return True
 
@@ -181,11 +241,32 @@ class AuthorizationManager(AuthBaseModel):
 
     @final_handler("save", KeyError)
     def remove_resource(self, resource_id: int, resource_name: str) -> bool:
+        """
+        Remove a resource from the list of resources.
+
+        Args:
+            resource_id (int): The ID of the resource to be removed.
+            resource_name (str): The name of the resource to be removed.
+
+        Returns:
+            bool: True if the resource was successfully removed, False otherwise.
+        """
         self._resources.remove_object(make_label(id=resource_id, name=resource_name))
         return True
 
     @final_handler("save", KeyError)
     def grant_perm_to_resource(self, perm_label: str, resource_label: str, category_name: str) -> bool:
+        """
+        Grant permission to a resource.
+
+        Args:
+            perm_label (str): The label of the permission to grant.
+            resource_label (str): The label of the resource to grant permission to.
+            category_name (str): The name of the category to associate with the granted permission.
+
+        Returns:
+            bool: True if the permission was successfully granted, False otherwise.
+        """
         source: Resource = self._resources.object_dict[resource_label]
         perm_to_grant: Permission = self._permissions.object_dict[perm_label]
         source.required_permissions.add_permission(perm_to_grant, category_name)
@@ -193,25 +274,73 @@ class AuthorizationManager(AuthBaseModel):
 
     @final_handler("save", KeyError)
     def grant_perm_to_role(self, perm_label: str, role_label: str) -> bool:
+        """
+        Grant permission to a role.
+
+        Args:
+            perm_label (str): The label of the permission to grant.
+            role_label (str): The label of the role to grant the permission to.
+
+        Returns:
+            bool: True if the permission was granted successfully, False otherwise.
+        """
         self._roles.object_dict.get(role_label).add_permission(self._permissions.object_dict.get(perm_label))
         return True
 
     @final_handler("save", KeyError)
     def grant_role_to_user(self, role_label: str, user_label: str) -> bool:
+        """
+        Grant a role to a user.
+
+        Args:
+            role_label (str): The label of the role to be granted.
+            user_label (str): The label of the user to grant the role to.
+
+        Returns:
+            bool: True if the role is successfully granted to the user, False otherwise.
+        """
         self._users.object_dict.get(user_label).add_role(self._roles.object_dict.get(role_label))
         return True
 
     def save(self) -> None:
+        """
+        Save the changes made to the permissions, roles, resources, and users.
+
+        Returns:
+            None
+        """
         self._permissions.save_object_list()
         self._roles.save_object_list()
         self._resources.save_object_list()
         self._users.save_object_list()
 
     def laod(self):
+        """
+        Load the object lists for permissions, roles, resources, and users.
+
+        This function loads the object lists for permissions, roles, resources, and users.
+        It does not take any parameters and does not return any values.
+
+        Returns:
+            None
+        """
         self._permissions.load_object_list()
         self._roles.load_object_list()
         self._resources.load_object_list()
         self._users.load_object_list()
 
     def update_resources(self, source_dict: Dict[str, Any]):
+        """
+        Updates the resources with the given source dictionary.
+
+        Args:
+            source_dict (Dict[str, Any]):
+            A dictionary containing the source information to update the resources with.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
         self._resources.update_sources(su_permissions=[self.__su_permission__], source_dict=source_dict)
