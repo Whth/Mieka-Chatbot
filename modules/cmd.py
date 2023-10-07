@@ -19,6 +19,19 @@ from modules.config_utils import (
 )
 
 
+def tokenize_cmd(cmd) -> List[str]:
+    """
+    Tokenizes a command string into a list of tokens.
+
+    Args:
+        cmd (str): The command string to tokenize.
+
+    Returns:
+        list: A list of tokens extracted from the command string.
+    """
+    return re.split(r"\s+", cmd)
+
+
 class CmdClient(object):
     """
     a config client that allows simple cli-liked operation on config
@@ -74,7 +87,7 @@ class CmdClient(object):
                 of arguments.
         """
         # Split the command into tokens
-        cmd_tokens: List[str] = re.split(r"\s+", cmd)
+        cmd_tokens: List[str] = tokenize_cmd(cmd)
         tokens_count = len(cmd_tokens)
         temp: Union[Dict, MappingProxyType, Setter, Void, StringMaker] = self.Hall_Cmd_Tree
 
@@ -270,13 +283,13 @@ class BaseCmdNode(BaseModel):
     def _delete(self, *delete_params: Unpack) -> Any:
         pass
 
-    def get_execute(self, permissions: List[Permission], *execute_params: Unpack) -> Any:
+    async def get_execute(self, permissions: List[Permission], *execute_params: Unpack) -> Any:
         if auth_check(self.required_permissions.execute + self.required_permissions.super, permissions):
-            return self._execute(*execute_params)
+            return await self._execute(*execute_params)
         raise PermissionError("Illegal Execute operation, insufficient permissions")
 
     @abstractmethod
-    def _execute(self, *execute_params: Unpack) -> Any:
+    async def _execute(self, *execute_params: Unpack) -> Any:
         pass
 
 
@@ -297,7 +310,7 @@ class ExecutableNode(BaseCmdNode):
     def _delete(self) -> Any:
         setattr(self, "source", None)
 
-    def _execute(self, *execute_params: Unpack) -> Any:
+    async def _execute(self, *execute_params: Unpack) -> Any:
         return self.source(*execute_params)
 
     def _read(self) -> Any:
@@ -330,7 +343,7 @@ class NameSpaceNode(BaseCmdNode):
     def _delete(self, *delete_params: Unpack) -> Any:
         self._children_node.clear()
 
-    def _execute(self, *execute_params: Unpack) -> Any:
+    async def _execute(self, *execute_params: Unpack) -> Any:
         raise NotImplementedError(f"{self.name} does not support execute operation")
 
     def __init__(self, **kwargs):
@@ -435,3 +448,15 @@ class NameSpaceNode(BaseCmdNode):
         if node not in self._children_node:
             raise KeyError(f"Node with name {node.name} does not exist")
         self._children_node.remove(node)
+
+    async def interpret(self, string: str, permissions: List[Permission]) -> Any:
+        tokens = tokenize_cmd(string)
+        if len(tokens) == 0:
+            raise KeyError("Empty command")
+        node = None
+        for i in range(1, len(tokens) + 1):
+            node = self.get_node(tokens[:i])
+            if isinstance(node, ExecutableNode):
+                return await node.get_execute(permissions, *tokens[i:])
+        if isinstance(node, NameSpaceNode):
+            return node.__doc__()

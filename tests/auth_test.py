@@ -1,3 +1,4 @@
+import asyncio
 import json
 import pathlib
 import unittest
@@ -19,6 +20,10 @@ def hello_world():
 
 def this_is_resource(ct: int):
     print(f"the input is {ct}")
+
+
+def echo(string: str):
+    print(string)
 
 
 def add_one(ct: int) -> int:
@@ -217,8 +222,10 @@ class CmdNodeTest(unittest.TestCase):
 
     def test_add_nested_exe_and_namespace(self):
         a = ExecutableNode(name="test2", source=hello_world, help_message="this will say hello to you")
+
         b = NameSpaceNode(name="test3")
-        tree = NameSpaceNode(name="test", children_node=[a, b])
+        c = ExecutableNode(name="test4", source=echo, help_message="echo message")
+        tree = NameSpaceNode(name="test", children_node=[a, b, c])
 
         self.root.add_node(tree)
         # self.root.get_node(["test"]).add_node(ExecutableNode(name="test2", source=hello_world, help_message="hello"))
@@ -252,6 +259,14 @@ class CmdNodeTest(unittest.TestCase):
         node = self.root.get_node(["test", "test2"])
 
         node.get_execute([])
+
+    def test_interpret(self):
+        self.test_add_nested_exe_and_namespace()
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(self.root.interpret("test test2", []))
+        with self.assertRaises(TypeError):
+            loop.run_until_complete(self.root.interpret("test test4", []))
+        loop.run_until_complete(self.root.interpret("test test4 this_is_echo", []))
 
 
 if __name__ == "__main__":
