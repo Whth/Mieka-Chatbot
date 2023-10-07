@@ -10,6 +10,7 @@ from modules.auth.resources import Resource, RequiredPermission, required_perm_g
 from modules.auth.roles import Role
 from modules.auth.users import User, UserManager
 from modules.auth.utils import make_label, extract_label
+from modules.cmd import NameSpaceNode, ExecutableNode
 
 
 def hello_world():
@@ -193,6 +194,51 @@ class AuthCoreTest(unittest.TestCase):
                 self.perms[0].unique_label, resource_label="3-testRes", category_name="execute"
             ),
         )
+
+
+class CmdNodeTest(unittest.TestCase):
+    def setUp(self):
+        self.root = NameSpaceNode(name="root")
+
+    def tearDown(self):
+        print(f"{Fore.RED}{Back.BLACK}{self.root.dict()}{Fore.RESET}{Back.RESET}")
+
+    def test_add_namespace(self):
+        self.root.add_node(NameSpaceNode(name="test"))
+        self.root.add_node(NameSpaceNode(name="test2"))
+        with self.assertRaises(KeyError):
+            self.root.add_node(NameSpaceNode(name="test"))
+
+    def test_add_executable(self):
+        self.root.add_node(ExecutableNode(name="test", source=hello_world))
+        self.root.add_node(ExecutableNode(name="test2", source=hello_world))
+        with self.assertRaises(KeyError):
+            self.root.add_node(ExecutableNode(name="test"))
+
+    def test_add_nested_exe_and_namespace(self):
+        tree = NameSpaceNode(name="test", children_node=[ExecutableNode(name="test2", source=hello_world)])
+        self.root.add_node(tree)
+
+    def test_get_node(self):
+        self.test_add_nested_exe_and_namespace()
+
+        with self.assertRaises(KeyError):
+            self.root.get_node(["test", "not a node"])
+        node = self.root.get_node(["test", "test2"])
+        print(node.dict())
+
+    def test_remove_node(self):
+        with self.assertRaises(KeyError):
+            self.root.remove_node(["test", "test2"])
+        self.test_add_nested_exe_and_namespace()
+        self.root.get_node(["test", "test2"])
+        self.root.remove_node(["test", "test2"])
+
+        with self.assertRaises(KeyError):
+            self.root.remove_node(["test", "test2"])
+
+        with self.assertRaises(KeyError):
+            self.root.get_node(["test", "test2"])
 
 
 if __name__ == "__main__":

@@ -1,9 +1,13 @@
 import re
+from abc import abstractmethod
 from inspect import signature, iscoroutinefunction
+from pydantic import BaseModel, Field, PrivateAttr
 from types import MappingProxyType
-from typing import Optional, Dict, Any, Tuple, List, Union, Callable, Type
+from typing import Optional, Dict, Any, Tuple, List, Union, Callable, Type, Unpack, final
 
 from constant import Value
+from modules.auth.permissions import Permission, auth_check
+from modules.auth.resources import RequiredPermission
 from modules.config_utils import (
     get_config,
     get_signature_with_annotations,
@@ -212,3 +216,221 @@ class CmdBuilder(object):
 
         _list_out()  # test if it works
         return _list_out
+
+
+class BaseCmdNode(BaseModel):
+    class Config:
+        allow_mutation = True
+        validate_assignment = True
+
+    name: str = Field(allow_mutation=False, validate_assignment=True)
+    help_message: str = Field(default="no help provided", allow_mutation=False, validate_assignment=True)
+    required_permissions: RequiredPermission = Field(
+        default_factory=RequiredPermission, allow_mutation=False, validate_assignment=True
+    )
+
+    @final
+    def __eq__(self, other) -> bool:
+        return self.name == other.name
+
+    @final
+    def __ne__(self, other) -> bool:
+        return self.name != other.name
+
+    @final
+    def __str__(self) -> str:
+        return self.name
+
+    @abstractmethod
+    def __doc__(self) -> str:
+        return self.help_message
+
+    def get_read(self, permissions: List[Permission]) -> Any:
+        if auth_check(self.required_permissions.read + self.required_permissions.super, permissions):
+            return self._read()
+        raise PermissionError("Illegal Read operation, insufficient permissions")
+
+    @abstractmethod
+    def _read(self) -> Any:
+        pass
+
+    def get_modify(self, permissions: List[Permission], *modify_params: Unpack) -> Any:
+        if auth_check(self.required_permissions.modify + self.required_permissions.super, permissions):
+            return self._modify(*modify_params)
+        raise PermissionError("Illegal Modify operation, insufficient permissions")
+
+    @abstractmethod
+    def _modify(self, *modify_params: Unpack) -> Any:
+        pass
+
+    def get_delete(self, permissions: List[Permission], *delete_params: Unpack) -> Any:
+        if auth_check(self.required_permissions.delete + self.required_permissions.super, permissions):
+            return self._delete(*delete_params)
+        raise PermissionError("Illegal Delete operation, insufficient permissions")
+
+    @abstractmethod
+    def _delete(self, *delete_params: Unpack) -> Any:
+        pass
+
+    def get_execute(self, permissions: List[Permission], *execute_params: Unpack) -> Any:
+        if auth_check(self.required_permissions.execute + self.required_permissions.super, permissions):
+            return self._execute(*execute_params)
+        raise PermissionError("Illegal Execute operation, insufficient permissions")
+
+    @abstractmethod
+    def _execute(self, *execute_params: Unpack) -> Any:
+        pass
+
+
+class ExecutableNode(BaseCmdNode):
+    source: Union[Callable, None] = Field(default=None, allow_mutation=True, exclude=True)
+
+    def _modify(self, *modify_params: Unpack) -> Any:
+        if len(modify_params) == 1:
+            if callable(modify_params[0]):
+                self.source = modify_params[0]
+        else:
+            raise ValueError("too many arguments, accepted 1")
+
+    def _delete(self) -> Any:
+        self.source = None
+
+    def _execute(self, *execute_params: Unpack) -> Any:
+        return self.source(*execute_params)
+
+    def _read(self) -> Any:
+        return self.source.__name__
+
+    def __doc__(self) -> str:
+        return self.source.__doc__
+
+
+class NameSpaceNode(BaseCmdNode):
+    def __doc__(self) -> str:
+        return f"{self.name}\n\n{[str(node) for node in self._children_node]}\n\n{self.help_message}"
+
+    def _read(self) -> Any:
+        return self
+
+    def _modify(self, *modify_params: Unpack) -> Any:
+        merge_queue = []
+        for param in modify_params:
+            if isinstance(param, list):
+                merge_queue.extend(param)
+                continue
+            merge_queue.append(param)
+
+        self._children_node.extend(filter(lambda x: isinstance(x, (ExecutableNode, NameSpaceNode)), merge_queue))
+
+    def _delete(self, *delete_params: Unpack) -> Any:
+        self._children_node.clear()
+
+    def _execute(self, *execute_params: Unpack) -> Any:
+        raise NotImplementedError
+
+    children_node: List[Union["NameSpaceNode", "ExecutableNode"]] = Field(
+        default_factory=list, unique_items=True, allow_mutation=True
+    )
+    _children_node: List[Union["NameSpaceNode", "ExecutableNode"]] = PrivateAttr(default_factory=list)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._children_node.extend(self.children_node)
+        self.children_node = []
+
+    def dict(
+        self,
+        *args,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        self.children_node = self._children_node
+        res = super().dict(*args, **kwargs)
+        self.children_node = []
+        return res
+
+    # TODO method below may need permissions control
+    def get_node(self, chain: List[str]) -> Union["NameSpaceNode", "ExecutableNode"]:
+        """
+        Get the namespace or executable node by traversing the chain of names.
+
+        Args:
+            chain (List[str]): The chain of names to traverse.
+
+        Returns:
+            Union[NameSpaceNode, ExecutableNode]: The target node found by traversing the chain.
+
+        Raises:
+            KeyError: If the chain is empty.
+            KeyError: If multiple nodes with the same name are found.
+            KeyError: If no node is found in the chain.
+        """
+        # Check if the chain is empty
+        if len(chain) == 0:
+            raise KeyError("The chain is empty")
+
+        # Filter the children nodes to find the target node with the first name in the chain
+        target_node: List[Union["NameSpaceNode", "ExecutableNode"]] = list(
+            filter(lambda x: x.name == chain[0], self._children_node)
+        )
+
+        # Check if multiple nodes with the same name are found
+        if len(target_node) > 1:
+            raise KeyError(f"Multiple nodes with name {chain[0]} found")
+        # Check if a single node is found
+        elif len(target_node) == 1:
+            # If there are more names in the chain, recursively call get_node on the target node
+            if len(chain) > 1:
+                return target_node[0].get_node(chain[1:])
+            # If there are no more names in the chain, return the target node
+            elif len(chain) == 1:
+                return target_node[0]
+
+        # If no node is found in the chain, raise an exception
+        raise KeyError(f"No node with name {chain[0]} found")
+
+    def add_node(self, node: Union["NameSpaceNode", "ExecutableNode"]) -> None:
+        """
+        Adds a node to the current node.
+
+        Parameters:
+            node (Union[NameSpaceNode, ExecutableNode]): The node to be added. It must be of type NameSpaceNode or ExecutableNode.
+
+        Returns:
+            None
+
+        Raises:
+            TypeError: If the node is not of type NameSpaceNode or ExecutableNode.
+            KeyError: If a node with the same name already exists.
+        """
+        if not isinstance(node, (NameSpaceNode, ExecutableNode)):
+            raise TypeError(f"Node must be of type {NameSpaceNode} or {ExecutableNode}")
+        if node not in self._children_node:
+            self._children_node.append(node)
+            return
+        raise KeyError(f"Node with name {node.name} already exists")
+
+    def remove_node(self, node: Union["NameSpaceNode", "ExecutableNode", str, List[str]]) -> None:
+        """
+        Removes a node from the namespace.
+
+        Parameters:
+            node (Union["NameSpaceNode", "ExecutableNode", str, List[str]]): The node to be removed.
+            It can be an instance of "NameSpaceNode", "ExecutableNode",
+            a string representing the node name, or a list of strings representing the path to the node.
+
+        Returns:
+            None
+
+        Raises:
+            KeyError: If the node does not exist in the namespace.
+        """
+        if isinstance(node, str):
+            node = self.get_node([node])
+        elif isinstance(node, list):
+            parent_node = self.get_node(node[:-1])
+            parent_node.remove_node(node[-1])
+            return
+
+        if node not in self._children_node:
+            raise KeyError(f"Node with name {node.name} does not exist")
+        self._children_node.remove(node)
