@@ -131,6 +131,9 @@ class AuthorizationManager(AuthBaseModel):
         self._users.remove_object(make_label(user_id, user_name))
         return True
 
+    def get_user(self, user_id: int, user_name: str) -> User:
+        return self._users.object_dict[make_label(user_id, user_name)]
+
     @final_handler("save", KeyError)
     def add_role(self, role_id: int, role_name: str, role_perms: Optional[Iterable[UniqueLabel]] = None) -> bool:
         """
