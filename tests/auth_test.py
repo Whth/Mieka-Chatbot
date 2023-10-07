@@ -216,8 +216,14 @@ class CmdNodeTest(unittest.TestCase):
             self.root.add_node(ExecutableNode(name="test"))
 
     def test_add_nested_exe_and_namespace(self):
-        tree = NameSpaceNode(name="test", children_node=[ExecutableNode(name="test2", source=hello_world)])
+        a = ExecutableNode(name="test2", source=hello_world, help_message="this will say hello to you")
+        b = NameSpaceNode(name="test3")
+        tree = NameSpaceNode(name="test", children_node=[a, b])
+
         self.root.add_node(tree)
+        # self.root.get_node(["test"]).add_node(ExecutableNode(name="test2", source=hello_world, help_message="hello"))
+
+        root = self.root.get_node(["test"])
 
     def test_get_node(self):
         self.test_add_nested_exe_and_namespace()
@@ -239,6 +245,13 @@ class CmdNodeTest(unittest.TestCase):
 
         with self.assertRaises(KeyError):
             self.root.get_node(["test", "test2"])
+
+    def test_execute(self):
+        self.test_add_nested_exe_and_namespace()
+
+        node = self.root.get_node(["test", "test2"])
+
+        node.get_execute([])
 
 
 if __name__ == "__main__":

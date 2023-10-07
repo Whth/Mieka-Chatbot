@@ -3,7 +3,7 @@ from abc import abstractmethod
 from inspect import signature, iscoroutinefunction
 from pydantic import BaseModel, Field, PrivateAttr
 from types import MappingProxyType
-from typing import Optional, Dict, Any, Tuple, List, Union, Callable, Type, Unpack, final
+from typing import Optional, Dict, Any, Tuple, List, Union, Callable, Type, Unpack, final, TypeVar
 
 from constant import Value
 from modules.auth.permissions import Permission, auth_check
@@ -220,14 +220,12 @@ class CmdBuilder(object):
 
 class BaseCmdNode(BaseModel):
     class Config:
-        allow_mutation = True
+        allow_mutation = False
         validate_assignment = True
 
-    name: str = Field(allow_mutation=False, validate_assignment=True)
-    help_message: str = Field(default="no help provided", allow_mutation=False, validate_assignment=True)
-    required_permissions: RequiredPermission = Field(
-        default_factory=RequiredPermission, allow_mutation=False, validate_assignment=True
-    )
+    name: str = Field()
+    help_message: str = Field(default="no help provided")
+    required_permissions: RequiredPermission = Field(default_factory=RequiredPermission)
 
     @final
     def __eq__(self, other) -> bool:
@@ -282,18 +280,22 @@ class BaseCmdNode(BaseModel):
         pass
 
 
+T_CmdNode = TypeVar("T_CmdNode", bound=BaseCmdNode)
+
+
 class ExecutableNode(BaseCmdNode):
-    source: Union[Callable, None] = Field(default=None, allow_mutation=True, exclude=True)
+    source: Union[Callable, None] = Field(default=None, allow_mutation=True, exclude=True, validate_assignment=True)
 
     def _modify(self, *modify_params: Unpack) -> Any:
         if len(modify_params) == 1:
             if callable(modify_params[0]):
-                self.source = modify_params[0]
+                setattr(self, "source", modify_params[0])
+
         else:
             raise ValueError("too many arguments, accepted 1")
 
     def _delete(self) -> Any:
-        self.source = None
+        setattr(self, "source", None)
 
     def _execute(self, *execute_params: Unpack) -> Any:
         return self.source(*execute_params)
@@ -306,6 +308,9 @@ class ExecutableNode(BaseCmdNode):
 
 
 class NameSpaceNode(BaseCmdNode):
+    children_node: List[T_CmdNode] = Field(default_factory=list, unique_items=True, validate_assignment=True)
+    _children_node: List[T_CmdNode] = PrivateAttr(default_factory=list)
+
     def __doc__(self) -> str:
         return f"{self.name}\n\n{[str(node) for node in self._children_node]}\n\n{self.help_message}"
 
@@ -326,26 +331,22 @@ class NameSpaceNode(BaseCmdNode):
         self._children_node.clear()
 
     def _execute(self, *execute_params: Unpack) -> Any:
-        raise NotImplementedError
-
-    children_node: List[Union["NameSpaceNode", "ExecutableNode"]] = Field(
-        default_factory=list, unique_items=True, allow_mutation=True
-    )
-    _children_node: List[Union["NameSpaceNode", "ExecutableNode"]] = PrivateAttr(default_factory=list)
+        raise NotImplementedError(f"{self.name} does not support execute operation")
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._children_node.extend(self.children_node)
-        self.children_node = []
+        self.children_node.clear()
 
     def dict(
         self,
         *args,
         **kwargs,
     ) -> Dict[str, Any]:
-        self.children_node = self._children_node
+        self.children_node.clear()
+        self.children_node.extend(self._children_node)
         res = super().dict(*args, **kwargs)
-        self.children_node = []
+        self.children_node.clear()
         return res
 
     # TODO method below may need permissions control
