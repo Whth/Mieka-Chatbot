@@ -4,10 +4,10 @@ from graia.ariadne.entry import config
 from graia.ariadne.message.chain import MessageChain
 from graia.ariadne.model import Group, Friend, Member, Stranger
 from graia.ariadne.model.util import AriadneOptions
-from typing import Dict, List, NamedTuple, Any, Union
+from typing import Dict, List, NamedTuple, Union
 
 from modules.auth.core import AuthorizationManager, Root
-from modules.cmd import CmdClient
+from modules.cmd import NameSpaceNode
 from modules.extension_manager import ExtensionManager
 from modules.plugin_base import PluginsView
 
@@ -52,7 +52,6 @@ class BotConfig(NamedTuple):
 
     extension_dir: str
     auth_config_file_path: str
-    syntax_tree: Dict[str, Any]
     accepted_message_types: List[str] = ["GroupMessage"]
 
 
@@ -60,16 +59,6 @@ class ChatBot(object):
     """
     ChatBot class
     """
-
-    @property
-    def client(self) -> CmdClient:
-        """
-        Returns the `CmdClient` instance associated with this object.
-
-        :return: The `CmdClient` instance.
-        :rtype: CmdClient
-        """
-        return self._bot_client
 
     @property
     def extensions(self) -> ExtensionManager:
@@ -101,29 +90,41 @@ class ChatBot(object):
         self._auth_manager: AuthorizationManager = AuthorizationManager(
             **(Root()._asdict()), config_file_path=bot_config.auth_config_file_path
         )
-        self._bot_client: CmdClient = CmdClient(bot_config.syntax_tree)
-
+        self._root: NameSpaceNode = NameSpaceNode(name="root")
         self._extensions: ExtensionManager = ExtensionManager(self._bot_config.extension_dir, [])
 
-        async def _bot_client_call(target: Union[Group, Friend, Member, Stranger], message: MessageChain):
+        async def _cmd_interpret(target: Union[Group, Friend, Member, Stranger], message: MessageChain):
             """
-            Asynchronously calls the bot client to send a message to the specified target.
+            Asynchronously calls the bot client with the given target and message.
 
             Args:
-                target (Union[Group, Friend, Member, Stranger]): The target to send the message to.
-                message (MessageChain): The message to send.
+                target (Union[Group, Friend, Member, Stranger]): The target of the bot client call.
+                message (MessageChain): The message to be sent.
 
             Returns:
                 None
+
+            Raises:
+                KeyError: If the user is not found.
             """
             try:
-                stdout = await self._bot_client.interpret(str(message))
+                user = self._auth_manager.get_user(user_id=target.id, user_name=target.name)
+                success = False
+                for role in user.roles:
+                    with role as perms:
+                        try:
+                            stdout = await self._root.interpret(str(message), perms)
+                            success = True
+                        except PermissionError:
+                            pass
+                    if success:
+                        break
             except KeyError:
                 return
             (await self._ariadne_app.send_message(target, message=stdout)) if stdout else None
 
         for message_type in bot_config.accepted_message_types:
-            self._ariadne_app.broadcast.receiver(message_type)(_bot_client_call)
+            self._ariadne_app.broadcast.receiver(message_type)(_cmd_interpret)
 
     @property
     def get_installed_plugins(self) -> PluginsView:
@@ -151,6 +152,7 @@ class ChatBot(object):
         self._extensions.install_all_extensions(
             broadcast=self._ariadne_app.broadcast, bot_client=self._bot_client, proxy=self._extensions.plugins_view
         )
+        # TODO use NameSpaceNode replace the bot_client
 
     def run(self) -> None:
         """
