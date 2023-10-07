@@ -3,7 +3,7 @@ from abc import abstractmethod
 from inspect import signature, iscoroutinefunction
 from pydantic import BaseModel, Field, PrivateAttr
 from types import MappingProxyType
-from typing import Optional, Dict, Any, Tuple, List, Union, Callable, Type, Unpack, final, TypeVar
+from typing import Optional, Dict, Any, Tuple, List, Union, Callable, Type, Unpack, final, TypeVar, Iterable
 
 from constant import Value
 from modules.auth.permissions import Permission, auth_check
@@ -256,7 +256,7 @@ class BaseCmdNode(BaseModel):
     def __doc__(self) -> str:
         return self.help_message
 
-    def get_read(self, permissions: List[Permission]) -> Any:
+    def get_read(self, permissions: Iterable[Permission]) -> Any:
         if auth_check(self.required_permissions.read + self.required_permissions.super, permissions):
             return self._read()
         raise PermissionError("Illegal Read operation, insufficient permissions")
@@ -265,7 +265,7 @@ class BaseCmdNode(BaseModel):
     def _read(self) -> Any:
         pass
 
-    def get_modify(self, permissions: List[Permission], *modify_params: Unpack) -> Any:
+    def get_modify(self, permissions: Iterable[Permission], *modify_params: Unpack) -> Any:
         if auth_check(self.required_permissions.modify + self.required_permissions.super, permissions):
             return self._modify(*modify_params)
         raise PermissionError("Illegal Modify operation, insufficient permissions")
@@ -274,7 +274,7 @@ class BaseCmdNode(BaseModel):
     def _modify(self, *modify_params: Unpack) -> Any:
         pass
 
-    def get_delete(self, permissions: List[Permission], *delete_params: Unpack) -> Any:
+    def get_delete(self, permissions: Iterable[Permission], *delete_params: Unpack) -> Any:
         if auth_check(self.required_permissions.delete + self.required_permissions.super, permissions):
             return self._delete(*delete_params)
         raise PermissionError("Illegal Delete operation, insufficient permissions")
@@ -283,7 +283,7 @@ class BaseCmdNode(BaseModel):
     def _delete(self, *delete_params: Unpack) -> Any:
         pass
 
-    async def get_execute(self, permissions: List[Permission], *execute_params: Unpack) -> Any:
+    async def get_execute(self, permissions: Iterable[Permission], *execute_params: Unpack) -> Any:
         if auth_check(self.required_permissions.execute + self.required_permissions.super, permissions):
             return await self._execute(*execute_params)
         raise PermissionError("Illegal Execute operation, insufficient permissions")
@@ -362,22 +362,27 @@ class NameSpaceNode(BaseCmdNode):
         self.children_node.clear()
         return res
 
-    # TODO method below may need permissions control
-    def get_node(self, chain: List[str]) -> Union["NameSpaceNode", "ExecutableNode"]:
+    def get_node(
+        self,
+        chain: List[str],
+        permissions: Iterable[Permission] = tuple(),
+    ) -> Union["NameSpaceNode", "ExecutableNode"]:
         """
-        Get the namespace or executable node by traversing the chain of names.
+        Get the node with the specified chain of names.
 
         Args:
-            chain (List[str]): The chain of names to traverse.
+            chain (List[str]): The chain of names to traverse to find the target node.
+            permissions (List[Permission]): The list of permissions for the user.
 
         Returns:
-            Union[NameSpaceNode, ExecutableNode]: The target node found by traversing the chain.
+            Union[NameSpaceNode, ExecutableNode]: The target node with the specified chain of names.
 
         Raises:
-            KeyError: If the chain is empty.
-            KeyError: If multiple nodes with the same name are found.
-            KeyError: If no node is found in the chain.
+            PermissionError: If the user does not have sufficient permissions.
+            KeyError: If the chain is empty or if no node with the specified name is found.
         """
+        if not auth_check(self.required_permissions.read + self.required_permissions.super, permissions):
+            raise PermissionError("Illegal Read operation, insufficient permissions")
         # Check if the chain is empty
         if len(chain) == 0:
             raise KeyError("The chain is empty")
@@ -394,7 +399,7 @@ class NameSpaceNode(BaseCmdNode):
         elif len(target_node) == 1:
             # If there are more names in the chain, recursively call get_node on the target node
             if len(chain) > 1:
-                return target_node[0].get_node(chain[1:])
+                return target_node[0].get_node(chain[1:], permissions)
             # If there are no more names in the chain, return the target node
             elif len(chain) == 1:
                 return target_node[0]
@@ -402,20 +407,28 @@ class NameSpaceNode(BaseCmdNode):
         # If no node is found in the chain, raise an exception
         raise KeyError(f"No node with name {chain[0]} found")
 
-    def add_node(self, node: Union["NameSpaceNode", "ExecutableNode"]) -> None:
+    def add_node(
+        self,
+        node: Union["NameSpaceNode", "ExecutableNode"],
+        permissions: List[Permission] = tuple(),
+    ) -> None:
         """
-        Adds a node to the current node.
+        Adds a node to the current object.
 
-        Parameters:
-            node (Union[NameSpaceNode, ExecutableNode]): The node to be added. It must be of type NameSpaceNode or ExecutableNode.
-
-        Returns:
-            None
+        Args:
+            node (Union[NameSpaceNode, ExecutableNode]): The node object to be added.
+            permissions (List[Permission], optional): The permissions required to add the node. Defaults to an empty list.
 
         Raises:
+            PermissionError: If the user does not have the required permissions to add the node.
             TypeError: If the node is not of type NameSpaceNode or ExecutableNode.
             KeyError: If a node with the same name already exists.
+
+        Returns:
+            None: This function does not return any value.
         """
+        if not auth_check(self.required_permissions.modify + self.required_permissions.super, permissions):
+            raise PermissionError("Illegal Modify operation, insufficient permissions")
         if not isinstance(node, (NameSpaceNode, ExecutableNode)):
             raise TypeError(f"Node must be of type {NameSpaceNode} or {ExecutableNode}")
         if node not in self._children_node:
@@ -423,40 +436,75 @@ class NameSpaceNode(BaseCmdNode):
             return
         raise KeyError(f"Node with name {node.name} already exists")
 
-    def remove_node(self, node: Union["NameSpaceNode", "ExecutableNode", str, List[str]]) -> None:
+    def remove_node(
+        self,
+        node: Union["NameSpaceNode", "ExecutableNode", str, List[str]],
+        permissions: Iterable[Permission] = tuple(),
+    ) -> None:
         """
-        Removes a node from the namespace.
+        Remove a node from the namespace.
 
-        Parameters:
-            node (Union["NameSpaceNode", "ExecutableNode", str, List[str]]): The node to be removed.
-            It can be an instance of "NameSpaceNode", "ExecutableNode",
-            a string representing the node name, or a list of strings representing the path to the node.
+        Args:
+            node (Union["NameSpaceNode", "ExecutableNode", str, List[str]]): The node to be removed. It can be an instance of NameSpaceNode, ExecutableNode, a string representing the name of the node, or a list of strings representing the path to the node.
+            permissions (List[Permission], optional): The permissions required to remove the node. Defaults to an empty list.
+
+        Raises:
+            PermissionError: If the user does not have the required permissions to perform the delete operation.
 
         Returns:
             None
-
-        Raises:
-            KeyError: If the node does not exist in the namespace.
         """
+        if not auth_check(
+            self.required_permissions.delete + self.required_permissions.read + self.required_permissions.super,
+            permissions,
+        ):
+            raise PermissionError(
+                "Illegal Delete operation, insufficient permissions, you need have the read and delete permissions"
+            )
         if isinstance(node, str):
-            node = self.get_node([node])
+            node = self.get_node([node], permissions)
         elif isinstance(node, list):
-            parent_node = self.get_node(node[:-1])
-            parent_node.remove_node(node[-1])
+            parent_node = self.get_node(node[:-1], permissions)
+            parent_node.remove_node(node[-1], permissions)
             return
 
         if node not in self._children_node:
             raise KeyError(f"Node with name {node.name} does not exist")
         self._children_node.remove(node)
 
-    async def interpret(self, string: str, permissions: List[Permission]) -> Any:
+    async def interpret(self, string: str, permissions: Iterable[Permission] = tuple()) -> Any:
+        """
+        Interprets a command string and returns the result.
+
+        Args:
+            string (str): The command string to interpret.
+            permissions (List[Permission], optional): The list of permissions.Defaults to an empty tuple.
+
+        Returns:
+            Any: The result of the interpretation.
+
+        Raises:
+            KeyError: If the command string is empty.
+
+        """
+
+        # Tokenize the command string
         tokens = tokenize_cmd(string)
+
+        # Check if there are no tokens
         if len(tokens) == 0:
             raise KeyError("Empty command")
+
         node = None
+        # Iterate through the tokens
         for i in range(1, len(tokens) + 1):
-            node = self.get_node(tokens[:i])
+            # Get the corresponding node for the current tokens
+            node = self.get_node(tokens[:i], permissions)
+
+            # If the node is an ExecutableNode, execute the command
             if isinstance(node, ExecutableNode):
                 return await node.get_execute(permissions, *tokens[i:])
+
+        # If the node is a NameSpaceNode, return its documentation
         if isinstance(node, NameSpaceNode):
             return node.__doc__()

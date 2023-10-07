@@ -227,10 +227,10 @@ class CmdNodeTest(unittest.TestCase):
         c = ExecutableNode(name="test4", source=echo, help_message="echo message")
         tree = NameSpaceNode(name="test", children_node=[a, b, c])
 
-        self.root.add_node(tree)
+        self.root.add_node(tree, [])
         # self.root.get_node(["test"]).add_node(ExecutableNode(name="test2", source=hello_world, help_message="hello"))
 
-        root = self.root.get_node(["test"])
+        root = self.root.get_node(["test"], [])
 
     def test_get_node(self):
         self.test_add_nested_exe_and_namespace()
