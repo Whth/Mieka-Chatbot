@@ -1,13 +1,13 @@
-from typing import Dict, List, NamedTuple, Any, Union
-
 from graia.ariadne.app import Ariadne
 from graia.ariadne.connection.config import WebsocketClientConfig
 from graia.ariadne.entry import config
 from graia.ariadne.message.chain import MessageChain
 from graia.ariadne.model import Group, Friend, Member, Stranger
 from graia.ariadne.model.util import AriadneOptions
+from typing import Dict, List, NamedTuple, Any, Union
 
-from modules.config_utils import CmdClient
+from modules.auth.core import AuthorizationManager, Root
+from modules.cmd import CmdClient
 from modules.extension_manager import ExtensionManager
 from modules.plugin_base import PluginsView
 
@@ -51,6 +51,7 @@ class BotConfig(NamedTuple):
     """
 
     extension_dir: str
+    auth_config_file_path: str
     syntax_tree: Dict[str, Any]
     accepted_message_types: List[str] = ["GroupMessage"]
 
@@ -70,15 +71,38 @@ class ChatBot(object):
         """
         return self._bot_client
 
+    @property
+    def extensions(self) -> ExtensionManager:
+        """
+        Returns the ExtensionManager object that manages the extensions for this class.
+
+        :return: An instance of the ExtensionManager class.
+        :rtype: ExtensionManager
+        """
+        return self._extensions
+
+    @property
+    def auth_manager(self) -> AuthorizationManager:
+        """
+        Return the authorization manager object.
+
+        :return: An instance of AuthorizationManager.
+        :rtype: AuthorizationManager
+        """
+        return self._auth_manager
+
     def __init__(self, bot_info: BotInfo, bot_config: BotConfig, bot_connection_config: BotConnectionConfig):
         self._ariadne_app: Ariadne = Ariadne(
             config(bot_info.account_id, bot_connection_config.verify_key, bot_connection_config.websocket_config)
         )
         Ariadne.options = AriadneOptions(default_account=bot_info.account_id)
         self._bot_name: str = bot_info.bot_name
+        self._bot_config: BotConfig = bot_config
+        self._auth_manager: AuthorizationManager = AuthorizationManager(
+            **(Root()._asdict()), config_file_path=bot_config.auth_config_file_path
+        )
         self._bot_client: CmdClient = CmdClient(bot_config.syntax_tree)
 
-        self._bot_config: BotConfig = bot_config
         self._extensions: ExtensionManager = ExtensionManager(self._bot_config.extension_dir, [])
 
         async def _bot_client_call(target: Union[Group, Friend, Member, Stranger], message: MessageChain):
@@ -156,6 +180,8 @@ class ChatBot(object):
 
         except KeyboardInterrupt:
             self.stop()
+        finally:
+            self._auth_manager.save()
 
     def stop(self) -> None:
         """

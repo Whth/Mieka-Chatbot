@@ -1,0 +1,436 @@
+import re
+from abc import abstractmethod
+from inspect import signature, iscoroutinefunction
+from pydantic import BaseModel, Field, PrivateAttr
+from types import MappingProxyType
+from typing import Optional, Dict, Any, Tuple, List, Union, Callable, Type, Unpack, final
+
+from constant import Value
+from modules.auth.permissions import Permission, auth_check
+from modules.auth.resources import RequiredPermission
+from modules.config_utils import (
+    get_config,
+    get_signature_with_annotations,
+    Setter,
+    Void,
+    StringMaker,
+    get_all_config_chains,
+    make_config,
+)
+
+
+class CmdClient(object):
+    """
+    a config client that allows simple cli-liked operation on config
+    """
+
+    # TODO should add a override lock to avoid concurrent access
+    def __init__(self, syntax_tree: Optional[Dict[str, Any]] = None):
+        self._Hall_Cmd_Tree: Dict[str, Any] = {}
+        self.Hall_Cmd_Tree: MappingProxyType = MappingProxyType(self._Hall_Cmd_Tree)
+        self.register(syntax_tree, True) if syntax_tree else None
+
+    @property
+    def get_all_available_cmd(self) -> Tuple[str]:
+        """
+        Returns a list of all available commands.
+
+        :return: A list of strings representing the available commands.
+        :rtype: List[str]
+        """
+
+        return tuple(self.Hall_Cmd_Tree.keys())
+
+    def get_help(self, cmd_path_chain: List[str]) -> Union[List[str], Dict[str, Any]]:
+        """
+        Retrieves the help information for a command specified by the given command path chain.
+
+        Parameters:
+            cmd_path_chain (List[str]): A list of strings representing the path to the desired command.
+
+        Returns:
+            Union[List[str], Dict[str, Any]]: The help information for the command.
+            If the command is callable, return the signature with annotations.
+            If the command is a dictionary, returns a list of its keys.
+        """
+        cmd_options = get_config(self.Hall_Cmd_Tree, cmd_path_chain)
+        if callable(cmd_options):
+            return get_signature_with_annotations(cmd_options)
+        if isinstance(cmd_options, Dict):
+            return list(cmd_options.keys())
+
+    async def interpret(self, cmd: str) -> Any:
+        """
+        Interprets a command and executes it.
+
+        Args:
+            cmd: The command to interpret.
+
+        Returns:
+            The result of executing the command.
+
+        Raises:
+            KeyError: If the command is not supported or has an incorrect number
+                of arguments.
+        """
+        # Split the command into tokens
+        cmd_tokens: List[str] = re.split(r"\s+", cmd)
+        tokens_count = len(cmd_tokens)
+        temp: Union[Dict, MappingProxyType, Setter, Void, StringMaker] = self.Hall_Cmd_Tree
+
+        # Traverse the syntax tree based on command tokens
+        for token in cmd_tokens:
+            if token not in temp:
+                return
+
+            temp = temp[token]
+            tokens_count -= 1
+
+            # If a callable is encountered, execute it
+            if callable(temp):
+                # Extract the parameter names from the function signature
+                hints = signature(temp).parameters
+                params_name_list: List[str] = list(hints.keys())
+                required_token_count = len(hints)
+
+                # If the number of tokens matches the number of parameters
+                if tokens_count == required_token_count:
+                    raw_params = cmd_tokens[-tokens_count:]
+
+                    # Convert the raw parameters to their annotated types
+                    params_pack = tuple(
+                        hints[param_name].annotation(raw_param)
+                        for param_name, raw_param in zip(params_name_list, raw_params)
+                    )
+                    if iscoroutinefunction(temp):
+                        return await temp(*params_pack)
+                    return temp(*params_pack)
+                else:
+                    raise ValueError(f"expected {required_token_count} args, got {tokens_count}")
+
+        raise KeyError("Bad syntax tree, please check")
+
+    def register(self, syntax_tree: Dict[str, Any], logging: bool = True) -> None:
+        """Register a new syntax tree for a command.
+
+        Parameters:
+            logging ():
+            syntax_tree (Dict[str, Any]): The syntax tree to register.
+
+        Raises:
+            KeyError: If the command is already registered.
+
+        Returns:
+            None
+        """
+
+        chains, values = get_all_config_chains(syntax_tree)
+        print("\n".join(f"{chain}={value}" for chain, value in zip(chains, values))) if logging else None
+        for chain, value in zip(chains, values):
+            make_config(self._Hall_Cmd_Tree, chain, value)
+
+
+class CmdBuilder(object):
+    """
+    build the cmd functions for a specific config client
+    """
+
+    def __init__(self, config_getter: Callable[[str], Value], config_setter: Callable[[str, Value], None]):
+        self._config_setter = config_setter
+        self._config_getter = config_getter
+
+    def build_setter_for(self, config_path: str) -> Callable[[str], str]:
+        """
+        Returns a callable function that can be used to set a configuration value.
+
+        Args:
+            config_path (str): The path to the configuration value.
+
+        Returns: Callable[[str], str]: A callable function that takes in a new configuration value as a string and
+        returns a string message indicating the success or failure of the operation.
+        """
+
+        origin_config = self._config_getter(config_path)
+        origin_config_type = type(origin_config)
+
+        def _setter(new_config: str) -> str:
+            try:
+                converted = origin_config_type(new_config)
+            except ValueError as e:
+                return f"Can not set [{config_path}] to [{new_config}]\nERROR:\n\t[{e}]"
+            self._config_setter(config_path, converted)
+            return f"Set [{config_path}]:\nFrom [{origin_config}] to [{new_config}]"
+
+        _setter(origin_config)  # test if it works
+        return _setter
+
+    def build_setter_hall(self) -> Callable[[str, str], str]:
+        """
+        Builds and returns a setter function that can be used to modify configuration values.
+
+
+        Returns:
+            str: A message indicating the result of the configuration modification.
+        """
+
+        def _setter(config_path: str, new_config: str) -> str:
+            """
+            Sets the value of a configuration option.
+
+            Args:
+                config_path (str): The path of the configuration option.
+                new_config (str): The new value to set.
+
+            Returns:
+                str: A message indicating the success or failure of the operation.
+            """
+            origin_config = self._config_getter(config_path)
+
+            origin_config_type: Type = type(origin_config)
+
+            try:
+                converted = origin_config_type(new_config)
+            except ValueError as e:
+                return f"Can not set [{config_path}] to [{new_config}]\nERROR:\n\t[{e}]"
+            self._config_setter(config_path, converted)
+            return f"Set [{config_path}]:\nFrom [{origin_config}] to [{new_config}]"
+
+        return _setter
+
+    def build_list_out_for(self, config_paths: List[str]) -> Callable[[], str]:
+        """
+        Builds and returns a function that lists out the values of the given config paths.
+
+        Parameters:
+            config_paths (List[str]): A list of config paths.
+
+        Returns:
+            Callable[[], str]: A function that, when called, returns a string listing out the values of the config paths.
+        """
+
+        def _list_out() -> str:
+            temp_string: str = ""
+            for config_path in config_paths:
+                temp_string += f"{config_path} = {self._config_getter(config_path)}\n"
+            return temp_string
+
+        _list_out()  # test if it works
+        return _list_out
+
+
+class BaseCmdNode(BaseModel):
+    class Config:
+        allow_mutation = True
+        validate_assignment = True
+
+    name: str = Field(allow_mutation=False, validate_assignment=True)
+    help_message: str = Field(default="no help provided", allow_mutation=False, validate_assignment=True)
+    required_permissions: RequiredPermission = Field(
+        default_factory=RequiredPermission, allow_mutation=False, validate_assignment=True
+    )
+
+    @final
+    def __eq__(self, other) -> bool:
+        return self.name == other.name
+
+    @final
+    def __ne__(self, other) -> bool:
+        return self.name != other.name
+
+    @final
+    def __str__(self) -> str:
+        return self.name
+
+    @abstractmethod
+    def __doc__(self) -> str:
+        return self.help_message
+
+    def get_read(self, permissions: List[Permission]) -> Any:
+        if auth_check(self.required_permissions.read + self.required_permissions.super, permissions):
+            return self._read()
+        raise PermissionError("Illegal Read operation, insufficient permissions")
+
+    @abstractmethod
+    def _read(self) -> Any:
+        pass
+
+    def get_modify(self, permissions: List[Permission], *modify_params: Unpack) -> Any:
+        if auth_check(self.required_permissions.modify + self.required_permissions.super, permissions):
+            return self._modify(*modify_params)
+        raise PermissionError("Illegal Modify operation, insufficient permissions")
+
+    @abstractmethod
+    def _modify(self, *modify_params: Unpack) -> Any:
+        pass
+
+    def get_delete(self, permissions: List[Permission], *delete_params: Unpack) -> Any:
+        if auth_check(self.required_permissions.delete + self.required_permissions.super, permissions):
+            return self._delete(*delete_params)
+        raise PermissionError("Illegal Delete operation, insufficient permissions")
+
+    @abstractmethod
+    def _delete(self, *delete_params: Unpack) -> Any:
+        pass
+
+    def get_execute(self, permissions: List[Permission], *execute_params: Unpack) -> Any:
+        if auth_check(self.required_permissions.execute + self.required_permissions.super, permissions):
+            return self._execute(*execute_params)
+        raise PermissionError("Illegal Execute operation, insufficient permissions")
+
+    @abstractmethod
+    def _execute(self, *execute_params: Unpack) -> Any:
+        pass
+
+
+class ExecutableNode(BaseCmdNode):
+    source: Union[Callable, None] = Field(default=None, allow_mutation=True, exclude=True)
+
+    def _modify(self, *modify_params: Unpack) -> Any:
+        if len(modify_params) == 1:
+            if callable(modify_params[0]):
+                self.source = modify_params[0]
+        else:
+            raise ValueError("too many arguments, accepted 1")
+
+    def _delete(self) -> Any:
+        self.source = None
+
+    def _execute(self, *execute_params: Unpack) -> Any:
+        return self.source(*execute_params)
+
+    def _read(self) -> Any:
+        return self.source.__name__
+
+    def __doc__(self) -> str:
+        return self.source.__doc__
+
+
+class NameSpaceNode(BaseCmdNode):
+    def __doc__(self) -> str:
+        return f"{self.name}\n\n{[str(node) for node in self._children_node]}\n\n{self.help_message}"
+
+    def _read(self) -> Any:
+        return self
+
+    def _modify(self, *modify_params: Unpack) -> Any:
+        merge_queue = []
+        for param in modify_params:
+            if isinstance(param, list):
+                merge_queue.extend(param)
+                continue
+            merge_queue.append(param)
+
+        self._children_node.extend(filter(lambda x: isinstance(x, (ExecutableNode, NameSpaceNode)), merge_queue))
+
+    def _delete(self, *delete_params: Unpack) -> Any:
+        self._children_node.clear()
+
+    def _execute(self, *execute_params: Unpack) -> Any:
+        raise NotImplementedError
+
+    children_node: List[Union["NameSpaceNode", "ExecutableNode"]] = Field(
+        default_factory=list, unique_items=True, allow_mutation=True
+    )
+    _children_node: List[Union["NameSpaceNode", "ExecutableNode"]] = PrivateAttr(default_factory=list)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._children_node.extend(self.children_node)
+        self.children_node = []
+
+    def dict(
+        self,
+        *args,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        self.children_node = self._children_node
+        res = super().dict(*args, **kwargs)
+        self.children_node = []
+        return res
+
+    # TODO method below may need permissions control
+    def get_node(self, chain: List[str]) -> Union["NameSpaceNode", "ExecutableNode"]:
+        """
+        Get the namespace or executable node by traversing the chain of names.
+
+        Args:
+            chain (List[str]): The chain of names to traverse.
+
+        Returns:
+            Union[NameSpaceNode, ExecutableNode]: The target node found by traversing the chain.
+
+        Raises:
+            KeyError: If the chain is empty.
+            KeyError: If multiple nodes with the same name are found.
+            KeyError: If no node is found in the chain.
+        """
+        # Check if the chain is empty
+        if len(chain) == 0:
+            raise KeyError("The chain is empty")
+
+        # Filter the children nodes to find the target node with the first name in the chain
+        target_node: List[Union["NameSpaceNode", "ExecutableNode"]] = list(
+            filter(lambda x: x.name == chain[0], self._children_node)
+        )
+
+        # Check if multiple nodes with the same name are found
+        if len(target_node) > 1:
+            raise KeyError(f"Multiple nodes with name {chain[0]} found")
+        # Check if a single node is found
+        elif len(target_node) == 1:
+            # If there are more names in the chain, recursively call get_node on the target node
+            if len(chain) > 1:
+                return target_node[0].get_node(chain[1:])
+            # If there are no more names in the chain, return the target node
+            elif len(chain) == 1:
+                return target_node[0]
+
+        # If no node is found in the chain, raise an exception
+        raise KeyError(f"No node with name {chain[0]} found")
+
+    def add_node(self, node: Union["NameSpaceNode", "ExecutableNode"]) -> None:
+        """
+        Adds a node to the current node.
+
+        Parameters:
+            node (Union[NameSpaceNode, ExecutableNode]): The node to be added. It must be of type NameSpaceNode or ExecutableNode.
+
+        Returns:
+            None
+
+        Raises:
+            TypeError: If the node is not of type NameSpaceNode or ExecutableNode.
+            KeyError: If a node with the same name already exists.
+        """
+        if not isinstance(node, (NameSpaceNode, ExecutableNode)):
+            raise TypeError(f"Node must be of type {NameSpaceNode} or {ExecutableNode}")
+        if node not in self._children_node:
+            self._children_node.append(node)
+            return
+        raise KeyError(f"Node with name {node.name} already exists")
+
+    def remove_node(self, node: Union["NameSpaceNode", "ExecutableNode", str, List[str]]) -> None:
+        """
+        Removes a node from the namespace.
+
+        Parameters:
+            node (Union["NameSpaceNode", "ExecutableNode", str, List[str]]): The node to be removed.
+            It can be an instance of "NameSpaceNode", "ExecutableNode",
+            a string representing the node name, or a list of strings representing the path to the node.
+
+        Returns:
+            None
+
+        Raises:
+            KeyError: If the node does not exist in the namespace.
+        """
+        if isinstance(node, str):
+            node = self.get_node([node])
+        elif isinstance(node, list):
+            parent_node = self.get_node(node[:-1])
+            parent_node.remove_node(node[-1])
+            return
+
+        if node not in self._children_node:
+            raise KeyError(f"Node with name {node.name} does not exist")
+        self._children_node.remove(node)

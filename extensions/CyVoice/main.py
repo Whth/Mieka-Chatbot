@@ -71,7 +71,7 @@ class CyVoice(AbstractPlugin):
 
     def install(self):
         from graia.ariadne.message.element import Voice
-        from modules.config_utils import CmdBuilder
+        from modules.cmd import CmdBuilder
         from .api import VITS
 
         self.__register_all_config()
