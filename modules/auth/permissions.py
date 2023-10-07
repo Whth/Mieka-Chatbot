@@ -15,6 +15,15 @@ class PermissionCode(Enum):
 
 
 class Permission(AuthBaseModel):
+    """
+    ReadPermission: int = 1
+    ExecutePermission: int = 2
+    ModifyPermission: int = 4
+    DeletePermission: int = 8
+    SpecialPermission: int = 16
+    SuperPermission: int = 32
+    """
+
     __permission_categories__: Dict[int, str] = {v.value: v.name for v in PermissionCode}
 
     __cache__: Dict[FrozenSet, "Permission"] = {}
