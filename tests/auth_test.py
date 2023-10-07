@@ -223,14 +223,14 @@ class CmdNodeTest(unittest.TestCase):
     def test_add_nested_exe_and_namespace(self):
         a = ExecutableNode(name="test2", source=hello_world, help_message="this will say hello to you")
 
-        b = NameSpaceNode(name="test3")
+        b = NameSpaceNode(
+            name="test3", help_message="this is a detailed help message", children_node=[NameSpaceNode(name="empty")]
+        )
         c = ExecutableNode(name="test4", source=echo, help_message="echo message")
         tree = NameSpaceNode(name="test", children_node=[a, b, c])
 
         self.root.add_node(tree, [])
         # self.root.get_node(["test"]).add_node(ExecutableNode(name="test2", source=hello_world, help_message="hello"))
-
-        root = self.root.get_node(["test"], [])
 
     def test_get_node(self):
         self.test_add_nested_exe_and_namespace()
@@ -267,6 +267,51 @@ class CmdNodeTest(unittest.TestCase):
         with self.assertRaises(TypeError):
             loop.run_until_complete(self.root.interpret("test test4", []))
         loop.run_until_complete(self.root.interpret("test test4 this_is_echo", []))
+        print("should print doc", loop.run_until_complete(self.root.interpret("test test3", [])))
+
+        print(loop.run_until_complete(self.root.interpret("test test3 empty", [])))
+
+    def test_perm_check_access(self):
+        su_perm = Permission(id=32, name="su")
+        test_req_perm = required_perm_generator(target_resource_name="lalalai", super_permissions=[su_perm])
+        name_space = NameSpaceNode(
+            name="perm_test",
+            children_node=[
+                NameSpaceNode(name="read_test", required_permissions=RequiredPermission(read=test_req_perm.read)),
+                NameSpaceNode(
+                    name="modify_test",
+                    children_node=[
+                        NameSpaceNode(
+                            name="empty", required_permissions=RequiredPermission(delete=test_req_perm.delete)
+                        )
+                    ],
+                    required_permissions=RequiredPermission(read=test_req_perm.read, modify=test_req_perm.modify),
+                ),
+            ],
+            required_permissions=RequiredPermission(super=[su_perm]),
+        )
+        self.root.add_node(name_space)
+        loop = asyncio.get_event_loop()
+        with self.assertRaises(PermissionError):
+            loop.run_until_complete(self.root.interpret("perm_test read_test", []))
+        print(loop.run_until_complete(self.root.interpret("perm_test modify_test", [su_perm])))
+        with self.assertRaises(PermissionError):
+            print(loop.run_until_complete(self.root.interpret("perm_test modify_test empty", test_req_perm.modify)))
+        with self.assertRaises(PermissionError):
+            print(loop.run_until_complete(self.root.interpret("perm_test modify_test empty", [su_perm])))
+        print(
+            loop.run_until_complete(self.root.interpret("perm_test modify_test empty", [su_perm] + test_req_perm.read))
+        )
+        with self.assertRaises(PermissionError):
+            self.root.get_node(["perm_test", "modify_test", "empty"])
+        empty_node = self.root.get_node(["perm_test", "modify_test", "empty"], [su_perm] + test_req_perm.read)
+        empty_node.add_node(NameSpaceNode(name="i am empty"))
+        with self.assertRaises(PermissionError):
+            empty_node.remove_node("i am empty", [])
+        self.root.get_node(["perm_test", "modify_test", "empty", "i am empty"], [su_perm] + test_req_perm.read)
+        empty_node.remove_node("i am empty", test_req_perm.delete + [su_perm])
+        with self.assertRaises(KeyError):
+            self.root.get_node(["perm_test", "modify_test", "empty", "i am empty"], [su_perm] + test_req_perm.read)
 
 
 if __name__ == "__main__":
