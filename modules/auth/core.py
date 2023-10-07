@@ -212,8 +212,6 @@ class AuthorizationManager(AuthBaseModel):
         """
         if std_init:
             req_perm = required_perm_generator(
-                required_perm_id=resource_id,
-                required_perm_name=resource_name,
                 target_resource_name=resource_name,
                 super_permissions=[self.__su_permission__],
             )

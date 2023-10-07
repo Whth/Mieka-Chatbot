@@ -42,8 +42,6 @@ def random_digits(digits: int) -> int:
 def required_perm_generator(
     target_resource_name: str,
     super_permissions: Optional[List[Permission]] = None,
-    required_perm_name: Optional[str] = None,
-    required_perm_id: Optional[int] = random_digits(5),
 ) -> RequiredPermission:
     """
     Generate a RequiredPermission object based on the given parameters.
@@ -64,8 +62,6 @@ def required_perm_generator(
     """
     super_permissions = super_permissions or []
     return RequiredPermission(
-        id=required_perm_id,
-        name=required_perm_name or f"{target_resource_name}RequiredPermission",
         read=[Permission(id=PermissionCode.ReadPermission.value, name=target_resource_name)],
         modify=[Permission(id=PermissionCode.ModifyPermission.value, name=target_resource_name)],
         execute=[Permission(id=PermissionCode.ExecutePermission.value, name=target_resource_name)],
