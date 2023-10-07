@@ -231,6 +231,34 @@ class CmdBuilder(object):
         return _list_out
 
 
+__su_permissions__: List[Permission] = []
+
+
+def set_su_permissions(permissions: Iterable[Permission]) -> None:
+    """
+    Set superuser permissions.
+
+    This function overrides the existing permissions with the given permissions.
+    The set value will be used to namespace access check, allowing all operations for
+    NameSpaceNode and ExecutableNode with any of the permissions in the list.
+
+    Args:
+        permissions: An iterable of Permission objects.
+
+    Raises:
+        TypeError: If any of the permissions is not of type Permission.
+
+    Returns:
+        None
+    """
+    global __su_permissions__
+
+    if all(isinstance(perm, Permission) for perm in permissions):
+        __su_permissions__ = list(permissions)
+    else:
+        raise TypeError("All permissions must be of type Permission")
+
+
 class BaseCmdNode(BaseModel):
     class Config:
         allow_mutation = False
@@ -257,7 +285,10 @@ class BaseCmdNode(BaseModel):
         return self.help_message
 
     def get_read(self, permissions: Iterable[Permission]) -> Any:
-        if auth_check(self.required_permissions.read + self.required_permissions.super, permissions):
+        global __su_permissions__
+        if auth_check(
+            __su_permissions__ + self.required_permissions.super + self.required_permissions.read, permissions
+        ):
             return self._read()
         raise PermissionError("Illegal Read operation, insufficient permissions")
 
@@ -266,7 +297,10 @@ class BaseCmdNode(BaseModel):
         pass
 
     def get_modify(self, permissions: Iterable[Permission], *modify_params: Unpack) -> Any:
-        if auth_check(self.required_permissions.modify + self.required_permissions.super, permissions):
+        global __su_permissions__
+        if auth_check(
+            __su_permissions__ + self.required_permissions.super + self.required_permissions.modify, permissions
+        ):
             return self._modify(*modify_params)
         raise PermissionError("Illegal Modify operation, insufficient permissions")
 
@@ -275,7 +309,10 @@ class BaseCmdNode(BaseModel):
         pass
 
     def get_delete(self, permissions: Iterable[Permission], *delete_params: Unpack) -> Any:
-        if auth_check(self.required_permissions.delete + self.required_permissions.super, permissions):
+        global __su_permissions__
+        if auth_check(
+            __su_permissions__ + self.required_permissions.super + self.required_permissions.delete, permissions
+        ):
             return self._delete(*delete_params)
         raise PermissionError("Illegal Delete operation, insufficient permissions")
 
@@ -284,7 +321,10 @@ class BaseCmdNode(BaseModel):
         pass
 
     async def get_execute(self, permissions: Iterable[Permission], *execute_params: Unpack) -> Any:
-        if auth_check(self.required_permissions.execute + self.required_permissions.super, permissions):
+        global __su_permissions__
+        if auth_check(
+            __su_permissions__ + self.required_permissions.super + self.required_permissions.execute, permissions
+        ):
             return await self._execute(*execute_params)
         raise PermissionError("Illegal Execute operation, insufficient permissions")
 
@@ -381,31 +421,34 @@ class NameSpaceNode(BaseCmdNode):
             PermissionError: If the user does not have sufficient permissions.
             KeyError: If the chain is empty or if no node with the specified name is found.
         """
-        if not auth_check(self.required_permissions.read + self.required_permissions.super, permissions):
-            raise PermissionError("Illegal Read operation, insufficient permissions")
+        global __su_permissions__
         # Check if the chain is empty
-        if len(chain) == 0:
-            raise KeyError("The chain is empty")
+        if auth_check(
+            __su_permissions__ + self.required_permissions.super + self.required_permissions.read, permissions
+        ):
+            if len(chain) == 0:
+                raise KeyError("The chain is empty")
 
-        # Filter the children nodes to find the target node with the first name in the chain
-        target_node: List[Union["NameSpaceNode", "ExecutableNode"]] = list(
-            filter(lambda x: x.name == chain[0], self._children_node)
-        )
+            # Filter the children nodes to find the target node with the first name in the chain
+            target_node: List[Union["NameSpaceNode", "ExecutableNode"]] = list(
+                filter(lambda x: x.name == chain[0], self._children_node)
+            )
 
-        # Check if multiple nodes with the same name are found
-        if len(target_node) > 1:
-            raise KeyError(f"Multiple nodes with name {chain[0]} found")
-        # Check if a single node is found
-        elif len(target_node) == 1:
-            # If there are more names in the chain, recursively call get_node on the target node
-            if len(chain) > 1:
-                return target_node[0].get_node(chain[1:], permissions)
-            # If there are no more names in the chain, return the target node
-            elif len(chain) == 1:
-                return target_node[0]
+            # Check if multiple nodes with the same name are found
+            if len(target_node) > 1:
+                raise KeyError(f"Multiple nodes with name {chain[0]} found")
+            # Check if a single node is found
+            elif len(target_node) == 1:
+                # If there are more names in the chain, recursively call get_node on the target node
+                if len(chain) > 1:
+                    return target_node[0].get_node(chain[1:], permissions)
+                # If there are no more names in the chain, return the target node
+                elif len(chain) == 1:
+                    return target_node[0]
 
-        # If no node is found in the chain, raise an exception
-        raise KeyError(f"No node with name {chain[0]} found")
+            # If no node is found in the chain, raise an exception
+            raise KeyError(f"No node with name {chain[0]} found")
+        raise PermissionError("Illegal Read operation, insufficient permissions")
 
     def add_node(
         self,
@@ -427,14 +470,17 @@ class NameSpaceNode(BaseCmdNode):
         Returns:
             None: This function does not return any value.
         """
-        if not auth_check(self.required_permissions.modify + self.required_permissions.super, permissions):
-            raise PermissionError("Illegal Modify operation, insufficient permissions")
-        if not isinstance(node, (NameSpaceNode, ExecutableNode)):
-            raise TypeError(f"Node must be of type {NameSpaceNode} or {ExecutableNode}")
-        if node not in self._children_node:
-            self._children_node.append(node)
-            return
-        raise KeyError(f"Node with name {node.name} already exists")
+        global __su_permissions__
+        if auth_check(
+            __su_permissions__ + self.required_permissions.super + self.required_permissions.modify, permissions
+        ):
+            if not isinstance(node, (NameSpaceNode, ExecutableNode)):
+                raise TypeError(f"Node must be of type {NameSpaceNode} or {ExecutableNode}")
+            if node not in self._children_node:
+                self._children_node.append(node)
+                return
+            raise KeyError(f"Node with name {node.name} already exists")
+        raise PermissionError("Illegal Modify operation, insufficient permissions")
 
     def remove_node(
         self,
@@ -454,23 +500,26 @@ class NameSpaceNode(BaseCmdNode):
         Returns:
             None
         """
-        if not auth_check(
-            self.required_permissions.delete + self.required_permissions.read + self.required_permissions.super,
-            permissions,
+        global __su_permissions__
+        if (
+            any(su_perm in permissions for su_perm in __su_permissions__ + self.required_permissions.super)
+            or auth_check(self.required_permissions.delete, permissions)
+            and auth_check(self.required_permissions.read, permissions)
         ):
-            raise PermissionError(
-                "Illegal Delete operation, insufficient permissions, you need have the read and delete permissions"
-            )
-        if isinstance(node, str):
-            node = self.get_node([node], permissions)
-        elif isinstance(node, list):
-            parent_node = self.get_node(node[:-1], permissions)
-            parent_node.remove_node(node[-1], permissions)
-            return
+            if isinstance(node, str):
+                node = self.get_node([node], permissions)
+            elif isinstance(node, list):
+                parent_node = self.get_node(node[:-1], permissions)
+                parent_node.remove_node(node[-1], permissions)
+                return
 
-        if node not in self._children_node:
-            raise KeyError(f"Node with name {node.name} does not exist")
-        self._children_node.remove(node)
+            if node not in self._children_node:
+                raise KeyError(f"Node with name {node.name} does not exist")
+            self._children_node.remove(node)
+            return
+        raise PermissionError(
+            "Illegal Delete operation, insufficient permissions, you need have the read and delete permissions"
+        )
 
     async def interpret(self, string: str, permissions: Iterable[Permission] = tuple()) -> Any:
         """

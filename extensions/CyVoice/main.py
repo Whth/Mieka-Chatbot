@@ -162,4 +162,4 @@ class CyVoice(AbstractPlugin):
                 },
             }
         }
-        self._cmd_client.register(tree, True)
+        self._root_namespace_node.register(tree, True)

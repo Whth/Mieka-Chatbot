@@ -7,7 +7,8 @@ from types import MappingProxyType
 from typing import List, Dict, Type, Sequence
 
 from constant import REQUIREMENTS_FILE_NAME, MAIN
-from modules.cmd import CmdClient
+from modules.auth.core import AuthorizationManager
+from modules.cmd import CmdClient, NameSpaceNode
 from modules.file_manager import get_all_sub_dirs
 from modules.launch_utils import install_requirements
 from modules.plugin_base import AbstractPlugin, PluginsView
@@ -40,14 +41,21 @@ class ExtensionManager:
         """
         return MappingProxyType(self._plugins)
 
-    def install_all_extensions(self, broadcast: Broadcast, bot_client: CmdClient, proxy: PluginsView) -> None:
+    def install_all_extensions(
+        self,
+        broadcast: Broadcast,
+        root_namespace_node: NameSpaceNode,
+        proxy: PluginsView,
+        auth_manager: AuthorizationManager,
+    ) -> None:
         """
         Installs all extensions for the given app and bot client.
 
         Args:
 
+            auth_manager ():
             broadcast ():
-            bot_client (CmdClient): The bot client instance.
+            root_namespace_node (CmdClient): The bot client instance.
             proxy (MappingProxyType[str, AbstractPlugin]): The proxy mapping of plugin names to plugin instances.
 
         Returns:
@@ -79,23 +87,25 @@ class ExtensionManager:
             if plugin.get_plugin_name() in self._black_list:
                 continue
             print(Fore.LIGHTRED_EX)
-            self.install_plugin(plugin, broadcast, bot_client, proxy)
+            self.install_plugin(plugin, broadcast, root_namespace_node, proxy, auth_manager)
             print(Fore.RESET)
 
     def install_plugin(
         self,
         plugin: Type[AbstractPlugin],
         broadcast: Broadcast,
-        bot_client: CmdClient,
+        root_namespace_node: NameSpaceNode,
         proxy: PluginsView,
+        auth_manager: AuthorizationManager,
     ) -> None:
         """
         Installs a plugin into the system.
 
         Args:
+            auth_manager ():
             plugin (Type[AbstractPlugin]): The plugin class to be installed.
 
-            bot_client (CmdClient): The bot client instance.
+            root_namespace_node (CmdClient): The bot client instance.
             proxy (MappingProxyType[str, AbstractPlugin]): The proxy object for accessing other plugins.
 
         Returns:
@@ -106,7 +116,7 @@ class ExtensionManager:
         """
         if plugin.get_plugin_name in self._plugins:
             raise ValueError("Plugin already registered")
-        plugin_instance = plugin(proxy, bot_client, broadcast)
+        plugin_instance = plugin(proxy, root_namespace_node, broadcast, auth_manager)
 
         plugin_instance.install()
         self._plugins[plugin.get_plugin_name()] = plugin_instance

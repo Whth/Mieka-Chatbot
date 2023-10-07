@@ -50,4 +50,4 @@ class Novelin(AbstractPlugin):
             return get_paragraph(path, length)
 
         tree = {self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD): _some_novel}
-        self._cmd_client.register(tree, True)
+        self._root_namespace_node.register(tree, True)

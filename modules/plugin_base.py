@@ -7,7 +7,8 @@ from types import MappingProxyType
 from typing import final, Callable, Type, List
 
 from constant import CONFIG_FILE_NAME
-from modules.cmd import CmdClient
+from modules.auth.core import AuthorizationManager
+from modules.cmd import NameSpaceNode
 from modules.config_utils import ConfigRegistry
 
 
@@ -20,14 +21,16 @@ class AbstractPlugin(ABC):
     def __init__(
         self,
         plugins_viewer: MappingProxyType[str, "AbstractPlugin"],
-        cmd_client: CmdClient,
+        root_namespace_node: NameSpaceNode,
         broadcast: Broadcast,
+        auth_manager: AuthorizationManager,
     ):
+        self._auth_manager = auth_manager
         self._receiver = broadcast.receiver
         self._namespace: Namespace = broadcast.createNamespace(name=self.get_plugin_name())
         self._plugin_view: MappingProxyType[str, "AbstractPlugin"] = plugins_viewer
         self._config_registry: ConfigRegistry = ConfigRegistry(f"{self._get_config_parent_dir()}/{CONFIG_FILE_NAME}")
-        self._cmd_client: CmdClient = cmd_client
+        self._root_namespace_node: NameSpaceNode = root_namespace_node
 
     @final
     def receiver(

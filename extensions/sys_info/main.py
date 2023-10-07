@@ -6,7 +6,6 @@ __all__ = ["SysInfo"]
 
 
 class SysInfo(AbstractPlugin):
-    __INFO_CMD = "info"
     __INFO_CPU_CMD = "cpu"
     __INFO_GPU_CMD = "gpu"
     __INFO_MEM_CMD = "mem"
@@ -39,19 +38,21 @@ class SysInfo(AbstractPlugin):
 
     def install(self):
         from .util import get_gpu_info, get_mem_info, get_cpu_info, get_all_info, get_disk_info
+        from modules.cmd import NameSpaceNode, ExecutableNode
 
         self.__register_all_config()
         self._config_registry.load_config()
 
-        tree = {
-            self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD): {
-                self.__INFO_CMD: {
-                    self.__INFO_CPU_CMD: get_cpu_info,
-                    self.__INFO_MEM_CMD: get_mem_info,
-                    self.__INFO_DISK_CMD: get_disk_info,
-                    self.__INFO_GPU_CMD: get_gpu_info,
-                    self.__INFO_ALL_CMD: get_all_info,
-                }
-            }
-        }
-        self._cmd_client.register(tree, True)
+        tree = NameSpaceNode(
+            name=self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD),
+            help_message="system status monitor,allow some hardware info interrogating operations",
+            children_node=[
+                ExecutableNode(name=self.__INFO_CPU_CMD, help_message="get cpu info", source=get_cpu_info),
+                ExecutableNode(name=self.__INFO_MEM_CMD, help_message="get memory info", source=get_mem_info),
+                ExecutableNode(name=self.__INFO_DISK_CMD, help_message="get disk info", source=get_disk_info),
+                ExecutableNode(name=self.__INFO_GPU_CMD, help_message="get gpu info", source=get_gpu_info),
+                ExecutableNode(name=self.__INFO_ALL_CMD, help_message="get all info", source=get_all_info),
+            ],
+        )
+
+        self._root_namespace_node.add_node(tree, [])

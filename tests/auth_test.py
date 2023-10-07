@@ -293,7 +293,7 @@ class CmdNodeTest(unittest.TestCase):
         self.root.add_node(name_space)
         loop = asyncio.get_event_loop()
         with self.assertRaises(PermissionError):
-            loop.run_until_complete(self.root.interpret("perm_test read_test", []))
+            loop.run_until_complete(self.root.interpret("perm_test read_test"))
         print(loop.run_until_complete(self.root.interpret("perm_test modify_test", [su_perm])))
         with self.assertRaises(PermissionError):
             print(loop.run_until_complete(self.root.interpret("perm_test modify_test empty", test_req_perm.modify)))

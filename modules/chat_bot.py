@@ -61,6 +61,16 @@ class ChatBot(object):
     """
 
     @property
+    def root(self) -> NameSpaceNode:
+        """
+        Returns the root node of the NameSpace tree.
+
+        :return: The root node of the NameSpace tree.
+        :rtype: NameSpaceNode
+        """
+        return self._root
+
+    @property
     def extensions(self) -> ExtensionManager:
         """
         Returns the ExtensionManager object that manages the extensions for this class.
@@ -150,9 +160,11 @@ class ChatBot(object):
         """
         self._extensions.install_all_requirements()
         self._extensions.install_all_extensions(
-            broadcast=self._ariadne_app.broadcast, bot_client=self._bot_client, proxy=self._extensions.plugins_view
+            broadcast=self._ariadne_app.broadcast,
+            root_namespace_node=self._root,
+            proxy=self._extensions.plugins_view,
+            auth_manager=self._auth_manager,
         )
-        # TODO use NameSpaceNode replace the bot_client
 
     def run(self) -> None:
         """

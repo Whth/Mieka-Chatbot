@@ -69,7 +69,7 @@ class BegForMercy(AbstractPlugin):
             return "\n".join(kw_list)
 
         tree = {CMD.ROOT: {CMD.ADD: _add_new_keyword, CMD.LIST: _list_kws}}
-        self._cmd_client.register(tree)
+        self._root_namespace_node.register(tree)
 
         from graia.ariadne import Ariadne
 

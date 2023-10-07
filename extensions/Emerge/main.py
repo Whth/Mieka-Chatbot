@@ -54,4 +54,4 @@ class Emerge(AbstractPlugin):
             return Image(path=path)
 
         tree = {self.CMD.ROOT: _merge_emoji}
-        self._cmd_client.register(tree, True)
+        self._root_namespace_node.register(tree, True)
