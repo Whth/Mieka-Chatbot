@@ -170,7 +170,7 @@ class AuthorizationManager(AuthBaseModel):
         return True
 
     @final_handler("save", KeyError)
-    def add_perm(self, perm_id: int, perm_name: str) -> bool:
+    def add_perm_from_info(self, perm_id: int, perm_name: str) -> bool:
         """
         Adds a permission to the object.
 
@@ -182,6 +182,28 @@ class AuthorizationManager(AuthBaseModel):
             bool: True if the permission was successfully added, False otherwise.
         """
         return self._permissions.add_object(Permission(id=perm_id, name=perm_name))
+
+    @final_handler("save", KeyError)
+    def add_perm_from_raw(self, perm: Permission) -> bool:
+        """
+        Adds a permission to the object.
+        """
+        return self._permissions.add_object(perm)
+
+    @final_handler("save", KeyError)
+    def add_perm_from_req(self, required_permission: RequiredPermission) -> bool:
+        """
+        Adds a permission to the object.
+        """
+
+        return all(
+            self._permissions.add_object(perm)
+            for perm in required_permission.read
+            + required_permission.modify
+            + required_permission.execute
+            + required_permission.delete
+            + required_permission.super
+        )
 
     @final_handler("save", KeyError)
     def remove_perm(self, perm_id: int, perm_name: str) -> bool:

@@ -171,15 +171,15 @@ class AuthCoreTest(unittest.TestCase):
         print(self.manager.dict())
 
     def test_add_perm(self):
-        self.manager.add_perm(self.perms[0].id, self.perms[0].name)
-        self.manager.add_perm(self.perms[1].id, self.perms[1].name)
-        self.manager.add_perm(self.perms[2].id, self.perms[2].name)
+        self.manager.add_perm_from_info(self.perms[0].id, self.perms[0].name)
+        self.manager.add_perm_from_info(self.perms[1].id, self.perms[1].name)
+        self.manager.add_perm_from_info(self.perms[2].id, self.perms[2].name)
         print(self.manager.dict())
 
     def test_add_role(self):
-        self.manager.add_perm(self.perms[0].id, self.perms[0].name)
-        self.manager.add_perm(self.perms[1].id, self.perms[1].name)
-        self.manager.add_perm(self.perms[2].id, self.perms[2].name)
+        self.manager.add_perm_from_info(self.perms[0].id, self.perms[0].name)
+        self.manager.add_perm_from_info(self.perms[1].id, self.perms[1].name)
+        self.manager.add_perm_from_info(self.perms[2].id, self.perms[2].name)
         print(self.manager.add_role(role_id=1, role_name="hall", role_perms=[self.perms[0].unique_label]))
         print(self.manager.add_role(role_id=2, role_name="hall", role_perms=[self.perms[1].unique_label]))
         print(self.manager.add_role(role_id=4, role_name="hall", role_perms=[self.perms[2].unique_label]))
