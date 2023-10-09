@@ -110,7 +110,7 @@ class Resource(AuthBaseModel):
         if callable(self._source):
             raise PermissionError("Illegal Read operation, executable resource cannot be accessed in read")
 
-        if auth_check(self.required_permissions.read + self.required_permissions.super, permissions):
+        if auth_check(self.required_permissions.read, permissions, optional_super=self.required_permissions.super):
             return copy.deepcopy(self._source)
         raise PermissionError("Illegal Read operation, insufficient permissions")
 
@@ -130,7 +130,7 @@ class Resource(AuthBaseModel):
             PermissionError: If the required permissions are not satisfied.
         """
 
-        if auth_check(self.required_permissions.modify + self.required_permissions.super, permissions):
+        if auth_check(self.required_permissions.modify, permissions, optional_super=self.required_permissions.super):
             operation(self._source, **modify_params)
             return
         raise PermissionError("Illegal Modify operation, insufficient permissions")
@@ -150,7 +150,7 @@ class Resource(AuthBaseModel):
             PermissionError: If the user does not have the required permissions to execute the function.
         """
 
-        if auth_check(self.required_permissions.execute + self.required_permissions.super, permissions):
+        if auth_check(self.required_permissions.execute, permissions, optional_super=self.required_permissions.super):
             return self._source(**execute_params)
         raise PermissionError("Illegal Execute operation, insufficient permissions")
 
@@ -169,7 +169,7 @@ class Resource(AuthBaseModel):
         """
         if self._is_deleted:
             raise PermissionError("Illegal Delete operation, resource already deleted")
-        if auth_check(self.required_permissions.delete + self.required_permissions.super, permissions):
+        if auth_check(self.required_permissions.delete, permissions, optional_super=self.required_permissions.super):
             del self._source
             self._source = None
             self._is_deleted = True

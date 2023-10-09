@@ -85,13 +85,13 @@ class AuthorizationManager(AuthBaseModel):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-
         root = Root()._asdict()
         self._permissions = PermissionManager(**root, config_file_path=self.config_file_path)
         self._roles = RoleManager(**root, config_file_path=self.config_file_path)
         self._users = UserManager(**root, config_file_path=self.config_file_path)
         self._resources = ResourceManager(**root, config_file_path=self.config_file_path)
         self._permissions.add_object(self.__su_permission__)
+        self.load()
         su_role = Role(**root, permissions=[self.__su_permission__])
         self._roles.add_object(su_role)
         su_user = User(id=self.id, name=self.name, roles=[su_role])
@@ -313,7 +313,7 @@ class AuthorizationManager(AuthBaseModel):
         self._resources.save_object_list()
         self._users.save_object_list()
 
-    def laod(self):
+    def load(self):
         """
         Load the object lists for permissions, roles, resources, and users.
 
@@ -323,6 +323,8 @@ class AuthorizationManager(AuthBaseModel):
         Returns:
             None
         """
+        if not pathlib.Path(self.config_file_path).exists():
+            return
         self._permissions.load_object_list()
         self._roles.load_object_list()
         self._resources.load_object_list()

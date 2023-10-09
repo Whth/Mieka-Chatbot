@@ -287,7 +287,9 @@ class BaseCmdNode(BaseModel):
     def get_read(self, permissions: Iterable[Permission]) -> Any:
         global __su_permissions__
         if auth_check(
-            __su_permissions__ + self.required_permissions.super + self.required_permissions.read, permissions
+            self.required_permissions.read,
+            permissions,
+            optional_super=__su_permissions__ + self.required_permissions.super,
         ):
             return self._read()
         raise PermissionError("Illegal Read operation, insufficient permissions")
@@ -299,7 +301,9 @@ class BaseCmdNode(BaseModel):
     def get_modify(self, permissions: Iterable[Permission], *modify_params: Unpack) -> Any:
         global __su_permissions__
         if auth_check(
-            __su_permissions__ + self.required_permissions.super + self.required_permissions.modify, permissions
+            self.required_permissions.modify,
+            permissions,
+            optional_super=__su_permissions__ + self.required_permissions.super,
         ):
             return self._modify(*modify_params)
         raise PermissionError("Illegal Modify operation, insufficient permissions")
@@ -311,7 +315,9 @@ class BaseCmdNode(BaseModel):
     def get_delete(self, permissions: Iterable[Permission], *delete_params: Unpack) -> Any:
         global __su_permissions__
         if auth_check(
-            __su_permissions__ + self.required_permissions.super + self.required_permissions.delete, permissions
+            self.required_permissions.delete,
+            permissions,
+            optional_super=__su_permissions__ + self.required_permissions.super,
         ):
             return self._delete(*delete_params)
         raise PermissionError("Illegal Delete operation, insufficient permissions")
@@ -323,7 +329,9 @@ class BaseCmdNode(BaseModel):
     async def get_execute(self, permissions: Iterable[Permission], *execute_params: Unpack) -> Any:
         global __su_permissions__
         if auth_check(
-            __su_permissions__ + self.required_permissions.super + self.required_permissions.execute, permissions
+            self.required_permissions.execute,
+            permissions,
+            optional_super=__su_permissions__ + self.required_permissions.super,
         ):
             return await self._execute(*execute_params)
         raise PermissionError("Illegal Execute operation, insufficient permissions")
@@ -422,33 +430,35 @@ class NameSpaceNode(BaseCmdNode):
             KeyError: If the chain is empty or if no node with the specified name is found.
         """
         global __su_permissions__
-        # Check if the chain is empty
-        if auth_check(
-            __su_permissions__ + self.required_permissions.super + self.required_permissions.read, permissions
+        if not auth_check(
+            self.required_permissions.read,
+            permissions,
+            optional_super=__su_permissions__ + self.required_permissions.super,
         ):
-            if len(chain) == 0:
-                raise KeyError("The chain is empty")
+            raise PermissionError("Illegal Read operation, insufficient permissions")
+        # Check if the chain is empty
+        if len(chain) == 0:
+            raise KeyError("The chain is empty")
 
-            # Filter the children nodes to find the target node with the first name in the chain
-            target_node: List[Union["NameSpaceNode", "ExecutableNode"]] = list(
-                filter(lambda x: x.name == chain[0], self._children_node)
-            )
+        # Filter the children nodes to find the target node with the first name in the chain
+        target_node: List[Union["NameSpaceNode", "ExecutableNode"]] = list(
+            filter(lambda x: x.name == chain[0], self._children_node)
+        )
 
-            # Check if multiple nodes with the same name are found
-            if len(target_node) > 1:
-                raise KeyError(f"Multiple nodes with name {chain[0]} found")
-            # Check if a single node is found
-            elif len(target_node) == 1:
-                # If there are more names in the chain, recursively call get_node on the target node
-                if len(chain) > 1:
-                    return target_node[0].get_node(chain[1:], permissions)
-                # If there are no more names in the chain, return the target node
-                elif len(chain) == 1:
-                    return target_node[0]
+        # Check if multiple nodes with the same name are found
+        if len(target_node) > 1:
+            raise KeyError(f"Multiple nodes with name {chain[0]} found")
+        # Check if a single node is found
+        elif len(target_node) == 1:
+            # If there are more names in the chain, recursively call get_node on the target node
+            if len(chain) > 1:
+                return target_node[0].get_node(chain[1:], permissions)
+            # If there are no more names in the chain, return the target node
+            elif len(chain) == 1:
+                return target_node[0]
 
-            # If no node is found in the chain, raise an exception
-            raise KeyError(f"No node with name {chain[0]} found")
-        raise PermissionError("Illegal Read operation, insufficient permissions")
+        # If no node is found in the chain, raise an exception
+        raise KeyError(f"No node with name {chain[0]} found")
 
     def add_node(
         self,
@@ -472,7 +482,9 @@ class NameSpaceNode(BaseCmdNode):
         """
         global __su_permissions__
         if auth_check(
-            __su_permissions__ + self.required_permissions.super + self.required_permissions.modify, permissions
+            self.required_permissions.modify,
+            permissions,
+            optional_super=__su_permissions__ + self.required_permissions.super,
         ):
             if not isinstance(node, (NameSpaceNode, ExecutableNode)):
                 raise TypeError(f"Node must be of type {NameSpaceNode} or {ExecutableNode}")
@@ -501,9 +513,8 @@ class NameSpaceNode(BaseCmdNode):
             None
         """
         global __su_permissions__
-        if (
-            any(su_perm in permissions for su_perm in __su_permissions__ + self.required_permissions.super)
-            or auth_check(self.required_permissions.delete, permissions)
+        if any(su_perm in permissions for su_perm in __su_permissions__ + self.required_permissions.super) or (
+            auth_check(self.required_permissions.delete, permissions)
             and auth_check(self.required_permissions.read, permissions)
         ):
             if isinstance(node, str):
@@ -537,23 +548,25 @@ class NameSpaceNode(BaseCmdNode):
 
         """
 
-        # Tokenize the command string
+        # Tokenize the command string, these token could contains cmds and parameters
         tokens = tokenize_cmd(string)
 
         # Check if there are no tokens
         if len(tokens) == 0:
             raise KeyError("Empty command")
 
-        node = None
+        target_node = None
         # Iterate through the tokens
         for i in range(1, len(tokens) + 1):
+            # this is to verify the parameter token counts
             # Get the corresponding node for the current tokens
-            node = self.get_node(tokens[:i], permissions)
+            target_node = self.get_node(tokens[:i], permissions)
 
             # If the node is an ExecutableNode, execute the command
-            if isinstance(node, ExecutableNode):
-                return await node.get_execute(permissions, *tokens[i:])
+            if isinstance(target_node, ExecutableNode):
+                return await target_node.get_execute(permissions, *tokens[i:])
 
         # If the node is a NameSpaceNode, return its documentation
-        if isinstance(node, NameSpaceNode):
-            return node.__doc__()
+        if isinstance(target_node, NameSpaceNode):
+            # TODO doc access is not a permission restricted-option, shall give it one?
+            return target_node.__doc__()

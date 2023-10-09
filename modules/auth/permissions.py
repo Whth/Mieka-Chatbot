@@ -70,12 +70,16 @@ PermissionManager: Type[ManagerBase] = manager_factory(Permission)
 
 
 def auth_check(
-    required_permissions: Iterable[Permission], query_permissions: Iterable[Permission], all_required: bool = False
+    required_permissions: Iterable[Permission],
+    query_permissions: Iterable[Permission],
+    optional_super: Iterable[Permission] = tuple(),
+    all_required: bool = False,
 ) -> bool:
     """
     Check if the given query permissions match the required permissions.
 
     Args:
+        optional_super ():
         required_permissions (Iterable[Permission]): The required permissions.
         query_permissions (Iterable[Permission]): The query permissions to check.
         all_required (bool, optional): Whether all the required permissions are needed. Defaults to False.
@@ -87,4 +91,8 @@ def auth_check(
     """
 
     operator = all if all_required else any
-    return not required_permissions or operator(read_perm in query_permissions for read_perm in required_permissions)
+    return (
+        operator(perm in optional_super for perm in query_permissions)  # check super permissions
+        or not required_permissions  # check if required permissions are empty
+        or operator(perm in query_permissions for perm in required_permissions)
+    )
