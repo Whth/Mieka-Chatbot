@@ -76,6 +76,22 @@ class AuthorizationManager(AuthBaseModel):
     _permissions: PermissionManager = PrivateAttr()
     _resources: ResourceManager = PrivateAttr()
 
+    @property
+    def users(self) -> List[User]:
+        return list(self._users.object_dict.values())
+
+    @property
+    def roles(self) -> List[Role]:
+        return list(self._roles.object_dict.values())
+
+    @property
+    def permissions(self) -> List[Permission]:
+        return list(self._permissions.object_dict.values())
+
+    @property
+    def resources(self) -> List[Resource]:
+        return list(self._resources.object_dict.values())
+
     @validator("config_file_path")
     def validate_config_file_path(cls, path: str | pathlib.Path) -> str:
         path_obj = pathlib.Path(path)
@@ -131,8 +147,15 @@ class AuthorizationManager(AuthBaseModel):
         self._users.remove_object(make_label(user_id, user_name))
         return True
 
-    def get_user(self, user_id: int, user_name: str) -> User:
-        return self._users.object_dict[make_label(user_id, user_name)]
+    def get_user(self, user_id: Optional[int] = None, user_name: Optional[str] = None) -> User | List[User]:
+        if user_id and user_name:
+            return self._users.object_dict[make_label(user_id, user_name)]
+        elif user_id:
+            return list(filter(lambda user: user.id == user_id, self._users.object_dict.values()))
+        elif user_name:
+            return list(filter(lambda user: user.name == user_name, self._users.object_dict.values()))
+        else:
+            raise KeyError("Either user_id or user_name must be provided.")
 
     @final_handler("save", KeyError)
     def add_role(self, role_id: int, role_name: str, role_perms: Optional[Iterable[UniqueLabel]] = None) -> bool:
