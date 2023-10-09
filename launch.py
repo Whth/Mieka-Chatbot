@@ -5,7 +5,7 @@ from typing import List
 
 from constant import CONFIG_FILE_NAME, CONFIG_DIR, EXTENSION_DIR
 from modules.chat_bot import ChatBot, BotInfo, BotConfig, BotConnectionConfig
-from modules.cmd import CmdClient
+from modules.cmd import ExecutableNode, NameSpaceNode
 from modules.config_utils import ConfigRegistry
 
 
@@ -18,12 +18,9 @@ class DefaultConfig(Enum):
     VERSION = "v0.3.4"
 
 
-def make_help_cmd(client: CmdClient):
+def make_help_cmd(client: NameSpaceNode):
     def _cmds():
-        temp_string = "Available CMD:\n"
-        for cmd in client.get_all_available_cmd:
-            temp_string += f"\t{cmd}\n"
-        return temp_string
+        return client.__doc__()
 
     return _cmds
 
@@ -35,6 +32,14 @@ def make_installed_plugins_cmd(plugins_view):
         )
 
     return _plugins
+
+
+class CMD:
+    ROOT = "bot"
+    VERSION = "version"
+    PLUGINS = "plugins"
+    HELP = "cmds"
+    SU = "su"
 
 
 class Mieka(object):
@@ -67,6 +72,18 @@ class Mieka(object):
         bot_config=__bot_config,
         bot_connection_config=__bot_connection_config,
     )
+    __bot_tree: NameSpaceNode = NameSpaceNode(
+        name=CMD.ROOT,
+        children_node=[
+            ExecutableNode(
+                name=CMD.PLUGINS, source=make_installed_plugins_cmd(plugins_view=__bot.get_installed_plugins)
+            ),
+            ExecutableNode(name=CMD.HELP, source=make_help_cmd(client=__bot.root)),
+            ExecutableNode(name=CMD.VERSION, source=lambda: DefaultConfig.VERSION.value),
+        ],
+        help_message="BotInfo provided",
+    )
+    __bot.root.add_node(__bot_tree)
 
     @classmethod
     def init(cls):
