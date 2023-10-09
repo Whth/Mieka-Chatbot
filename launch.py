@@ -15,7 +15,7 @@ class DefaultConfig(Enum):
     VERIFY_KEY = "INITKEYXBVCdNG0"
     ACCOUNT_ID = 1234567890
     ACCEPTED_MESSAGE_TYPES = ["GroupMessage"]
-    VERSION = "v0.3.4"
+    VERSION = "v0.4.4"
 
 
 def make_help_cmd(client: NameSpaceNode):
