@@ -7,6 +7,7 @@ from graia.ariadne.model.util import AriadneOptions
 from typing import Dict, List, NamedTuple, Union
 
 from modules.auth.core import AuthorizationManager, Root
+from modules.auth.users import User
 from modules.cmd import NameSpaceNode, set_su_permissions
 from modules.extension_manager import ExtensionManager
 from modules.plugin_base import PluginsView
@@ -110,7 +111,7 @@ class ChatBot(object):
             self._ariadne_app.broadcast.receiver(message_type)(self._make_cmd_interpreter())
 
     def _make_cmd_interpreter(self):
-        async def _cmd_interpret(target: Union[Group, Friend, Member, Stranger], message: MessageChain):
+        async def _cmd_interpret(person: Union[Friend, Member, Stranger], message: MessageChain):
             """
             Asynchronously calls the bot client with the given target and message.
 
@@ -124,25 +125,41 @@ class ChatBot(object):
             Raises:
                 KeyError: If the user is not found.
             """
+            stack: List[User] = []
+            group = None
+            if isinstance(person, Member):
+                group = person.group
+
+                try:
+                    group_user = self._auth_manager.get_user(user_id=group.id, user_name=group.name)
+                    stack.append(group_user)
+                except KeyError:
+                    pass
 
             try:
-                name = target.name if hasattr(target, "name") else target.nickname
+                person_user = self._auth_manager.get_user(user_id=person.id, user_name=person.name)
+                stack.append(person_user)
+            except KeyError:
+                return
 
-                user = self._auth_manager.get_user(user_id=target.id, user_name=name)
-
+            try:
                 success = False
-                for role in user.roles:
-                    with role as perms:
-                        try:
-                            stdout = await self._root.interpret(str(message), perms)
-                            success = True
-                        except PermissionError:
-                            pass
+                for target in stack:
+                    for role in target.roles:
+                        with role as perms:
+                            try:
+                                stdout = await self._root.interpret(str(message), perms)
+                                success = True
+                            except PermissionError:
+                                pass
+                        if success:
+                            break
                     if success:
                         break
             except KeyError:
                 return
             print(f"stdout: {stdout}") if stdout else print("stdout: None")
+            target = group if group else person
             (await self._ariadne_app.send_message(target, message=stdout)) if stdout else None
 
         return _cmd_interpret
