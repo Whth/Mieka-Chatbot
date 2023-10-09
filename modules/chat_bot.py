@@ -1,13 +1,13 @@
-from typing import Dict, List, NamedTuple, Any, Union
-
 from graia.ariadne.app import Ariadne
 from graia.ariadne.connection.config import WebsocketClientConfig
 from graia.ariadne.entry import config
 from graia.ariadne.message.chain import MessageChain
 from graia.ariadne.model import Group, Friend, Member, Stranger
 from graia.ariadne.model.util import AriadneOptions
+from typing import Dict, List, NamedTuple, Union
 
-from modules.config_utils import CmdClient
+from modules.auth.core import AuthorizationManager, Root
+from modules.cmd import NameSpaceNode, set_su_permissions
 from modules.extension_manager import ExtensionManager
 from modules.plugin_base import PluginsView
 
@@ -51,7 +51,7 @@ class BotConfig(NamedTuple):
     """
 
     extension_dir: str
-    syntax_tree: Dict[str, Any]
+    auth_config_file_path: str
     accepted_message_types: List[str] = ["GroupMessage"]
 
 
@@ -61,14 +61,34 @@ class ChatBot(object):
     """
 
     @property
-    def client(self) -> CmdClient:
+    def root(self) -> NameSpaceNode:
         """
-        Returns the `CmdClient` instance associated with this object.
+        Returns the root node of the NameSpace tree.
 
-        :return: The `CmdClient` instance.
-        :rtype: CmdClient
+        :return: The root node of the NameSpace tree.
+        :rtype: NameSpaceNode
         """
-        return self._bot_client
+        return self._root
+
+    @property
+    def extensions(self) -> ExtensionManager:
+        """
+        Returns the ExtensionManager object that manages the extensions for this class.
+
+        :return: An instance of the ExtensionManager class.
+        :rtype: ExtensionManager
+        """
+        return self._extensions
+
+    @property
+    def auth_manager(self) -> AuthorizationManager:
+        """
+        Return the authorization manager object.
+
+        :return: An instance of AuthorizationManager.
+        :rtype: AuthorizationManager
+        """
+        return self._auth_manager
 
     def __init__(self, bot_info: BotInfo, bot_config: BotConfig, bot_connection_config: BotConnectionConfig):
         self._ariadne_app: Ariadne = Ariadne(
@@ -76,30 +96,56 @@ class ChatBot(object):
         )
         Ariadne.options = AriadneOptions(default_account=bot_info.account_id)
         self._bot_name: str = bot_info.bot_name
-        self._bot_client: CmdClient = CmdClient(bot_config.syntax_tree)
-
         self._bot_config: BotConfig = bot_config
+
+        self._auth_manager: AuthorizationManager = AuthorizationManager(
+            **(Root()._asdict()), config_file_path=bot_config.auth_config_file_path
+        )
+
+        set_su_permissions([self._auth_manager.__su_permission__])
+        self._root: NameSpaceNode = NameSpaceNode(name="root")
         self._extensions: ExtensionManager = ExtensionManager(self._bot_config.extension_dir, [])
 
-        async def _bot_client_call(target: Union[Group, Friend, Member, Stranger], message: MessageChain):
+        for message_type in bot_config.accepted_message_types:
+            self._ariadne_app.broadcast.receiver(message_type)(self._make_cmd_interpreter())
+
+    def _make_cmd_interpreter(self):
+        async def _cmd_interpret(target: Union[Group, Friend, Member, Stranger], message: MessageChain):
             """
-            Asynchronously calls the bot client to send a message to the specified target.
+            Asynchronously calls the bot client with the given target and message.
 
             Args:
-                target (Union[Group, Friend, Member, Stranger]): The target to send the message to.
-                message (MessageChain): The message to send.
+                target (Union[Group, Friend, Member, Stranger]): The target of the bot client call.
+                message (MessageChain): The message to be sent.
 
             Returns:
                 None
+
+            Raises:
+                KeyError: If the user is not found.
             """
+
             try:
-                stdout = await self._bot_client.interpret(str(message))
+                name = target.name if hasattr(target, "name") else target.nickname
+
+                user = self._auth_manager.get_user(user_id=target.id, user_name=name)
+
+                success = False
+                for role in user.roles:
+                    with role as perms:
+                        try:
+                            stdout = await self._root.interpret(str(message), perms)
+                            success = True
+                        except PermissionError:
+                            pass
+                    if success:
+                        break
             except KeyError:
                 return
+            print(f"stdout: {stdout}") if stdout else print("stdout: None")
             (await self._ariadne_app.send_message(target, message=stdout)) if stdout else None
 
-        for message_type in bot_config.accepted_message_types:
-            self._ariadne_app.broadcast.receiver(message_type)(_bot_client_call)
+        return _cmd_interpret
 
     @property
     def get_installed_plugins(self) -> PluginsView:
@@ -125,8 +171,12 @@ class ChatBot(object):
         """
         self._extensions.install_all_requirements()
         self._extensions.install_all_extensions(
-            broadcast=self._ariadne_app.broadcast, bot_client=self._bot_client, proxy=self._extensions.plugins_view
+            broadcast=self._ariadne_app.broadcast,
+            root_namespace_node=self._root,
+            proxy=self._extensions.plugins_view,
+            auth_manager=self._auth_manager,
         )
+        # TODO better add a hall perm checker, to eliminate unregistered perm be used
 
     def run(self) -> None:
         """
@@ -156,6 +206,9 @@ class ChatBot(object):
 
         except KeyboardInterrupt:
             self.stop()
+        finally:
+            print("Save the changes made to the permissions, roles, resources, and users.")
+            self._auth_manager.save()
 
     def stop(self) -> None:
         """

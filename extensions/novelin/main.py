@@ -37,6 +37,9 @@ class Novelin(AbstractPlugin):
         from .extractor import get_paragraph, remove_blank_lines
         from modules.file_manager import explore_folder
         from random import choice
+        from modules.cmd import RequiredPermission, ExecutableNode
+        from modules.auth.resources import required_perm_generator
+        from modules.auth.permissions import Permission, PermissionCode
 
         self.__register_all_config()
         self._config_registry.load_config()
@@ -45,9 +48,32 @@ class Novelin(AbstractPlugin):
         pathlib.Path(asset_path).mkdir(parents=True, exist_ok=True)
 
         def _some_novel(length: int) -> str:
+            """
+            Generate a novel of a specified length.
+
+            Args:
+                length (int): The desired length of the novel.
+
+            Returns:
+                str: The generated novel.
+
+            Raises:
+                None.
+            """
             path = choice(explore_folder(asset_path))
             remove_blank_lines(path)
-            return get_paragraph(path, length)
+            return get_paragraph(path, int(length))
 
-        tree = {self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD): _some_novel}
-        self._cmd_client.register(tree, True)
+        su_perm = Permission(id=PermissionCode.SuperPermission.value, name=self.get_plugin_name())
+        req_perm: RequiredPermission = required_perm_generator(
+            target_resource_name=self.get_plugin_name(), super_permissions=[su_perm]
+        )
+
+        tree = ExecutableNode(
+            name=self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD),
+            source=_some_novel,
+            required_permissions=req_perm,
+            help_message=_some_novel.__doc__,
+        )
+        self._auth_manager.add_perm_from_req(req_perm)
+        self._root_namespace_node.add_node(tree)
