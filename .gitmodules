@@ -1,0 +1,12 @@
+[submodule "extensions/AuthCore"]
+	path = extensions/AuthCore
+	url = https://github.com/Whth/AuthCore
+[submodule "extensions/SD-Dev"]
+	path = extensions/SD-Dev
+	url = https://github.com/Whth/SD-Dev
+[submodule "extensions/Pic-Eval"]
+	path = extensions/Pic-Eval
+	url = https://github.com/Whth/Pic-Eval
+[submodule "extensions/EasyPin"]
+	path = extensions/EasyPin
+	url = https://github.com/Whth/EasyPIn
