@@ -373,7 +373,8 @@ class NameSpaceNode(BaseCmdNode):
     _children_node: List[T_CmdNode] = PrivateAttr(default_factory=list)
 
     def __doc__(self) -> str:
-        return f"{self.name}\n\n{[str(node) for node in self._children_node]}\n\n{self.help_message}"
+        nodes = "\n".join(f"[{node[0]}]: {node[1]}" for node in enumerate(self._children_node))
+        return f"{self.name}\n\n{nodes}\n\n{self.help_message}"
 
     def _read(self) -> Any:
         return self
