@@ -359,7 +359,15 @@ class ExecutableNode(BaseCmdNode):
         setattr(self, "source", None)
 
     async def _execute(self, *execute_params: Unpack) -> Any:
-        return await self.source(*execute_params) if iscoroutinefunction(self.source) else self.source(*execute_params)
+        sig = get_signature_with_annotations(self.source)
+        converted = []
+        for para, param_type in zip(execute_params, sig.values()):
+            try:
+                converted.append(param_type(para))
+            except TypeError:
+                converted.append(para)
+
+        return await self.source(*converted) if iscoroutinefunction(self.source) else self.source(*converted)
 
     def _read(self) -> Any:
         return self.source.__name__
