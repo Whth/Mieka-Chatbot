@@ -6,6 +6,7 @@ from .utils import AuthBaseModel, manager_factory, ManagerBase
 
 
 class User(AuthBaseModel):
+    name: str
     roles: List[Role] = Field(default_factory=list, unique_items=True)
 
     @validator("roles")
