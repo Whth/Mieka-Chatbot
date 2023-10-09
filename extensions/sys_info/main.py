@@ -19,11 +19,11 @@ class SysInfo(AbstractPlugin):
 
     @classmethod
     def get_plugin_name(cls) -> str:
-        return "System Info"
+        return "SystemInfo"
 
     @classmethod
     def get_plugin_description(cls) -> str:
-        return "plugin plugin that allow some hardware info interrogating operations"
+        return "system status monitor,allow some hardware info interrogating operations"
 
     @classmethod
     def get_plugin_version(cls) -> str:
@@ -38,14 +38,22 @@ class SysInfo(AbstractPlugin):
 
     def install(self):
         from .util import get_gpu_info, get_mem_info, get_cpu_info, get_all_info, get_disk_info
-        from modules.cmd import NameSpaceNode, ExecutableNode
+        from modules.cmd import NameSpaceNode, ExecutableNode, RequiredPermission
 
         self.__register_all_config()
         self._config_registry.load_config()
 
+        from modules.auth.resources import required_perm_generator
+        from modules.auth.permissions import Permission, PermissionCode
+
+        su_perm = Permission(id=PermissionCode.SuperPermission.value, name=f"{self.get_plugin_name()}")
+        req_perm: RequiredPermission = required_perm_generator(
+            target_resource_name=self.get_plugin_name(), super_permissions=[su_perm]
+        )
+        self._auth_manager.add_perm_from_req(req_perm)
         tree = NameSpaceNode(
             name=self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD),
-            help_message="system status monitor,allow some hardware info interrogating operations",
+            help_message=self.get_plugin_description(),
             children_node=[
                 ExecutableNode(name=self.__INFO_CPU_CMD, help_message="get cpu info", source=get_cpu_info),
                 ExecutableNode(name=self.__INFO_MEM_CMD, help_message="get memory info", source=get_mem_info),
@@ -53,6 +61,7 @@ class SysInfo(AbstractPlugin):
                 ExecutableNode(name=self.__INFO_GPU_CMD, help_message="get gpu info", source=get_gpu_info),
                 ExecutableNode(name=self.__INFO_ALL_CMD, help_message="get all info", source=get_all_info),
             ],
+            required_permissions=req_perm,
         )
 
         self._root_namespace_node.add_node(tree, [])
