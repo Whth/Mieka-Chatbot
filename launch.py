@@ -78,8 +78,14 @@ class Mieka(object):
             ExecutableNode(
                 name=CMD.PLUGINS, source=make_installed_plugins_cmd(plugins_view=__bot.get_installed_plugins)
             ),
-            ExecutableNode(name=CMD.HELP, source=make_help_cmd(client=__bot.root)),
-            ExecutableNode(name=CMD.VERSION, source=lambda: DefaultConfig.VERSION.value),
+            ExecutableNode(
+                name=CMD.HELP,
+                source=make_help_cmd(client=__bot.root),
+                help_message="These cmds are both built-in and extensions",
+            ),
+            ExecutableNode(
+                name=CMD.VERSION, source=lambda: DefaultConfig.VERSION.value, help_message="The core version of the bot"
+            ),
         ],
         help_message="BotInfo provided",
     )

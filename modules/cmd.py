@@ -359,7 +359,7 @@ class ExecutableNode(BaseCmdNode):
         setattr(self, "source", None)
 
     async def _execute(self, *execute_params: Unpack) -> Any:
-        return self.source(*execute_params)
+        return await self.source(*execute_params) if iscoroutinefunction(self.source) else self.source(*execute_params)
 
     def _read(self) -> Any:
         return self.source.__name__
