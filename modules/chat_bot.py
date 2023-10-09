@@ -7,7 +7,7 @@ from graia.ariadne.model.util import AriadneOptions
 from typing import Dict, List, NamedTuple, Union
 
 from modules.auth.core import AuthorizationManager, Root
-from modules.cmd import NameSpaceNode
+from modules.cmd import NameSpaceNode, set_su_permissions
 from modules.extension_manager import ExtensionManager
 from modules.plugin_base import PluginsView
 
@@ -97,12 +97,19 @@ class ChatBot(object):
         Ariadne.options = AriadneOptions(default_account=bot_info.account_id)
         self._bot_name: str = bot_info.bot_name
         self._bot_config: BotConfig = bot_config
+
         self._auth_manager: AuthorizationManager = AuthorizationManager(
             **(Root()._asdict()), config_file_path=bot_config.auth_config_file_path
         )
+
+        set_su_permissions([self._auth_manager.__su_permission__])
         self._root: NameSpaceNode = NameSpaceNode(name="root")
         self._extensions: ExtensionManager = ExtensionManager(self._bot_config.extension_dir, [])
 
+        for message_type in bot_config.accepted_message_types:
+            self._ariadne_app.broadcast.receiver(message_type)(self._make_cmd_interpreter())
+
+    def _make_cmd_interpreter(self):
         async def _cmd_interpret(target: Union[Group, Friend, Member, Stranger], message: MessageChain):
             """
             Asynchronously calls the bot client with the given target and message.
@@ -117,8 +124,12 @@ class ChatBot(object):
             Raises:
                 KeyError: If the user is not found.
             """
+
             try:
-                user = self._auth_manager.get_user(user_id=target.id, user_name=target.name)
+                name = target.name if hasattr(target, "name") else target.nickname
+
+                user = self._auth_manager.get_user(user_id=target.id, user_name=name)
+
                 success = False
                 for role in user.roles:
                     with role as perms:
@@ -131,10 +142,10 @@ class ChatBot(object):
                         break
             except KeyError:
                 return
+            print(f"stdout: {stdout}") if stdout else print("stdout: None")
             (await self._ariadne_app.send_message(target, message=stdout)) if stdout else None
 
-        for message_type in bot_config.accepted_message_types:
-            self._ariadne_app.broadcast.receiver(message_type)(_cmd_interpret)
+        return _cmd_interpret
 
     @property
     def get_installed_plugins(self) -> PluginsView:
@@ -165,6 +176,7 @@ class ChatBot(object):
             proxy=self._extensions.plugins_view,
             auth_manager=self._auth_manager,
         )
+        # TODO better add a hall perm checker, to eliminate unregistered perm be used
 
     def run(self) -> None:
         """
@@ -195,6 +207,7 @@ class ChatBot(object):
         except KeyboardInterrupt:
             self.stop()
         finally:
+            print("Save the changes made to the permissions, roles, resources, and users.")
             self._auth_manager.save()
 
     def stop(self) -> None:

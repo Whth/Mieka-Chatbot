@@ -11,7 +11,7 @@ from modules.config_utils import ConfigRegistry
 
 class DefaultConfig(Enum):
     WEBSOCKET_HOST = "http://127.0.0.1:8080"
-    AUTH_CONFIG_FILE_NAME: str = f"{CONFIG_DIR}/auth.json"
+    AUTH_CONFIG_FILE_NAME: str = f"{CONFIG_DIR}/auth_manager.json"
     VERIFY_KEY = "INITKEYXBVCdNG0"
     ACCOUNT_ID = 1234567890
     ACCEPTED_MESSAGE_TYPES = ["GroupMessage"]
@@ -56,12 +56,6 @@ class Mieka(object):
     __bot_config = BotConfig(
         extension_dir=EXTENSION_DIR,
         auth_config_file_path=__config.get_config(DefaultConfig.AUTH_CONFIG_FILE_NAME.name),
-        syntax_tree={
-            "bot": {
-                "version": lambda: DefaultConfig.VERSION.value,
-                "areas": lambda: "\n".join(Mieka.accepted_message_types),
-            },
-        },
         accepted_message_types=accepted_message_types,
     )
     __bot_connection_config = BotConnectionConfig(
@@ -73,15 +67,6 @@ class Mieka(object):
         bot_config=__bot_config,
         bot_connection_config=__bot_connection_config,
     )
-
-    updated_tree = {
-        "bot": {
-            "cmds": make_help_cmd(__bot.client),
-            "extensions": make_installed_plugins_cmd(__bot.get_installed_plugins),
-        }
-    }
-
-    __bot.client.register(updated_tree, True)
 
     @classmethod
     def init(cls):

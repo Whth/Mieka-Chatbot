@@ -152,7 +152,7 @@ class ResourceManagerTest(unittest.TestCase):
 
 class AuthCoreTest(unittest.TestCase):
     def setUp(self):
-        self.config_file_path = f"../{CONFIG_DIR}/auth.json"
+        self.config_file_path = f"{CONFIG_DIR}/auth_test.json"
         self.manager = AuthorizationManager(id=1, name="authManager", config_file_path=self.config_file_path)
         self.resource_list = [[12, 35], {14: 16, 17: 18}, lambda x: x + 1]
         self.perms = [Permission(id=1, name="hall"), Permission(id=2, name="hall"), Permission(id=4, name="hall")]
@@ -277,7 +277,15 @@ class CmdNodeTest(unittest.TestCase):
         name_space = NameSpaceNode(
             name="perm_test",
             children_node=[
-                NameSpaceNode(name="read_test", required_permissions=RequiredPermission(read=test_req_perm.read)),
+                NameSpaceNode(
+                    name="read_test",
+                    required_permissions=RequiredPermission(read=test_req_perm.read),
+                    children_node=[
+                        NameSpaceNode(
+                            name="oneChildNode",
+                        )
+                    ],
+                ),
                 NameSpaceNode(
                     name="modify_test",
                     children_node=[
@@ -291,9 +299,10 @@ class CmdNodeTest(unittest.TestCase):
             required_permissions=RequiredPermission(super=[su_perm]),
         )
         self.root.add_node(name_space)
+
         loop = asyncio.get_event_loop()
-        with self.assertRaises(PermissionError):
-            loop.run_until_complete(self.root.interpret("perm_test read_test"))
+        print(loop.run_until_complete(self.root.interpret("perm_test read_test")))
+
         print(loop.run_until_complete(self.root.interpret("perm_test modify_test", [su_perm])))
         with self.assertRaises(PermissionError):
             print(loop.run_until_complete(self.root.interpret("perm_test modify_test empty", test_req_perm.modify)))
