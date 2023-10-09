@@ -137,7 +137,9 @@ class ChatBot(object):
                     pass
 
             try:
-                person_user = self._auth_manager.get_user(user_id=person.id, user_name=person.name)
+                person_user = self._auth_manager.get_user(
+                    user_id=person.id, user_name=person.name if isinstance(person, Member) else person.nickname
+                )
                 stack.append(person_user)
             except KeyError:
                 return
