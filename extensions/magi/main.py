@@ -7,6 +7,9 @@ __all__ = ["Magi"]
 
 
 class Magi(AbstractPlugin):
+    class CMD:
+        ROOT = "magi"
+
     CONFIG_GIF_ASSET_PATH: str = "gif_asset_path"
     CONFIG_DETECTED_KEYWORD: str = "detected_keyword"
     CONFIG_TEMP_DIR_PATH: str = "temp_dir_path"
@@ -48,12 +51,10 @@ class Magi(AbstractPlugin):
         self._config_registry.register_config(self.CONFIG_DETECTED_KEYWORD, "magi")
 
     def install(self):
-        from graia.ariadne.app import Ariadne
         from graia.ariadne.message.element import Image
-        from graia.ariadne.message.parser.base import ContainKeyword
-        from graia.ariadne.model import Group
-
-        from graia.ariadne.event.message import GroupMessage
+        from modules.cmd import RequiredPermission, ExecutableNode
+        from modules.auth.resources import required_perm_generator
+        from modules.auth.permissions import Permission, PermissionCode
         from modules.file_manager import explore_folder
         from .gif_factory import GifFactory
 
@@ -70,15 +71,12 @@ class Magi(AbstractPlugin):
         jpg_count: int = self._config_registry.get_config(self.CONFIG_PASS_FRAME_COUNT)
         duration: int = self._config_registry.get_config(self.CONFIG_RESULT_FRAME_DURATION)
 
-        @self.receiver(
-            GroupMessage,
-            decorators=[ContainKeyword(keyword=self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD))],
-        )
-        async def MAGI_SYS_DECISION_MAKING(app: Ariadne, group: Group):
+        async def MAGI_SYS_DECISION_MAKING():
             """
-            random send a gif in a day
-            :param group:
-            :return:
+            Asynchronously makes a decision in the MAGI_SYS system.
+
+            Returns:
+                Image: The resulting image from the decision-making process.
             """
             random_pass_file_path = choice(explore_folder(f"{gif_dir_path}/{self.__PASS_DIR_NAME}"))
             GifFactory.append_jpg_to_gif(
@@ -89,4 +87,18 @@ class Magi(AbstractPlugin):
                 output_path=temp_file_path,
                 duration=duration,
             )
-            await app.send_message(group, Image(path=temp_file_path))
+            return Image(path=temp_file_path)
+
+        su_perm = Permission(id=PermissionCode.SuperPermission.value, name=self.get_plugin_name())
+        req_perm: RequiredPermission = required_perm_generator(
+            target_resource_name=self.get_plugin_name(), super_permissions=[su_perm]
+        )
+
+        tree = ExecutableNode(
+            name=self.CMD.ROOT,
+            source=MAGI_SYS_DECISION_MAKING,
+            required_permissions=req_perm,
+            help_message=MAGI_SYS_DECISION_MAKING.__doc__,
+        )
+        self._auth_manager.add_perm_from_req(req_perm)
+        self._root_namespace_node.add_node(tree)

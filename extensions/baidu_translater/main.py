@@ -1,5 +1,4 @@
 import os
-from typing import Dict
 
 from modules.plugin_base import AbstractPlugin
 
@@ -42,6 +41,9 @@ class BaiduTranslater(AbstractPlugin):
 
     def install(self):
         from .translater import Translater
+        from modules.cmd import RequiredPermission, ExecutableNode
+        from modules.auth.resources import required_perm_generator
+        from modules.auth.permissions import Permission, PermissionCode
 
         self.__register_all_config()
         self._config_registry.load_config()
@@ -54,8 +56,18 @@ class BaiduTranslater(AbstractPlugin):
         def _trans_partial(to_lang: str, query: str) -> str:
             return f"翻译结果:\n\t{self.translater.translate(to_lang, query)}"
 
-        cmd_syntax_tree: Dict = {self._config_registry.get_config(self.CONFIG_TRANSLATE_KEYWORD): _trans_partial}
-        self._root_namespace_node.register(cmd_syntax_tree, True)
+        su_perm = Permission(id=PermissionCode.SuperPermission.value, name=f"{self.get_plugin_name()}")
+        req_perm: RequiredPermission = required_perm_generator(
+            target_resource_name=self.get_plugin_name(), super_permissions=[su_perm]
+        )
+        tree = ExecutableNode(
+            name=self._config_registry.get_config(self.CONFIG_TRANSLATE_KEYWORD),
+            help_message=self.get_plugin_description(),
+            source=_trans_partial,
+            required_permissions=req_perm,
+        )
+
+        self._root_namespace_node.add_node(tree)
 
     def translate(self, to_lang: str, query: str, from_lang: str = "auto"):
         """

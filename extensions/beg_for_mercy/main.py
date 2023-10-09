@@ -50,6 +50,9 @@ class BegForMercy(AbstractPlugin):
         from graia.ariadne.model import Group
         from colorama import Back
         from modules.file_manager import explore_folder
+        from modules.cmd import RequiredPermission, ExecutableNode, NameSpaceNode
+        from modules.auth.resources import required_perm_generator
+        from modules.auth.permissions import Permission, PermissionCode
 
         self.__register_all_config()
         self._config_registry.load_config()
@@ -68,8 +71,29 @@ class BegForMercy(AbstractPlugin):
 
             return "\n".join(kw_list)
 
-        tree = {CMD.ROOT: {CMD.ADD: _add_new_keyword, CMD.LIST: _list_kws}}
-        self._root_namespace_node.register(tree)
+        su_perm = Permission(id=PermissionCode.SuperPermission.value, name=self.get_plugin_name())
+        req_perm: RequiredPermission = required_perm_generator(
+            target_resource_name=self.get_plugin_name(), super_permissions=[su_perm]
+        )
+
+        tree = NameSpaceNode(
+            name=CMD.ROOT,
+            required_permissions=req_perm,
+            children_node=[
+                ExecutableNode(
+                    name=CMD.ADD,
+                    required_permissions=req_perm,
+                    source=_add_new_keyword,
+                ),
+                ExecutableNode(
+                    name=CMD.LIST,
+                    required_permissions=req_perm,
+                    source=_list_kws,
+                ),
+            ],
+        )
+        self._auth_manager.add_perm_from_req(req_perm)
+        self._root_namespace_node.add_node(tree)
 
         from graia.ariadne import Ariadne
 
