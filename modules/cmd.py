@@ -217,8 +217,8 @@ class CmdBuilder(object):
         Parameters:
             config_paths (List[str]): A list of config paths.
 
-        Returns:
-            Callable[[], str]: A function that, when called, returns a string listing out the values of the config paths.
+        Returns: Callable[[], str]: A function that, when called, returns a string listing out the values of the
+        config paths.
         """
 
         def _list_out() -> str:
@@ -479,7 +479,9 @@ class NameSpaceNode(BaseCmdNode):
 
         Args:
             node (Union[NameSpaceNode, ExecutableNode]): The node object to be added.
-            permissions (List[Permission], optional): The permissions required to add the node. Defaults to an empty list.
+            permissions (List[Permission], optional): The permissions required to add the node.
+                Defaults to an empty list.
+
 
         Raises:
             PermissionError: If the user does not have the required permissions to add the node.
@@ -512,8 +514,12 @@ class NameSpaceNode(BaseCmdNode):
         Remove a node from the namespace.
 
         Args:
-            node (Union["NameSpaceNode", "ExecutableNode", str, List[str]]): The node to be removed. It can be an instance of NameSpaceNode, ExecutableNode, a string representing the name of the node, or a list of strings representing the path to the node.
-            permissions (List[Permission], optional): The permissions required to remove the node. Defaults to an empty list.
+            node (Union["NameSpaceNode", "ExecutableNode", str, List[str]]): The node to be removed.
+                It can be an instance of NameSpaceNode, ExecutableNode, a string representing the name of the node,
+                or a list of strings representing the path to the node.
+
+            permissions (List[Permission], optional): The permissions required to remove it.
+                Defaults to an empty list.
 
         Raises:
             PermissionError: If the user does not have the required permissions to perform the delete operation.
@@ -557,7 +563,7 @@ class NameSpaceNode(BaseCmdNode):
 
         """
 
-        # Tokenize the command string, these token could contains cmds and parameters
+        # Tokenize the command string, these tokens could contain cmds and parameters
         tokens = tokenize_cmd(string)
 
         # Check if there are no tokens

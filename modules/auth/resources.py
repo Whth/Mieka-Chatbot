@@ -49,8 +49,11 @@ def required_perm_generator(
     This function takes in the following parameters:
     - target_resource_name: A string representing the name of the target resource.
     - extra_permissions(optional): A list of Permission objects representing any additional permissions.
-    - required_perm_name (optional): A string representing the name of the required permission. If not provided, it will be generated based on the target_resource_name.
-    - required_perm_id (optional): An integer representing the ID of the required permission. If not provided, it will be randomly generated using the random_digits function.
+    - required_perm_name (optional): A string representing the name of the required permission.
+        If not provided, it will be generated based on the target_resource_name.
+    - required_perm_id (optional): An integer representing the ID of the required permission.
+        If not provided, it will be randomly generated using the random_digits function.
+
 
     The function returns a RequiredPermission object that contains the following attributes:
     - id: An integer representing the ID of the required permission.

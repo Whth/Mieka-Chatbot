@@ -5,16 +5,38 @@ import warnings
 from abc import abstractmethod
 from pydantic import BaseModel, validator, Field, PrivateAttr, NonNegativeInt
 from typing import TypeVar, Type, Dict, List, final, Any, TypeAlias, Tuple
-from typing_extensions import override
 
 label_pattern = re.compile(r"^(\d+)-([a-zA-Z_]+)$")
 
 
-def make_label(id: int, name: str) -> str:
-    return f"{id}-{name}"
+def make_label(target_id: int, target_name: str) -> str:
+    """
+    Generate a label by combining the target ID and target name.
+
+    Args:
+        target_id (int): The ID of the target.
+        target_name (str): The name of the target.
+
+    Returns:
+        str: The generated label combining the target ID and target name.
+    """
+    return f"{target_id}-{target_name}"
 
 
 def extract_label(label: str) -> Tuple[int, str]:
+    """
+    Extracts a label by matching it against a label pattern.
+
+    Args:
+        label (str): The label to be extracted.
+
+    Returns:
+        Tuple[int, str]: A tuple containing the extracted label's integer value and the remaining part of the label.
+
+    Raises:
+        ValueError: If the label is invalid.
+
+    """
     match = label_pattern.match(label)
     if match:
         return int(match[1]), match[2]
@@ -226,11 +248,9 @@ def manager_factory(T_type: Type[T_AUTH_BASE_MODEL]) -> Type[T_Manager]:
         ele_type: Type = Field(default=T_type, exclude=True, const=True)
         object_dict: Dict[str, T_type] = Field(default_factory=dict, const=True)
 
-        @override
         def _make_json_dict(self) -> Dict:
             return {self._root_key: [object_instance.dict() for object_instance in self.object_dict.values()]}
 
-        @override
         def _make_object_instance(self, **kwargs) -> T_type:
             return T_type(**kwargs)
 

@@ -1,15 +1,14 @@
+import aiohttp
 import base64
 import hashlib
 import json
 import os
 import pathlib
 import time
+from PIL import Image
 from pathlib import Path
 from typing import List, Sequence, Dict, Optional
 from typing import Tuple
-
-import aiohttp
-from PIL import Image
 
 
 def get_current_file_path() -> str:
@@ -121,7 +120,8 @@ async def download_file(url: str, save_dir: str, force_download: bool = False) -
     Args:
         url (str): The URL of the file to download.
         save_dir (str): The directory to save the downloaded file.
-        force_download (bool, optional): Whether to force re-download of the file if it already exists. Defaults to False.
+        force_download (bool, optional): Whether to force re-download it even it already exists.Defaults to False.
+
 
     Returns:
         str: The path to the downloaded file.
@@ -293,7 +293,7 @@ def rename_image_with_hash(image_path: str) -> str:
     return new_image_path
 
 
-class ConteneCacher:
+class ContentCacher:
     __CACHE_REGISTRY_FNAME = "cache_registry.json"
 
     def __init__(self, cache_dir: str):

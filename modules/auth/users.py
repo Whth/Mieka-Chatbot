@@ -12,7 +12,7 @@ class User(AuthBaseModel):
     @validator("roles")
     def validate_roles(cls, roles: Iterable[Role]) -> List[Role]:
         """
-        Validate the roles input.
+        Validate the input.
 
         Args:
             cls (Type): The class object.
