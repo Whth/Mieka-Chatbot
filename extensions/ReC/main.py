@@ -1,9 +1,8 @@
 import os
-from typing import List, Optional, Sequence
-
 from graia.ariadne import Ariadne
 from graia.ariadne.event.message import GroupMessage
 from graia.ariadne.model import Group
+from typing import List, Optional, Sequence
 
 from modules.plugin_base import AbstractPlugin
 
@@ -11,6 +10,7 @@ __all__ = ["ReC"]
 
 
 class ReC(AbstractPlugin):
+    CONFIG_HALL_RECALL = "hall_recall_keyword"
     CONFIG_DETECTED_KEYWORD = "detected_keyword"
     CONFIG_MAX_LOOK_BACK = "MaxLookBack"
 
@@ -27,13 +27,14 @@ class ReC(AbstractPlugin):
 
     @classmethod
     def get_plugin_version(cls) -> str:
-        return "0.0.2"
+        return "0.0.3"
 
     @classmethod
     def get_plugin_author(cls) -> str:
         return "whth"
 
     def __register_all_config(self):
+        self._config_registry.register_config(self.CONFIG_HALL_RECALL, "recallall")
         self._config_registry.register_config(self.CONFIG_DETECTED_KEYWORD, "recall")
         self._config_registry.register_config(self.CONFIG_MAX_LOOK_BACK, 30)
 
@@ -64,7 +65,7 @@ class ReC(AbstractPlugin):
                 message_event (GroupMessage): The group message event triggering the recall action.
             """
             last_message_id = message_event.id - 1
-            print(last_message_id)
+
             messages_to_recall: List[GroupMessage] = []
             if hasattr(message_event.quote, "origin"):
                 # Get the message to recall from the quote
@@ -89,12 +90,52 @@ class ReC(AbstractPlugin):
             # Recall the message
             await recall_group_messages(app, messages_to_recall, group)
 
+        @self.receiver(
+            GroupMessage,
+            decorators=[
+                MentionMe(),
+                ContainKeyword(keyword=self._config_registry.get_config(self.CONFIG_HALL_RECALL)),
+            ],
+        )
+        async def hall_recall(app: Ariadne, group: Group, message_event: GroupMessage):
+            """
+            Handle the recall action for a group message event.
+
+            Args:
+                group (Group): The group where the recall action is triggered.
+                message_event (GroupMessage): The group message event triggering the recall action.
+            """
+            last_message_id = message_event.id - 1
+
+            messages_to_recall: List[GroupMessage] = []
+            if hasattr(message_event.quote, "origin"):
+                # Get the message to recall from the quote
+                messages_to_recall.append(await app.get_message_from_id(message_event.quote.id, group))
+
+            # Check if the message event has a quote
+            else:
+                print(f"{Fore.RED}No Quote")
+                print(f"{Fore.RED}Searching previous [{max_look_back}] messages{Fore.RESET}")
+
+                messages_to_recall.extend(
+                    await search_messages(
+                        app=app,
+                        last_message_id=last_message_id,
+                        look_back=max_look_back,
+                        target_group=group,
+                    )
+                )
+
+            print(f"{Fore.RED}Execute recall on {len(messages_to_recall)} messages{Fore.RESET}")
+            # Recall the message
+            await recall_group_messages(app, messages_to_recall, group)
+
         async def search_messages(
             app: Ariadne,
             last_message_id: int,
             look_back: int,
             target_group: Group,
-            target_member_id: Optional[Sequence[int]],
+            target_member_id: Optional[Sequence[int]] = None,
         ) -> List[GroupMessage]:
             """
             Search for previous messages in a group based on the last message ID, a look back interval, the target group, and optional target member IDs.
@@ -141,4 +182,6 @@ async def recall_group_messages(app: Ariadne, message: List[GroupMessage], group
         try:
             await app.recall_message(msg, group)
         except RemoteException:
+            continue
+        except PermissionError:
             continue
