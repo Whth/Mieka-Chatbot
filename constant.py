@@ -1,7 +1,8 @@
-import os
+import pathlib
+
 from typing import Union, List, Dict
 
-ROOT: str = os.path.abspath(os.path.dirname(__file__))
+ROOT: str = str(pathlib.Path(__file__).parent)
 CONFIG_DIR: str = "config"
 EXTENSION_DIR: str = "extensions"
 CONFIG_FILE_NAME: str = "config.json"
