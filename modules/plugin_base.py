@@ -41,19 +41,28 @@ class AbstractPlugin(ABC):
         decorators: list[Decorator] | None = None,
     ) -> Callable:
         """
-        Registers a function as a receiver for a specific event.
+        This function is a decorator used to register event listeners.
+        It takes in the following parameters:
 
-        Args:
-            func (Callable): The function to be registered as a receiver.
-            event (str | Type[Dispatchable]): The event that the function will listen to.
-            priority (int, optional): The priority of the receiver. Defaults to 16.
-            dispatchers (List[Type[BaseDispatcher] | BaseDispatcher] | None, optional):
-                The dispatchers that the receiver will be associated with. Defaults to None.
-            decorators (list[Decorator] | None, optional):
-                The decorators to be applied to the receiver function. Defaults to None.
+        - `event`: A string or a subclass of `Dispatchable`.
+        This parameter represents the event that the decorated function wants to listen to.
+        - `priority`: An integer representing the priority of the event listener.
+            The higher the priority, the earlier listener be executed.
+        - `dispatchers`: An optional list of dispatchers to be used for inline event dispatching.
+        - `namespace`: An optional namespace to be used for the event listener.
+        - `decorators`: An optional list of decorators to be applied to the decorated function.
 
-        Returns:
-            None: This function does not return anything.
+        The function returns a wrapper function that registers the decorated function as an event listener.
+        If the event listener already exists, an exception is raised.
+
+        Example usage:
+
+        ```
+        @receiver("event_name", priority=10)
+        def event_handler(event):
+            # handle the event
+        ```
+
         """
         return self._receiver(
             event=event, priority=priority, dispatchers=dispatchers, decorators=decorators, namespace=self._namespace

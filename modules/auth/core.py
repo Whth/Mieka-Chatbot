@@ -22,7 +22,7 @@ def final_handler(final_method: str, exception: Optional[Type[Exception]] = Exce
 
     Args:
         final_method (str): The name of the final method to be called after the function is executed.
-        exception (Optional[Type[Exception]], optional): The type of exception to catch. Defaults to Exception.
+        exception (Optional[Type[Exception]], optional): The type of exception to catch. Default to Exception.
 
     Returns:
         Callable: The wrapped function.
@@ -295,7 +295,7 @@ class AuthorizationManager(AuthBaseModel):
         Returns:
             bool: True if the resource was successfully removed, False otherwise.
         """
-        self._resources.remove_object(make_label(id=resource_id, name=resource_name))
+        self._resources.remove_object(make_label(target_id=resource_id, target_name=resource_name))
         return True
 
     @final_handler("save", KeyError)

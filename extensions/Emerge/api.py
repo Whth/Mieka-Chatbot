@@ -1,9 +1,8 @@
 import pathlib
+import requests
 from enum import Enum
 
-import requests
-
-from modules.file_manager import ConteneCacher
+from modules.file_manager import ContentCacher
 
 
 class EmojiMerge:
@@ -18,7 +17,7 @@ class EmojiMerge:
         pathlib.Path(cache_dir).mkdir(parents=True, exist_ok=True)
 
         self._cache_dir = cache_dir
-        self._cacher: ConteneCacher = ConteneCacher(self._cache_dir)
+        self._cacher: ContentCacher = ContentCacher(self._cache_dir)
 
     def merge(self, emoji_1: str, emoji_2: str) -> str | None:
         """

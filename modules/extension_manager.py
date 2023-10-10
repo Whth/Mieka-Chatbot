@@ -102,17 +102,17 @@ class ExtensionManager:
         Installs a plugin into the system.
 
         Args:
-            auth_manager ():
-            plugin (Type[AbstractPlugin]): The plugin class to be installed.
-
-            root_namespace_node (CmdClient): The bot client instance.
-            proxy (MappingProxyType[str, AbstractPlugin]): The proxy object for accessing other plugins.
-
-        Returns:
-            None
+            plugin (Type[AbstractPlugin]): The plugin to install.
+            broadcast (Broadcast): The broadcast system to use.
+            root_namespace_node (NameSpaceNode): The root namespace node.
+            proxy (PluginsView): The plugins view proxy.
+            auth_manager (AuthorizationManager): The authorization manager.
 
         Raises:
             ValueError: If the plugin is already registered.
+
+        Returns:
+            None
         """
         if plugin.get_plugin_name in self._plugins:
             raise ValueError("Plugin already registered")
@@ -126,15 +126,45 @@ class ExtensionManager:
         )
 
     def uninstall_plugin(self, plugin_name: str) -> None:
+        """
+        Uninstalls a plugin with the given name.
+
+        Parameters:
+            plugin_name (str): The name of the plugin to uninstall.
+
+        Returns:
+            None
+        """
         if plugin_name in self._plugins:
             self._plugins.get(plugin_name).uninstall()
 
     def install_all_requirements(self):
+        """
+        Install all the detected requirements.
+
+        This function detects the requirement files and installs the packages specified in each file.
+
+        Parameters:
+            self (ExtensionManager): The instance of the class.
+
+        Returns:
+            None
+        """
         detected_requirements = self._detect_requirements()
         for requirement_file in detected_requirements:
             install_requirements(requirement_file)
 
     def _detect_plugins(self) -> List[Type[AbstractPlugin]]:
+        """
+        Generates the list of detected plugins by searching for subdirectories in the extension directory,
+        importing and adding each plugin found.
+
+        Returns:
+            A list of types representing the detected plugins.
+
+        Raises:
+            None.
+        """
         sub_dirs: List[str] = get_all_sub_dirs(self._extension_dir)
         detected_plugins: List[Type[AbstractPlugin]] = []
         for sub_dir in sub_dirs:
@@ -143,6 +173,14 @@ class ExtensionManager:
         return detected_plugins
 
     def _detect_requirements(self) -> List[str]:
+        """
+        Detects the requirements for the extension
+        by searching for a specific file in each subdirectory of the extension directory.
+
+        Returns:
+            A list of strings representing the file paths of the detected requirements files.
+
+        """
         sub_dirs: List[str] = get_all_sub_dirs(self._extension_dir)
         detected_requirements: List[str] = []
         for sub_dir in sub_dirs:

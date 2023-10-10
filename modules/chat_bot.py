@@ -2,11 +2,12 @@ from graia.ariadne.app import Ariadne
 from graia.ariadne.connection.config import WebsocketClientConfig
 from graia.ariadne.entry import config
 from graia.ariadne.message.chain import MessageChain
-from graia.ariadne.model import Group, Friend, Member, Stranger
+from graia.ariadne.model import Friend, Member, Stranger
 from graia.ariadne.model.util import AriadneOptions
-from typing import Dict, List, NamedTuple, Union
+from typing import List, NamedTuple, Union
 
 from modules.auth.core import AuthorizationManager, Root
+from modules.auth.roles import Role
 from modules.auth.users import User
 from modules.cmd import NameSpaceNode, set_su_permissions
 from modules.extension_manager import ExtensionManager
@@ -18,8 +19,8 @@ class BotInfo(NamedTuple):
     Represents information about a bot.
 
     Attributes:
-        account_id (int): The ID of the bot's account.
-        bot_name (str, optional): The name of the bot. Defaults to an empty string.
+        account_id (int): The ID of the bot account.
+        bot_name (str, optional): The name of the bot. Default to an empty string.
     """
 
     account_id: int
@@ -42,13 +43,13 @@ class BotConnectionConfig(NamedTuple):
 
 class BotConfig(NamedTuple):
     """
-    Represents the configuration for a bot.
+    Configuration settings for the bot.
 
     Attributes:
-        extension_dir (str): The directory where the bot's extensions are located.
-        syntax_tree (Dict[str, Any]): The syntax tree used by the bot.
-        accepted_message_types (List[str], optional): The types of messages accepted by the bot.
-         Defaults to ["GroupMessage"].
+        extension_dir (str): The directory path for the bot extensions.
+        auth_config_file_path (str): The file path for the authentication configuration.
+        accepted_message_types (List[str], optional): The list of accepted message types.
+            Defaults to ["GroupMessage"].
     """
 
     extension_dir: str
@@ -116,7 +117,7 @@ class ChatBot(object):
             Asynchronously calls the bot client with the given target and message.
 
             Args:
-                target (Union[Group, Friend, Member, Stranger]): The target of the bot client call.
+                person (Union[Friend, Member, Stranger]): The target of the bot client call.
                 message (MessageChain): The message to be sent.
 
             Returns:
@@ -131,36 +132,31 @@ class ChatBot(object):
                 group = person.group
 
                 try:
-                    group_user = self._auth_manager.get_user(user_id=group.id, user_name=group.name)
-                    stack.append(group_user)
+                    stack.append(self._auth_manager.get_user(user_id=group.id, user_name=group.name))
                 except KeyError:
                     pass
 
-            try:
-                person_user = self._auth_manager.get_user(
+            stack.append(
+                self._auth_manager.get_user(
                     user_id=person.id, user_name=person.name if isinstance(person, Member) else person.nickname
                 )
-                stack.append(person_user)
-            except KeyError:
-                return
+            )  # if this fails, then there is no need to go further
 
-            try:
-                success = False
-                for target in stack:
-                    for role in target.roles:
-                        with role as perms:
-                            try:
-                                stdout = await self._root.interpret(str(message), perms)
-                                success = True
-                            except PermissionError:
-                                pass
-                        if success:
-                            break
-                    if success:
-                        break
-            except KeyError:
-                return
-            print(f"stdout: {stdout}") if stdout else print("stdout: None")
+            success = False
+            roles_bunch: List[List[Role]] = [user.roles for user in stack]
+            owned_roles: List[Role] = []
+            for role in roles_bunch:
+                owned_roles.extend(role)
+            for role in owned_roles:
+                with role as perms:
+                    try:
+                        stdout = await self._root.interpret(str(message), perms)
+                        success = True
+                    except PermissionError:
+                        pass
+                if success:
+                    break
+
             target = group if group else person
             (await self._ariadne_app.send_message(target, message=stdout)) if stdout else None
 
@@ -177,16 +173,13 @@ class ChatBot(object):
 
     def init_utils(self) -> None:
         """
-        Initializes the utilities for the class.
+        Initializes the utils for the class.
 
-        This function installs all the required dependencies using `install_all_requirements()` method from the `_extensions` object.
-        It also installs all the extensions for the app, bot client, and proxy using `install_all_extensions()` method from the `_extensions` object.
-
-        Parameters:
-            None
+        Args:
+            self: The instance of the class.
 
         Returns:
-            None
+            None.
         """
         self._extensions.install_all_requirements()
         self._extensions.install_all_extensions(
