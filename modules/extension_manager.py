@@ -6,7 +6,7 @@ from graia.broadcast import Broadcast
 from types import MappingProxyType
 from typing import List, Dict, Type, Sequence
 
-from constant import REQUIREMENTS_FILE_NAME, MAIN
+from constant import REQUIREMENTS_FILE_NAME
 from modules.auth.core import AuthorizationManager
 from modules.cmd import CmdClient, NameSpaceNode
 from modules.file_manager import get_all_sub_dirs
@@ -202,7 +202,7 @@ class ExtensionManager:
             one extension is allowed to contain multiple extensions
         """
         try:
-            module = import_module(MAIN, extension_attr_chain)  # load extension
+            module = import_module(extension_attr_chain)  # load extension
         except ModuleNotFoundError:
             return []
         plugins: List[Type[AbstractPlugin]] = []  # init yield list

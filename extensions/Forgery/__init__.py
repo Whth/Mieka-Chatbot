@@ -1,8 +1,7 @@
 import os
-from typing import List, Tuple
-
 from graia.ariadne.event.message import GroupMessage
 from graia.ariadne.message.element import Plain, Forward, MultimediaElement
+from typing import List, Tuple
 
 from modules.plugin_base import AbstractPlugin
 

@@ -4,7 +4,6 @@ from typing import Union, List, Dict
 ROOT: str = os.path.abspath(os.path.dirname(__file__))
 CONFIG_DIR: str = "config"
 EXTENSION_DIR: str = "extensions"
-MAIN = ".main"
 CONFIG_FILE_NAME: str = "config.json"
 REQUIREMENTS_FILE_NAME: str = "requirements.txt"
 

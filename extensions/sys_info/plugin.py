@@ -2,8 +2,6 @@ import os
 
 from modules.plugin_base import AbstractPlugin
 
-__all__ = ["SysInfo"]
-
 
 class SysInfo(AbstractPlugin):
     __INFO_CPU_CMD = "cpu"
