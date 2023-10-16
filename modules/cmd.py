@@ -1,9 +1,10 @@
 import re
 from abc import abstractmethod
 from inspect import signature, iscoroutinefunction
-from pydantic import BaseModel, Field, PrivateAttr
 from types import MappingProxyType
 from typing import Optional, Dict, Any, Tuple, List, Union, Callable, Type, Unpack, final, TypeVar, Iterable
+
+from pydantic import BaseModel, Field, PrivateAttr
 
 from constant import Value
 from modules.auth.permissions import Permission, auth_check
@@ -287,9 +288,9 @@ class BaseCmdNode(BaseModel):
     def get_read(self, permissions: Iterable[Permission]) -> Any:
         global __su_permissions__
         if auth_check(
-            self.required_permissions.read,
-            permissions,
-            optional_super=__su_permissions__ + self.required_permissions.super,
+                self.required_permissions.read,
+                permissions,
+                optional_super=__su_permissions__ + self.required_permissions.super,
         ):
             return self._read()
         raise PermissionError("Illegal Read operation, insufficient permissions")
@@ -301,9 +302,9 @@ class BaseCmdNode(BaseModel):
     def get_modify(self, permissions: Iterable[Permission], *modify_params: Unpack) -> Any:
         global __su_permissions__
         if auth_check(
-            self.required_permissions.modify,
-            permissions,
-            optional_super=__su_permissions__ + self.required_permissions.super,
+                self.required_permissions.modify,
+                permissions,
+                optional_super=__su_permissions__ + self.required_permissions.super,
         ):
             return self._modify(*modify_params)
         raise PermissionError("Illegal Modify operation, insufficient permissions")
@@ -315,9 +316,9 @@ class BaseCmdNode(BaseModel):
     def get_delete(self, permissions: Iterable[Permission], *delete_params: Unpack) -> Any:
         global __su_permissions__
         if auth_check(
-            self.required_permissions.delete,
-            permissions,
-            optional_super=__su_permissions__ + self.required_permissions.super,
+                self.required_permissions.delete,
+                permissions,
+                optional_super=__su_permissions__ + self.required_permissions.super,
         ):
             return self._delete(*delete_params)
         raise PermissionError("Illegal Delete operation, insufficient permissions")
@@ -329,9 +330,9 @@ class BaseCmdNode(BaseModel):
     async def get_execute(self, permissions: Iterable[Permission], *execute_params: Unpack) -> Any:
         global __su_permissions__
         if auth_check(
-            self.required_permissions.execute,
-            permissions,
-            optional_super=__su_permissions__ + self.required_permissions.super,
+                self.required_permissions.execute,
+                permissions,
+                optional_super=__su_permissions__ + self.required_permissions.super,
         ):
             return await self._execute(*execute_params)
         raise PermissionError("Illegal Execute operation, insufficient permissions")
@@ -363,8 +364,10 @@ class ExecutableNode(BaseCmdNode):
         converted = []
         for para, param_type in zip(execute_params, sig.values()):
             try:
+                # try to convert it to the right type
                 converted.append(param_type(para))
             except TypeError:
+                # if the force conversion fails, use the original value
                 converted.append(para)
 
         return await self.source(*converted) if iscoroutinefunction(self.source) else self.source(*converted)
@@ -409,9 +412,9 @@ class NameSpaceNode(BaseCmdNode):
         self.children_node.clear()
 
     def dict(
-        self,
-        *args,
-        **kwargs,
+            self,
+            *args,
+            **kwargs,
     ) -> Dict[str, Any]:
         self.children_node.clear()
         self.children_node.extend(self._children_node)
@@ -420,9 +423,9 @@ class NameSpaceNode(BaseCmdNode):
         return res
 
     def get_node(
-        self,
-        chain: List[str],
-        permissions: Iterable[Permission] = tuple(),
+            self,
+            chain: List[str],
+            permissions: Iterable[Permission] = tuple(),
     ) -> Union["NameSpaceNode", "ExecutableNode"]:
         """
         Get the node with the specified chain of names.
@@ -440,9 +443,9 @@ class NameSpaceNode(BaseCmdNode):
         """
         global __su_permissions__
         if not auth_check(
-            self.required_permissions.read,
-            permissions,
-            optional_super=__su_permissions__ + self.required_permissions.super,
+                self.required_permissions.read,
+                permissions,
+                optional_super=__su_permissions__ + self.required_permissions.super,
         ):
             raise PermissionError("Illegal Read operation, insufficient permissions")
         # Check if the chain is empty
@@ -470,9 +473,9 @@ class NameSpaceNode(BaseCmdNode):
         raise KeyError(f"No node with name {chain[0]} found")
 
     def add_node(
-        self,
-        node: Union["NameSpaceNode", "ExecutableNode"],
-        permissions: List[Permission] = tuple(),
+            self,
+            node: Union["NameSpaceNode", "ExecutableNode"],
+            permissions: List[Permission] = tuple(),
     ) -> None:
         """
         Adds a node to the current object.
@@ -493,9 +496,9 @@ class NameSpaceNode(BaseCmdNode):
         """
         global __su_permissions__
         if auth_check(
-            self.required_permissions.modify,
-            permissions,
-            optional_super=__su_permissions__ + self.required_permissions.super,
+                self.required_permissions.modify,
+                permissions,
+                optional_super=__su_permissions__ + self.required_permissions.super,
         ):
             if not isinstance(node, (NameSpaceNode, ExecutableNode)):
                 raise TypeError(f"Node must be of type {NameSpaceNode} or {ExecutableNode}")
@@ -506,9 +509,9 @@ class NameSpaceNode(BaseCmdNode):
         raise PermissionError("Illegal Modify operation, insufficient permissions")
 
     def remove_node(
-        self,
-        node: Union["NameSpaceNode", "ExecutableNode", str, List[str]],
-        permissions: Iterable[Permission] = tuple(),
+            self,
+            node: Union["NameSpaceNode", "ExecutableNode", str, List[str]],
+            permissions: Iterable[Permission] = tuple(),
     ) -> None:
         """
         Remove a node from the namespace.
@@ -529,8 +532,8 @@ class NameSpaceNode(BaseCmdNode):
         """
         global __su_permissions__
         if any(su_perm in permissions for su_perm in __su_permissions__ + self.required_permissions.super) or (
-            auth_check(self.required_permissions.delete, permissions)
-            and auth_check(self.required_permissions.read, permissions)
+                auth_check(self.required_permissions.delete, permissions)
+                and auth_check(self.required_permissions.read, permissions)
         ):
             if isinstance(node, str):
                 node = self.get_node([node], permissions)
