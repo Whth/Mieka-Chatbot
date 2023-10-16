@@ -112,7 +112,7 @@ class ChatBot(object):
             self._ariadne_app.broadcast.receiver(message_type)(self._make_cmd_interpreter())
 
     def _make_cmd_interpreter(self):
-        async def _cmd_interpret(person: Union[Friend, Member, Stranger], message: MessageChain):
+        async def _cmd_interpret(person: Union[Friend, Member], message: MessageChain):
             """
             Asynchronously calls the bot client with the given target and message.
 
