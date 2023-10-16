@@ -153,6 +153,9 @@ class ChatBot(object):
                         success = True
                     except PermissionError:
                         pass
+                    except KeyError:
+                        # keyError is raised only when the cmd is not defined. on that account, exit will be proceeded
+                        return
                 if success:
                     break
 
