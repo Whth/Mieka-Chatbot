@@ -1,10 +1,11 @@
+from typing import List, NamedTuple, Union
+
 from graia.ariadne.app import Ariadne
 from graia.ariadne.connection.config import WebsocketClientConfig
 from graia.ariadne.entry import config
 from graia.ariadne.message.chain import MessageChain
 from graia.ariadne.model import Friend, Member, Stranger
 from graia.ariadne.model.util import AriadneOptions
-from typing import List, NamedTuple, Union
 
 from modules.auth.core import AuthorizationManager, Root
 from modules.auth.roles import Role
@@ -132,14 +133,12 @@ class ChatBot(object):
                 group = person.group
 
                 try:
-                    stack.append(self._auth_manager.get_user(user_id=group.id, user_name=group.name))
+                    stack.extend(self._auth_manager.get_user(user_id=group.id))
                 except KeyError:
                     pass
 
-            stack.append(
-                self._auth_manager.get_user(
-                    user_id=person.id, user_name=person.name if isinstance(person, Member) else person.nickname
-                )
+            stack.extend(
+                self._auth_manager.get_user(user_id=person.id)
             )  # if this fails, then there is no need to go further
 
             success = False
