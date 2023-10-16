@@ -1,7 +1,6 @@
 import os
-import random
-import string
 
+from modules.file_manager import generate_random_string
 from modules.plugin_base import AbstractPlugin
 
 __all__ = ["HeartBeat"]
@@ -68,17 +67,3 @@ class HeartBeat(AbstractPlugin):
             print(f"heart beat is enabled, beats every {interval} minutes")
             return
         print("heart beat is disabled")
-
-
-def generate_random_string(length: int) -> str:
-    """
-    Generate a random string of a specified length.
-
-    Parameters:
-        length (int): The desired length of the random string.
-
-    Returns:
-        str: A random string consisting of letters from the ASCII alphabet.
-    """
-    letters = string.ascii_letters
-    return "".join(random.choice(letters) for _ in range(length))
