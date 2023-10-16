@@ -1,10 +1,10 @@
-from importlib import import_module
-
 import pathlib
-from colorama import Fore, Back, Style
-from graia.broadcast import Broadcast
+from importlib import import_module
 from types import MappingProxyType
 from typing import List, Dict, Type, Sequence
+
+from colorama import Fore, Back, Style
+from graia.broadcast import Broadcast
 
 from constant import REQUIREMENTS_FILE_NAME
 from modules.auth.core import AuthorizationManager
@@ -117,8 +117,11 @@ class ExtensionManager:
         if plugin.get_plugin_name in self._plugins:
             raise ValueError("Plugin already registered")
         plugin_instance = plugin(proxy, root_namespace_node, broadcast, auth_manager)
-
-        plugin_instance.install()
+        try:
+            plugin_instance.install()
+        except Exception as e:
+            print(f"{Fore.RED}Failed to install {plugin.get_plugin_name()}: {e}{Fore.RESET}")
+            return
         self._plugins[plugin.get_plugin_name()] = plugin_instance
         print(
             f"{Fore.GREEN}Installed {plugin.get_plugin_name()}\n"
