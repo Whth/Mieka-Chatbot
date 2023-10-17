@@ -1,7 +1,8 @@
 import pathlib
 from enum import Enum
-from graia.ariadne.connection.config import WebsocketClientConfig
 from typing import List
+
+from graia.ariadne.connection.config import WebsocketClientConfig
 
 from constant import CONFIG_FILE_NAME, CONFIG_DIR, EXTENSION_DIR
 from modules.chat_bot import ChatBot, BotInfo, BotConfig, BotConnectionConfig
@@ -15,7 +16,7 @@ class DefaultConfig(Enum):
     VERIFY_KEY = "INITKEYXBVCdNG0"
     ACCOUNT_ID = 1234567890
     ACCEPTED_MESSAGE_TYPES = ["GroupMessage"]
-    VERSION = "v0.4.4"
+    VERSION = "v0.4.5"
 
 
 def make_help_cmd(client: NameSpaceNode):
