@@ -10,3 +10,6 @@
 [submodule "extensions/EasyPin"]
 	path = extensions/EasyPin
 	url = https://github.com/Whth/EasyPIn
+[submodule "extensions/CP-Gen"]
+	path = extensions/CP-Gen
+	url = https://github.com/Whth/CP-Gen.git
