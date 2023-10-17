@@ -556,19 +556,30 @@ class NameSpaceNode(BaseCmdNode):
             "Illegal Delete operation, insufficient permissions, you need have the read and delete permissions"
         )
 
-    async def interpret(self, string: str, permissions: Iterable[Permission] = tuple()) -> Any:
+    async def interpret(
+        self, string: str, permissions: Iterable[Permission] = tuple(), documentation_keyword: str = "doc"
+    ) -> Any:
         """
-        Interprets a command string and returns the result.
+        Asynchronously interprets a command string and executes the corresponding command.
 
-        Args:
-            string (str): The command string to interpret.
-            permissions (List[Permission], optional): The list of permissions.Defaults to an empty tuple.
+        Parameters:
+            string (str): The command string to be interpreted.
+            permissions (Iterable[Permission], optional): The permissions required to execute the command.
+                    Default to an empty tuple.
+            documentation_keyword (str, optional): The keyword to retrieve documentation.
+                    Defaults to "doc".
 
         Returns:
-            Any: The result of the interpretation.
+            Any: The result of executing the command.
 
         Raises:
             KeyError: If the command string is empty.
+
+        Note:
+            - This function tokenizes the command string into individual tokens.
+            - It iterates through the tokens to find the corresponding command node.
+            - If the command node is an `ExecutableNode`, it executes the command.
+            - If the command node is a `NameSpaceNode`, it returns the documentation of the node.
 
         """
 
@@ -588,7 +599,11 @@ class NameSpaceNode(BaseCmdNode):
 
             # If the node is an ExecutableNode, execute the command
             if isinstance(target_node, ExecutableNode):
-                return await target_node.get_execute(permissions, *tokens[i:])
+                args = tokens[i:]
+                if len(args) == 1 and args[0] == documentation_keyword:
+                    # return the documentation
+                    return target_node.help_message
+                return await target_node.get_execute(permissions, *args)
 
         # If the node is a NameSpaceNode, return its documentation
         if isinstance(target_node, NameSpaceNode):
