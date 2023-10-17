@@ -21,6 +21,7 @@ class CodeTalker(AbstractPlugin):
     CONFIG_PRE_APPEND_HISTORY = "pre_append_history"
     CONFIG_DICTIONARY_PATH = "dictionary_path"
     CONFIG_RE_GENERATE_PROBABILITY = "re_generate_probability"
+    CONFIG_MAX_TOKENS = "max_tokens"
 
     def _get_config_parent_dir(self) -> str:
         return os.path.abspath(os.path.dirname(__file__))
@@ -54,6 +55,7 @@ class CodeTalker(AbstractPlugin):
             self.CONFIG_DICTIONARY_PATH, f"{self._get_config_parent_dir()}/fuzzy_dictionary.json"
         )
         self._config_registry.register_config(self.CONFIG_RE_GENERATE_PROBABILITY, 0.3)
+        self._config_registry.register_config(self.CONFIG_MAX_TOKENS, 100)
 
     def install(self):
         from sparkdesk_api.core import SparkAPI
@@ -81,15 +83,20 @@ class CodeTalker(AbstractPlugin):
             target_resource_name=self.get_plugin_name(), super_permissions=[su_perm]
         )
 
-        def _talk(message: str):
+        def _talk(message: str, max_tokens: int = 0) -> str:
             # Search for similar words in the fuzzy dictionary
             search: List[str] = fuzzy_dictionary.search(message)
 
             # If the random number is less than or equal to the re-generate probability
             # or no similar words are found in the dictionary
             if random.random() <= self._config_registry.get_config(self.CONFIG_RE_GENERATE_PROBABILITY) or not search:
+                max_tokens = max_tokens if max_tokens else self._config_registry.get_config(self.CONFIG_MAX_TOKENS)
                 # Generate a response using the Spark API
-                response: str = sparkAPI.chat(query=message, history=history, max_tokens=40)
+                response: str = sparkAPI.chat(
+                    query=message,
+                    history=history,
+                    max_tokens=max_tokens,
+                )
                 if response:
                     # Register the generated response in the fuzzy dictionary
                     fuzzy_dictionary.register_key_value(message, response)
