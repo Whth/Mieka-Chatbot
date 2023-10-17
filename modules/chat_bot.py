@@ -153,6 +153,9 @@ class ChatBot(object):
                         success = True
                     except PermissionError:
                         pass
+                    except KeyError:
+                        # keyError is raised only when the cmd is not defined. on that account, exit will be proceeded
+                        return
                 if success:
                     break
 
@@ -191,19 +194,11 @@ class ChatBot(object):
 
     def run(self) -> None:
         """
-        Runs the function.
+        Run the application.
 
-        This function is responsible for executing the main logic of the program.
-        It performs the following steps:
-
-        1. Install all the requirements by calling `install_all_requirements()` with the `extension_dir` parameter.
-        2. Install all the extensions by calling `install_all_extensions()` with the `extension_dir` parameter.
-        3. Retrieve the `Broadcast` object from the `_ariadne_app` attribute.
-        4. Posts an `AllExtensionsInstalledEvent()` event to the broadcast.
-        5. Launches the `_ariadne_app` in blocking mode.
-
-        If a `KeyboardInterrupt` exception is raised during the execution, the function will call `stop()`
-        to stop the program.
+        This method launches the Ariadne app in blocking mode.
+        It catches a KeyboardInterrupt exception and stops the app if it is raised.
+        After the app is stopped, it saves the changes made to the permissions, roles, resources, and users using the AuthManager.
 
         Parameters:
 

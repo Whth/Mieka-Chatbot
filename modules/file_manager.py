@@ -1,14 +1,17 @@
-import aiohttp
 import base64
 import hashlib
 import json
 import os
 import pathlib
+import random
+import string
 import time
-from PIL import Image
 from pathlib import Path
 from typing import List, Sequence, Dict, Optional
 from typing import Tuple
+
+import aiohttp
+from PIL import Image
 
 
 def get_current_file_path() -> str:
@@ -320,3 +323,17 @@ class ContentCacher:
     def load(self):
         with open(os.path.join(self._cache_dir, self.__CACHE_REGISTRY_FNAME), "r") as f:
             self._registry.update(json.load(f))
+
+
+def generate_random_string(length: int) -> str:
+    """
+    Generate a random string of a specified length.
+
+    Parameters:
+        length (int): The desired length of the random string.
+
+    Returns:
+        str: A random string consisting of letters from the ASCII alphabet.
+    """
+    letters = string.ascii_letters
+    return "".join(random.choice(letters) for _ in range(length))
