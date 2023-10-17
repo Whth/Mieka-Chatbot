@@ -47,7 +47,7 @@ class Novelin(AbstractPlugin):
         asset_path = self._config_registry.get_config(self.CONFIG_NOVEL_ASSET_PATH)
         pathlib.Path(asset_path).mkdir(parents=True, exist_ok=True)
 
-        def _some_novel(length: int) -> str:
+        def _some_novel(length: int = 1) -> str:
             """
             Generate a novel of a specified length.
 
