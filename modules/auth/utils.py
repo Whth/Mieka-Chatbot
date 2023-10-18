@@ -3,8 +3,9 @@ import pathlib
 import re
 import warnings
 from abc import abstractmethod
-from pydantic import BaseModel, validator, Field, PrivateAttr, NonNegativeInt
 from typing import TypeVar, Type, Dict, List, final, Any, TypeAlias, Tuple
+
+from pydantic import BaseModel, validator, Field, PrivateAttr, NonNegativeInt
 
 label_pattern = re.compile(r"^(\d+)-([a-zA-Z_]+)$")
 
@@ -108,22 +109,25 @@ class ManagerBase(AuthBaseModel):
         return str(path.absolute())
 
     @final
-    def add_object(self, new_object: AuthBaseModel) -> bool:
+    def add_object(self, new_object: AuthBaseModel, info: bool = False) -> bool:
         """
-        Adds a new object to the object list if it is not already present.
+        Adds a new object to the object dictionary.
 
         Args:
-            new_object (AuthBaseModel): The object to be added to the list.
+            new_object (AuthBaseModel): The new object to be added.
+            info (bool, optional): Whether or not to display a warning if the object already exists.
+                Defaults to False.
 
         Returns:
-            bool: True if the object is added successfully, False if the object is already present in the list.
+            bool: True if the object was successfully added, False otherwise.
         """
         if new_object.unique_label in self.object_dict:
-            warnings.warn(
-                f"[<{new_object.id}>-{new_object.name}] is already in the object list, skipping",
-                category=UserWarning,
-                stacklevel=1,
-            )
+            if info:
+                warnings.warn(
+                    f"[<{new_object.id}>-{new_object.name}] is already in the object list, skipping",
+                    category=UserWarning,
+                    stacklevel=1,
+                )
             return False
         self.object_dict[new_object.unique_label] = new_object
         return True
