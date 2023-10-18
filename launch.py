@@ -5,6 +5,7 @@ from typing import List
 from graia.ariadne.connection.config import WebsocketClientConfig
 
 from constant import CONFIG_FILE_NAME, CONFIG_DIR, EXTENSION_DIR
+from modules.auth.resources import RequiredPermission
 from modules.chat_bot import ChatBot, BotInfo, BotConfig, BotConnectionConfig
 from modules.cmd import ExecutableNode, NameSpaceNode
 from modules.config_utils import ConfigRegistry
@@ -107,6 +108,7 @@ class Mieka(object):
                 ),
                 ExecutableNode(
                     name=CMD.REBOOT,
+                    required_permissions=RequiredPermission(execute=[self.__bot.auth_manager.__su_permission__]),
                     help_message="Reboot the bot",
                     source=lambda: f"Reboot the bot\nSuccess={self.__bot.reboot()}",
                 ),
