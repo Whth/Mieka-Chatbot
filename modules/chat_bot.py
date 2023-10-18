@@ -236,5 +236,6 @@ class ChatBot(object):
             import subprocess
             from constant import USER_BATCH_SCRIPT_PATH
 
+            subprocess.Popen("cls", shell=True)
             subprocess.Popen(USER_BATCH_SCRIPT_PATH, shell=True)
             exit(0)
