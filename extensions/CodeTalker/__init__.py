@@ -23,7 +23,8 @@ class CodeTalker(AbstractPlugin):
     CONFIG_RE_GENERATE_PROBABILITY = "re_generate_probability"
     CONFIG_MAX_TOKENS = "max_tokens"
 
-    def _get_config_parent_dir(self) -> str:
+    @classmethod
+    def _get_config_dir(cls) -> str:
         return os.path.abspath(os.path.dirname(__file__))
 
     @classmethod
@@ -52,7 +53,7 @@ class CodeTalker(AbstractPlugin):
             [],
         )
         self._config_registry.register_config(
-            self.CONFIG_DICTIONARY_PATH, f"{self._get_config_parent_dir()}/fuzzy_dictionary.json"
+            self.CONFIG_DICTIONARY_PATH, f"{self._get_config_dir()}/fuzzy_dictionary.json"
         )
         self._config_registry.register_config(self.CONFIG_RE_GENERATE_PROBABILITY, 0.3)
         self._config_registry.register_config(self.CONFIG_MAX_TOKENS, 100)

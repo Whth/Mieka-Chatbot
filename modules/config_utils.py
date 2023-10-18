@@ -1,13 +1,13 @@
-from json import load, dump
-
 import inspect
 import os
 import re
-from colorama import Back, Fore, Style
 from functools import singledispatch
+from json import load, dump
 from types import MappingProxyType
 from typing import Any, Dict, List, Union, TypeVar
 from typing import Sequence, Tuple, Optional, Callable
+
+from colorama import Back, Fore, Style
 
 from constant import CONFIG_PATH_PATTERN, Value
 
@@ -61,7 +61,7 @@ def get_signature_with_annotations(func) -> Dict[str, Any]:
 @singledispatch
 def get_config(body: Union[Dict, MappingProxyType], chain: Sequence[str]) -> Any:
     """
-    Get config recursively from the nested dict
+    Get config_registry recursively from the nested dict
     Args:
         body (dict): The nested dictionary
         chain (Sequence[str]): The sequence of keys representing the path to the desired value
@@ -93,14 +93,14 @@ def _() -> Any:
 @singledispatch
 def make_config(body: Dict, chain: Sequence[str], value: Any) -> Dict:
     """
-    Inject config to a nested dict
+    Inject config_registry to a nested dict
     Args:
         body (dict): The nested dictionary
         chain (Sequence[str]): The sequence of keys representing the path to the desired value.
         value (Any): The value to be injected
 
     Returns:
-        dict: The modified nested dictionary with the injected config
+        dict: The modified nested dictionary with the injected config_registry
     """
     raise KeyError("The chain is conflicting")
 
@@ -191,7 +191,7 @@ def get_all_config_chains(body: Dict[str, Any]) -> Tuple[List[List[str]], List[A
 class ConfigRegistry(object):
 
     """
-    a config registry class using json
+    a config_registry registry class using json
     """
 
     __config_registry_instance: List["ConfigRegistry"] = []
@@ -229,7 +229,7 @@ class ConfigRegistry(object):
     @property
     def config_file_path(self) -> str:
         """
-        the path where stores the config file, in json format
+        the path where stores the config_registry file, in json format
         Returns:
 
         """
@@ -238,7 +238,7 @@ class ConfigRegistry(object):
     @config_file_path.setter
     def config_file_path(self, config_path: str) -> None:
         """
-        set the config file path, with parent directory check
+        set the config_registry file path, with parent directory check
         Args:
             config_path ():
 
@@ -250,7 +250,7 @@ class ConfigRegistry(object):
 
     def load_config(self):
         """
-        load config
+        load config_registry
         Returns:
 
         """
@@ -258,10 +258,10 @@ class ConfigRegistry(object):
 
     def _load_config(self, config_path: str):
         """
-        Load the configuration from the given config file path.
+        Load the configuration from the given config_registry file path.
 
         Args:
-            config_path (Str): The path to the config file.
+            config_path (Str): The path to the config_registry file.
 
         Returns:
 
@@ -279,12 +279,12 @@ class ConfigRegistry(object):
 
     def save_config(self):
         """
-        save config to file
+        save config_registry to file
         Returns:
 
         """
         if not self._config_file_path:
-            raise ValueError("config file path is not set!")
+            raise ValueError("config_registry file path is not set!")
         temp = {}
         for k, v in self._config_registry_table_proxy.items():
             make_config(temp, registry_path_to_chain(k), v)
@@ -302,7 +302,7 @@ class ConfigRegistry(object):
 
     def register_config(self, registry_path: str, default_value: Value) -> None:
         """
-        register config
+        register config_registry
         Args:
             registry_path ():
             default_value ():
@@ -329,7 +329,7 @@ class ConfigRegistry(object):
 
     def set_config(self, config_path: str, new_config_value: Value) -> None:
         """
-        Sets a new configuration value for the given registry path in the config registry table.
+        Sets a new configuration value for the given registry path in the config_registry registry table.
 
         Parameters:
             - registry_path (str): The path of the registry to set the new value for.
@@ -339,7 +339,7 @@ class ConfigRegistry(object):
             None
 
         Raises:
-            KeyError: If the registry path does not exist in the config registry table.
+            KeyError: If the registry path does not exist in the config_registry registry table.
         """
         if config_path not in self._config_registry_table.keys():
             raise KeyError(f"{config_path} not exists!")

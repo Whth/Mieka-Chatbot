@@ -1,7 +1,8 @@
 import os
+from typing import List, Tuple
+
 from graia.ariadne.event.message import GroupMessage
 from graia.ariadne.message.element import Plain, Forward, MultimediaElement
-from typing import List, Tuple
 
 from modules.plugin_base import AbstractPlugin
 
@@ -13,7 +14,8 @@ class CMD:
 
 
 class Forgery(AbstractPlugin):
-    def _get_config_parent_dir(self) -> str:
+    @classmethod
+    def _get_config_dir(cls) -> str:
         return os.path.abspath(os.path.dirname(__file__))
 
     @classmethod
@@ -32,17 +34,11 @@ class Forgery(AbstractPlugin):
     def get_plugin_author(cls) -> str:
         return "whth"
 
-    def __register_all_config(self):
-        pass
-
     def install(self):
         from graia.ariadne.message.chain import MessageChain
         from graia.ariadne.model import Group
         import re
         from .fake_chain import make_forward, get_messages
-
-        self.__register_all_config()
-        self._config_registry.load_config()
 
         reg = re.compile(rf"{CMD.ROOT}\s+(\d+)")
 

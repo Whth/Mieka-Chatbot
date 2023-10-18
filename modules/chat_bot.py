@@ -229,7 +229,7 @@ class ChatBot(object):
             if with_save:
                 self._auth_manager.save()
                 for extension in self._extensions.plugins_view.values():
-                    extension.config.save_config()
+                    extension.config_registry.save_config()
 
     def reboot(self):
         if self._is_running:

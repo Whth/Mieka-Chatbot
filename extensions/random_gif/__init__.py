@@ -1,6 +1,7 @@
 import os
 import random
 
+from modules.file_manager import get_pwd
 from modules.plugin_base import AbstractPlugin
 
 __all__ = ["RandomMeme"]
@@ -10,7 +11,13 @@ class RandomMeme(AbstractPlugin):
     GIF_ASSET_PATH = "gif_asset_path"
     DETECTED_KEYWORD = "detected_keyword"
 
-    def _get_config_parent_dir(self) -> str:
+    DefaultConfig = {
+        GIF_ASSET_PATH: f"{get_pwd()}/asset",
+        DETECTED_KEYWORD: "meme",
+    }
+
+    @classmethod
+    def _get_config_dir(cls) -> str:
         return os.path.abspath(os.path.dirname(__file__))
 
     @classmethod
@@ -29,19 +36,12 @@ class RandomMeme(AbstractPlugin):
     def get_plugin_author(cls) -> str:
         return "whth"
 
-    def __register_all_config(self):
-        self._config_registry.register_config(self.GIF_ASSET_PATH, f"{self._get_config_parent_dir()}/asset")
-        self._config_registry.register_config(self.DETECTED_KEYWORD, "meme")
-
     def install(self):
         from modules.file_manager import explore_folder
         from graia.ariadne.message.element import Image
         from graia.ariadne.message.parser.base import ContainKeyword
         from graia.ariadne.model import Group
         from graia.ariadne.event.message import GroupMessage
-
-        self.__register_all_config()
-        self._config_registry.load_config()
 
         gif_dir_path = self._config_registry.get_config(self.GIF_ASSET_PATH)
 

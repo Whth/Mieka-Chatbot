@@ -12,7 +12,10 @@ class SysInfo(AbstractPlugin):
 
     CONFIG_DETECTED_KEYWORD = "detected_keyword"
 
-    def _get_config_parent_dir(self) -> str:
+    DefaultConfig = {CONFIG_DETECTED_KEYWORD: "sys"}
+
+    @classmethod
+    def _get_config_dir(cls) -> str:
         return os.path.abspath(os.path.dirname(__file__))
 
     @classmethod
@@ -31,15 +34,9 @@ class SysInfo(AbstractPlugin):
     def get_plugin_author(cls) -> str:
         return "whth"
 
-    def __register_all_config(self):
-        self._config_registry.register_config(self.CONFIG_DETECTED_KEYWORD, "sys")
-
     def install(self):
         from .util import get_gpu_info, get_mem_info, get_cpu_info, get_all_info, get_disk_info
         from modules.cmd import NameSpaceNode, ExecutableNode, RequiredPermission
-
-        self.__register_all_config()
-        self._config_registry.load_config()
 
         from modules.auth.resources import required_perm_generator
         from modules.auth.permissions import Permission, PermissionCode

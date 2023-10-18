@@ -9,7 +9,10 @@ __all__ = ["HeartBeat"]
 class HeartBeat(AbstractPlugin):
     CONFIG_HEART_BEAT_INTERVAL = "HeartBeatInterval"
 
-    def _get_config_parent_dir(self) -> str:
+    DefaultConfig = {CONFIG_HEART_BEAT_INTERVAL: 40}
+
+    @classmethod
+    def _get_config_dir(cls) -> str:
         return os.path.abspath(os.path.dirname(__file__))
 
     @classmethod
@@ -28,12 +31,7 @@ class HeartBeat(AbstractPlugin):
     def get_plugin_author(cls) -> str:
         return "whth"
 
-    def __register_all_config(self):
-        self._config_registry.register_config(self.CONFIG_HEART_BEAT_INTERVAL, 40)
-
     def install(self):
-        self.__register_all_config()
-        self._config_registry.load_config()
         from graia.ariadne.app import Ariadne
         from graia.scheduler import GraiaScheduler, timers
         from datetime import datetime

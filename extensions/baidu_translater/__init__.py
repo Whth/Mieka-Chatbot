@@ -14,7 +14,15 @@ class BaiduTranslater(AbstractPlugin):
 
     CONFIG_TRANSLATE_KEYWORD = "TranslateKeyword"
 
-    def _get_config_parent_dir(self) -> str:
+    DefaultConfig = {
+        CONFIG_APP_ID: "replace with baidu translate app_id",
+        CONFIG_APP_KEY: "replace with baidu translate app_key",
+        CONFIG_API_URL: "http://api.fanyi.baidu.com/api/trans/vip/translate",
+        CONFIG_TRANSLATE_KEYWORD: "trans",
+    }
+
+    @classmethod
+    def _get_config_dir(cls) -> str:
         return os.path.abspath(os.path.dirname(__file__))
 
     @classmethod
@@ -33,20 +41,12 @@ class BaiduTranslater(AbstractPlugin):
     def get_plugin_author(cls) -> str:
         return "whth"
 
-    def __register_all_config(self):
-        self._config_registry.register_config(self.CONFIG_APP_ID, "replace with baidu translate app_id")
-        self._config_registry.register_config(self.CONFIG_APP_KEY, "replace with baidu translate app_key")
-        self._config_registry.register_config(self.CONFIG_API_URL, "http://api.fanyi.baidu.com/api/trans/vip/translate")
-        self._config_registry.register_config(self.CONFIG_TRANSLATE_KEYWORD, "trans")
-
     def install(self):
         from .translater import Translater
         from modules.cmd import RequiredPermission, ExecutableNode
         from modules.auth.resources import required_perm_generator
         from modules.auth.permissions import Permission, PermissionCode
 
-        self.__register_all_config()
-        self._config_registry.load_config()
         self.translater = Translater(
             appid=self._config_registry.get_config(self.CONFIG_APP_ID),
             appkey=self._config_registry.get_config(self.CONFIG_APP_KEY),
