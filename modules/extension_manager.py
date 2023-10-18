@@ -47,6 +47,7 @@ class ExtensionManager:
         root_namespace_node: NameSpaceNode,
         proxy: PluginsView,
         auth_manager: AuthorizationManager,
+        enable_plugins: bool = True,
     ) -> None:
         """
         Installs all extensions for the given app and bot client.
@@ -87,8 +88,31 @@ class ExtensionManager:
             if plugin.get_plugin_name() in self._black_list:
                 continue
             print(Fore.LIGHTRED_EX)
-            self.install_plugin(plugin, broadcast, root_namespace_node, proxy, auth_manager)
+            self.install_plugin(
+                plugin=plugin,
+                broadcast=broadcast,
+                root_namespace_node=root_namespace_node,
+                proxy=proxy,
+                auth_manager=auth_manager,
+                enable_plugin=enable_plugins,
+            )
             print(Fore.RESET)
+
+    def uninstall_all_extensions(self):
+        for plugin_name in list(self.plugins.keys()):
+            self.uninstall_plugin(plugin_name)
+
+    def uninstall_plugin(self, plugin_name):
+        if plugin_name not in self.plugins_view:
+            raise KeyError(f"{plugin_name} not exists")
+        plugin = self.plugins_view.get(plugin_name)
+        print(
+            f"{Fore.LIGHTBLUE_EX}----------------------------------------\n"
+            f"Uninstalling {plugin.get_plugin_name()}-{plugin.get_plugin_version()}"
+        )
+        plugin.uninstall()
+        del self.plugins[plugin_name]
+        print(f"----------------------------------------{Fore.RESET}")
 
     def install_plugin(
         self,
@@ -97,30 +121,37 @@ class ExtensionManager:
         root_namespace_node: NameSpaceNode,
         proxy: PluginsView,
         auth_manager: AuthorizationManager,
+        enable_plugin: bool = True,
     ) -> None:
         """
         Installs a plugin into the system.
 
         Args:
             plugin (Type[AbstractPlugin]): The plugin to install.
-            broadcast (Broadcast): The broadcast system to use.
+            broadcast (Broadcast): The broadcast object.
             root_namespace_node (NameSpaceNode): The root namespace node.
-            proxy (PluginsView): The plugins view proxy.
+            proxy (PluginsView): The plugins view.
             auth_manager (AuthorizationManager): The authorization manager.
+            enable_plugin (bool, optional): Whether to enable the plugin. Defaults to True.
 
         Raises:
             ValueError: If the plugin is already registered.
 
         Returns:
             None
+
         """
         if plugin.get_plugin_name in self._plugins:
             raise ValueError("Plugin already registered")
         plugin_instance = plugin(proxy, root_namespace_node, broadcast, auth_manager)
         try:
             plugin_instance.install()
+            plugin_instance.enable() if enable_plugin else plugin_instance.disable()
         except Exception as e:
-            print(f"{Fore.RED}Failed to install {plugin.get_plugin_name()}: {e}{Fore.RESET}")
+            print(
+                f"{Fore.RED}Failed to install {plugin.get_plugin_name()}: {e}{Fore.RESET}\n"
+                f"{Fore.MAGENTA}----------------------------------------------\n"
+            )
             return
         self._plugins[plugin.get_plugin_name()] = plugin_instance
         print(
@@ -128,18 +159,26 @@ class ExtensionManager:
             f"{Fore.MAGENTA}----------------------------------------------\n"
         )
 
-    def uninstall_plugin(self, plugin_name: str) -> None:
+    def disable_plugin(self, plugin_name: str) -> bool:
         """
         Uninstalls a plugin with the given name.
 
         Parameters:
-            plugin_name (str): The name of the plugin to uninstall.
+            plugin_name (str): The name of the plugin to disable.
 
         Returns:
             None
         """
         if plugin_name in self._plugins:
-            self._plugins.get(plugin_name).uninstall()
+            self._plugins.get(plugin_name).disable()
+            return True
+        return False
+
+    def enable_plugin(self, plugin_name: str) -> bool:
+        if plugin_name in self._plugins:
+            self._plugins.get(plugin_name).enable()
+            return True
+        return False
 
     def install_all_requirements(self):
         """

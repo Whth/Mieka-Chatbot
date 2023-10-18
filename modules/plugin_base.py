@@ -2,9 +2,10 @@
 plugin_base that is used in create a standard plugin
 """
 from abc import ABC, abstractmethod
-from graia.broadcast import Namespace, BaseDispatcher, Decorator, Dispatchable, Broadcast
 from types import MappingProxyType
 from typing import final, Callable, Type, List
+
+from graia.broadcast import Namespace, BaseDispatcher, Decorator, Dispatchable, Broadcast
 
 from constant import CONFIG_FILE_NAME
 from modules.auth.core import AuthorizationManager
@@ -17,6 +18,10 @@ class AbstractPlugin(ABC):
     Abstract plugin class
     """
 
+    @property
+    def config(self) -> ConfigRegistry:
+        return self._config_registry
+
     @final
     def __init__(
         self,
@@ -27,7 +32,9 @@ class AbstractPlugin(ABC):
     ):
         self._auth_manager = auth_manager
         self._receiver = broadcast.receiver
-        self._namespace: Namespace = broadcast.createNamespace(name=self.get_plugin_name())
+        self._namespace: Namespace = broadcast.createNamespace(name=self.get_plugin_name(), disabled=True)
+        self._namespace_uninstaller = broadcast.removeNamespace
+
         self._plugin_view: MappingProxyType[str, "AbstractPlugin"] = plugins_viewer
         self._config_registry: ConfigRegistry = ConfigRegistry(f"{self._get_config_parent_dir()}/{CONFIG_FILE_NAME}")
         self._root_namespace_node: NameSpaceNode = root_namespace_node
@@ -135,11 +142,30 @@ class AbstractPlugin(ABC):
         pass
 
     @final
-    def uninstall(self):
+    def enable(self):
         """
-        Uninstall the plugin
+        Enable the plugin
+        """
+        self._namespace.disabled = False
+
+    @final
+    def disable(self):
+        """
+        Disable the plugin
         """
         self._namespace.disabled = True
+
+    @final
+    def uninstall(self):
+        self.disable()
+        self._namespace_uninstaller(self._namespace.name)
+        self.extra_uninstall()
+
+    def extra_uninstall(self):
+        """
+        A description of the extra_uninstall function.
+        """
+        pass
 
 
 PluginsView: Type = MappingProxyType[str, AbstractPlugin]
