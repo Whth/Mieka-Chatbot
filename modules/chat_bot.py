@@ -112,6 +112,8 @@ class ChatBot(object):
         for message_type in bot_config.accepted_message_types:
             self._ariadne_app.broadcast.receiver(message_type)(self._make_cmd_interpreter())
 
+        self._is_running: bool = False
+
     def _make_cmd_interpreter(self):
         async def _cmd_interpret(person: Union[Friend, Member], message: MessageChain):
             """
@@ -192,7 +194,7 @@ class ChatBot(object):
         )
         # TODO better add a hall perm checker, to eliminate unregistered perm be used
 
-    def run(self) -> None:
+    def run(self, init_utils: bool = True) -> None:
         """
         Run the application.
 
@@ -206,18 +208,33 @@ class ChatBot(object):
         Returns:
             None
         """
-
+        self.init_utils() if init_utils else None
+        if self._is_running:
+            return
         try:
+            self._is_running = True
             self._ariadne_app.launch_blocking()
 
         except KeyboardInterrupt:
-            self.stop()
-        finally:
-            print("Save the changes made to the permissions, roles, resources, and users.")
-            self._auth_manager.save()
+            self._is_running = False
+            self.stop(with_save=True)
 
-    def stop(self) -> None:
+    def stop(self, with_save: bool = True) -> None:
         """
         Stop the bot
         """
-        self._ariadne_app.stop()
+        if self._is_running:
+            self._ariadne_app.stop()
+            self._is_running = False
+            if with_save:
+                self._auth_manager.save()
+                for extension in self._extensions.plugins_view.values():
+                    extension.config.save_config()
+
+    def reboot(self):
+        if self._is_running:
+            import subprocess
+            from constant import USER_BATCH_SCRIPT_PATH
+
+            subprocess.Popen(USER_BATCH_SCRIPT_PATH, shell=True)
+            exit(0)

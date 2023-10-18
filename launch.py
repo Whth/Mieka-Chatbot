@@ -40,6 +40,10 @@ class CMD:
     VERSION = "version"
     PLUGINS = "plugins"
     HELP = "cmds"
+    DISABLE = "disable"
+
+    ENABLE = "enable"
+    REBOOT = "reboot"
     SU = "su"
 
 
@@ -73,28 +77,43 @@ class Mieka(object):
         bot_config=__bot_config,
         bot_connection_config=__bot_connection_config,
     )
-    __bot_tree: NameSpaceNode = NameSpaceNode(
-        name=CMD.ROOT,
-        children_node=[
-            ExecutableNode(
-                name=CMD.PLUGINS, source=make_installed_plugins_cmd(plugins_view=__bot.get_installed_plugins)
-            ),
-            ExecutableNode(
-                name=CMD.HELP,
-                source=make_help_cmd(client=__bot.root),
-                help_message="These cmds are both built-in and extensions",
-            ),
-            ExecutableNode(
-                name=CMD.VERSION, source=lambda: DefaultConfig.VERSION.value, help_message="The core version of the bot"
-            ),
-        ],
-        help_message="BotInfo provided",
-    )
-    __bot.root.add_node(__bot_tree)
 
-    @classmethod
-    def init(cls):
-        cls.__bot.init_utils()
+    def __init__(self):
+        bot_tree: NameSpaceNode = NameSpaceNode(
+            name=CMD.ROOT,
+            children_node=[
+                ExecutableNode(
+                    name=CMD.PLUGINS, source=make_installed_plugins_cmd(plugins_view=self.__bot.get_installed_plugins)
+                ),
+                ExecutableNode(
+                    name=CMD.HELP,
+                    source=make_help_cmd(client=self.__bot.root),
+                    help_message="These cmds are both built-in and extensions",
+                ),
+                ExecutableNode(
+                    name=CMD.VERSION,
+                    source=lambda: DefaultConfig.VERSION.value,
+                    help_message="The core version of the bot",
+                ),
+                ExecutableNode(
+                    name=CMD.DISABLE,
+                    help_message="Disable the target plugin",
+                    source=lambda x: f'Disable the "{x}" plugin\nSuccess={self.__bot.extensions.disable_plugin(x)}',
+                ),
+                ExecutableNode(
+                    name=CMD.ENABLE,
+                    help_message="Enable the target plugin",
+                    source=lambda x: f'Enable the "{x}" plugin\nSuccess={self.__bot.extensions.enable_plugin(x)}',
+                ),
+                ExecutableNode(
+                    name=CMD.REBOOT,
+                    help_message="Reboot the bot",
+                    source=lambda: f"Reboot the bot\nSuccess={self.__bot.reboot()}",
+                ),
+            ],
+            help_message="BotInfo provided",
+        )
+        self.__bot.root.add_node(bot_tree)
 
     @classmethod
     def run(cls):
@@ -104,12 +123,10 @@ class Mieka(object):
 
         """
 
-        cls.__bot.run()
-        cls.__config.save_all_configs()
+        cls.__bot.run(init_utils=True)
 
 
 if __name__ == "__main__":
     bot = Mieka()
 
-    bot.init()
     bot.run()
