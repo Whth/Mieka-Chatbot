@@ -238,4 +238,5 @@ class ChatBot(object):
 
             subprocess.Popen("cls", shell=True)
             subprocess.Popen(USER_BATCH_SCRIPT_PATH, shell=True)
+            self.stop()
             exit(0)
