@@ -148,6 +148,9 @@ class ExtensionManager:
             plugin_instance.install()
             plugin_instance.enable() if enable_plugin else plugin_instance.disable()
         except Exception as e:
+            import traceback
+
+            traceback.print_exc()
             print(
                 f"{Fore.RED}Failed to install {plugin.get_plugin_name()}: {e}{Fore.RESET}\n"
                 f"{Fore.MAGENTA}----------------------------------------------\n"

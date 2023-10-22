@@ -1,6 +1,7 @@
 import os
 from typing import List, Callable, Optional
 
+from modules.file_manager import get_pwd
 from modules.plugin_base import AbstractPlugin
 
 __all__ = ["CyVoice"]
@@ -35,7 +36,21 @@ class CyVoice(AbstractPlugin):
     CONFIG_API_HOST_URL = "ApiHostUrl"
     CONFIG_TEMP_FILE_DIR_PATH = "TempFileDirPath"
 
-    def _get_config_parent_dir(self) -> str:
+    DefaultConfig = {
+        CONFIG_NOISE: 0.667,
+        CONFIG_NOISE_W: 0.8,
+        CONFIG_MAX: 50,
+        CONFIG_ENABLE_TRANSLATE: 1,
+        CONFIG_TARGET_LANGUAGE: "jp",
+        CONFIG_ANNOTATE_STATEMENT: "ちゃんと聞いてくださいね、私の名前は",
+        CONFIG_DETECTED_KEYWORD: "cv",
+        CONFIG_USED_CV_INDEX: 0,
+        CONFIG_API_HOST_URL: "http://127.0.0.1:23456",
+        CONFIG_TEMP_FILE_DIR_PATH: f"{get_pwd()}/temp",
+    }
+
+    @classmethod
+    def _get_config_dir(cls) -> str:
         return os.path.abspath(os.path.dirname(__file__))
 
     @classmethod
@@ -54,21 +69,6 @@ class CyVoice(AbstractPlugin):
     def get_plugin_author(cls) -> str:
         return "whth"
 
-    def __register_all_config(self):
-        self._config_registry.register_config(self.CONFIG_DETECTED_KEYWORD, "cv")
-        self._config_registry.register_config(self.CONFIG_API_HOST_URL, "http://127.0.0.1:23456")
-        self._config_registry.register_config(self.CONFIG_USED_CV_INDEX, 0)
-        self._config_registry.register_config(self.CONFIG_TEMP_FILE_DIR_PATH, f"{self._get_config_parent_dir()}/temp")
-
-        self._config_registry.register_config(self.CONFIG_NOISE, 0.667)
-        self._config_registry.register_config(self.CONFIG_NOISE_W, 0.8)
-        self._config_registry.register_config(self.CONFIG_MAX, 50)
-
-        self._config_registry.register_config(self.CONFIG_ENABLE_TRANSLATE, 1)
-        self._config_registry.register_config(self.CONFIG_TARGET_LANGUAGE, "jp")
-
-        self._config_registry.register_config(self.CONFIG_ANNOTATE_STATEMENT, "ちゃんと聞いてくださいね、私の名前は")
-
     def install(self):
         from graia.ariadne.message.element import Voice
         from modules.cmd import CmdBuilder
@@ -77,8 +77,6 @@ class CyVoice(AbstractPlugin):
         from modules.auth.permissions import Permission, PermissionCode
         from .api import VITS
 
-        self.__register_all_config()
-        self._config_registry.load_config()
         translater: Optional[AbstractPlugin] = self._plugin_view.get(self.__TRANSLATE_PLUGIN_NAME, None)
         if translater:
             translate: CyVoice.__TRANSLATE_METHOD_TYPE = getattr(translater, self.__TRANSLATE_METHOD_NAME)

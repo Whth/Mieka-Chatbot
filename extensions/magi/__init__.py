@@ -1,6 +1,7 @@
 import os
 from random import choice
 
+from modules.file_manager import get_pwd
 from modules.plugin_base import AbstractPlugin
 
 __all__ = ["Magi"]
@@ -23,7 +24,17 @@ class Magi(AbstractPlugin):
     __EVALUATING_GIF_NAME: str = "result.gif"
     __TEMP_FILE_NAME: str = "eval_pass.gif"
 
-    def _get_config_parent_dir(self) -> str:
+    DefaultConfig = {
+        CONFIG_GIF_ASSET_PATH: f"{get_pwd()}/asset",
+        CONFIG_TEMP_DIR_PATH: f"{get_pwd()}/temp",
+        CONFIG_DETECTED_KEYWORD: "magi",
+        CONFIG_PASS_FRAME_COUNT: 20,
+        CONFIG_EVAL_GIF_LOOP_COUNT: 3,
+        CONFIG_RESULT_FRAME_DURATION: 80,
+    }
+
+    @classmethod
+    def _get_config_dir(cls) -> str:
         return os.path.abspath(os.path.dirname(__file__))
 
     @classmethod
@@ -42,14 +53,6 @@ class Magi(AbstractPlugin):
     def get_plugin_author(cls) -> str:
         return "whth"
 
-    def __register_all_config(self):
-        self._config_registry.register_config(self.CONFIG_GIF_ASSET_PATH, f"{self._get_config_parent_dir()}/asset")
-        self._config_registry.register_config(self.CONFIG_TEMP_DIR_PATH, f"{self._get_config_parent_dir()}/temp")
-        self._config_registry.register_config(self.CONFIG_PASS_FRAME_COUNT, 20)
-        self._config_registry.register_config(self.CONFIG_EVAL_GIF_LOOP_COUNT, 3)
-        self._config_registry.register_config(self.CONFIG_RESULT_FRAME_DURATION, 80)
-        self._config_registry.register_config(self.CONFIG_DETECTED_KEYWORD, "magi")
-
     def install(self):
         from graia.ariadne.message.element import Image
         from modules.cmd import RequiredPermission, ExecutableNode
@@ -57,9 +60,6 @@ class Magi(AbstractPlugin):
         from modules.auth.permissions import Permission, PermissionCode
         from modules.file_manager import explore_folder
         from .gif_factory import GifFactory
-
-        self.__register_all_config()
-        self._config_registry.load_config()
 
         gif_dir_path: str = self._config_registry.get_config(self.CONFIG_GIF_ASSET_PATH)
         temp_dir_path: str = self._config_registry.get_config(self.CONFIG_TEMP_DIR_PATH)

@@ -1,8 +1,9 @@
 import os
+from typing import List, Optional, Sequence
+
 from graia.ariadne import Ariadne
 from graia.ariadne.event.message import GroupMessage
 from graia.ariadne.model import Group
-from typing import List, Optional, Sequence
 
 from modules.plugin_base import AbstractPlugin
 
@@ -14,7 +15,14 @@ class ReC(AbstractPlugin):
     CONFIG_DETECTED_KEYWORD = "detected_keyword"
     CONFIG_MAX_LOOK_BACK = "MaxLookBack"
 
-    def _get_config_parent_dir(self) -> str:
+    DefaultConfig = {
+        CONFIG_HALL_RECALL: "recall",
+        CONFIG_DETECTED_KEYWORD: "recallall",
+        CONFIG_MAX_LOOK_BACK: 30,
+    }
+
+    @classmethod
+    def _get_config_dir(cls) -> str:
         return os.path.abspath(os.path.dirname(__file__))
 
     @classmethod
@@ -33,11 +41,6 @@ class ReC(AbstractPlugin):
     def get_plugin_author(cls) -> str:
         return "whth"
 
-    def __register_all_config(self):
-        self._config_registry.register_config(self.CONFIG_HALL_RECALL, "recallall")
-        self._config_registry.register_config(self.CONFIG_DETECTED_KEYWORD, "recall")
-        self._config_registry.register_config(self.CONFIG_MAX_LOOK_BACK, 30)
-
     def install(self):
         from graia.ariadne.event.message import GroupMessage
         from graia.ariadne.message.parser.base import ContainKeyword, MentionMe
@@ -45,8 +48,6 @@ class ReC(AbstractPlugin):
         from colorama import Fore
         from graia.ariadne.exception import UnknownTarget
 
-        self.__register_all_config()
-        self._config_registry.load_config()
         max_look_back: int = self._config_registry.get_config(self.CONFIG_MAX_LOOK_BACK)
 
         @self.receiver(

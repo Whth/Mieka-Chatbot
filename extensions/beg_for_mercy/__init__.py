@@ -1,6 +1,7 @@
 import os
 from typing import List
 
+from modules.file_manager import get_pwd
 from modules.plugin_base import AbstractPlugin
 
 __all__ = ["BegForMercy"]
@@ -16,7 +17,13 @@ class BegForMercy(AbstractPlugin):
     CONFIG_BEGGING_GIF_ASSET_PATH = "gif_asset_path"
     CONFIG_DETECTED_KEYWORD_LIST = "detected_keyword_list"
 
-    def _get_config_parent_dir(self) -> str:
+    DefaultConfig = {
+        CONFIG_BEGGING_GIF_ASSET_PATH: f"{get_pwd()}/asset",
+        CONFIG_DETECTED_KEYWORD_LIST: ["sb"],
+    }
+
+    @classmethod
+    def _get_config_dir(cls) -> str:
         return os.path.abspath(os.path.dirname(__file__))
 
     @classmethod
@@ -35,12 +42,6 @@ class BegForMercy(AbstractPlugin):
     def get_plugin_author(cls) -> str:
         return "whth"
 
-    def __register_all_config(self):
-        self._config_registry.register_config(
-            self.CONFIG_BEGGING_GIF_ASSET_PATH, f"{self._get_config_parent_dir()}/asset"
-        )
-        self._config_registry.register_config(self.CONFIG_DETECTED_KEYWORD_LIST, ["sb"])
-
     def install(self):
         from random import choice
         from graia.ariadne.message.chain import MessageChain
@@ -53,9 +54,6 @@ class BegForMercy(AbstractPlugin):
         from modules.cmd import RequiredPermission, ExecutableNode, NameSpaceNode
         from modules.auth.resources import required_perm_generator
         from modules.auth.permissions import Permission, PermissionCode
-
-        self.__register_all_config()
-        self._config_registry.load_config()
 
         gif_dir_path = self._config_registry.get_config(self.CONFIG_BEGGING_GIF_ASSET_PATH)
 

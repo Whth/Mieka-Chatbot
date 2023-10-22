@@ -2,12 +2,13 @@
 plugin_base that is used in create a standard plugin
 """
 from abc import ABC, abstractmethod
+from functools import partial
 from types import MappingProxyType
-from typing import final, Callable, Type, List
+from typing import final, Callable, Type, List, Dict
 
 from graia.broadcast import Namespace, BaseDispatcher, Decorator, Dispatchable, Broadcast
 
-from constant import CONFIG_FILE_NAME
+from constant import CONFIG_FILE_NAME, Value
 from modules.auth.core import AuthorizationManager
 from modules.cmd import NameSpaceNode
 from modules.config_utils import ConfigRegistry
@@ -18,9 +19,22 @@ class AbstractPlugin(ABC):
     Abstract plugin class
     """
 
+    DefaultConfig: Dict[str, Value] = {}
+
     @property
-    def config(self) -> ConfigRegistry:
+    def config_registry(self) -> ConfigRegistry:
         return self._config_registry
+
+    @final
+    def register_default_config(self):
+        """
+        Registers the default configuration settings.
+        Returns:
+            None
+        """
+
+        for items in self.DefaultConfig.items():
+            self.config_registry.register_config(*items)
 
     @final
     def __init__(
@@ -36,41 +50,52 @@ class AbstractPlugin(ABC):
         self._namespace_uninstaller = broadcast.removeNamespace
 
         self._plugin_view: MappingProxyType[str, "AbstractPlugin"] = plugins_viewer
-        self._config_registry: ConfigRegistry = ConfigRegistry(f"{self._get_config_parent_dir()}/{CONFIG_FILE_NAME}")
+        self._config_registry: ConfigRegistry = ConfigRegistry(f"{self._get_config_dir()}/{CONFIG_FILE_NAME}")
         self._root_namespace_node: NameSpaceNode = root_namespace_node
+        self.register_default_config()
+        self._config_registry.load_config()
 
     @final
     def receiver(
         self,
-        event: str | Type[Dispatchable],
+        event: str | Type[Dispatchable] | List[Type[Dispatchable]],
         priority: int = 16,
         dispatchers: List[Type[BaseDispatcher] | BaseDispatcher] | None = None,
         decorators: list[Decorator] | None = None,
     ) -> Callable:
         """
-        This function is a decorator used to register event listeners.
-        It takes in the following parameters:
+        Decorates a function to be a receiver of events.
 
-        - `event`: A string or a subclass of `Dispatchable`.
-        This parameter represents the event that the decorated function wants to listen to.
-        - `priority`: An integer representing the priority of the event listener.
-            The higher the priority, the earlier listener be executed.
-        - `dispatchers`: An optional list of dispatchers to be used for inline event dispatching.
-        - `namespace`: An optional namespace to be used for the event listener.
-        - `decorators`: An optional list of decorators to be applied to the decorated function.
+        Args:
+            event (str | Type[Dispatchable] | List[Type[Dispatchable]]): The event or events to listen for.
+            priority (int, optional): The priority of the receiver.
+                Defaults to 16.
+            dispatchers (List[Type[BaseDispatcher] | BaseDispatcher] | None, optional):
+                The dispatchers to use for the receiver. Defaults to None.
+            decorators (list[Decorator] | None, optional): The decorators to apply to the receiver. Defaults to None.
 
-        The function returns a wrapper function that registers the decorated function as an event listener.
-        If the event listener already exists, an exception is raised.
+        Returns:
+            Callable: The decorated receiver function.
 
-        Example usage:
-
-        ```
-        @receiver("event_name", priority=10)
-        def event_handler(event):
-            # handle the event
-        ```
-
+        Raises:
+            TypeError: If the event parameter is not of the correct type.
         """
+        if event and isinstance(event, list):
+            partial_receiver = partial(
+                self._receiver,
+                priority=priority,
+                dispatchers=dispatchers,
+                decorators=decorators,
+                namespace=self._namespace,
+            )
+
+            def merged_receiver(callable_target: Callable) -> Callable:
+                for sub_event in event:
+                    partial_receiver(sub_event)(callable_target)
+                return callable_target
+
+            return merged_receiver
+
         return self._receiver(
             event=event, priority=priority, dispatchers=dispatchers, decorators=decorators, namespace=self._namespace
         )
@@ -85,8 +110,9 @@ class AbstractPlugin(ABC):
         """
         return self._namespace
 
+    @classmethod
     @abstractmethod
-    def _get_config_parent_dir(self) -> str:
+    def _get_config_dir(cls) -> str:
         """
         Get the config parent dir, absolute path
         :return:

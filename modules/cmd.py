@@ -41,7 +41,7 @@ def tokenize_cmd(cmd: str) -> List[str]:
 
 class CmdClient(object):
     """
-    a config client that allows simple cli-liked operation on config
+    a config_registry client that allows simple cli-liked operation on config_registry
     """
 
     # TODO should add a override lock to avoid concurrent access
@@ -152,7 +152,7 @@ class CmdClient(object):
 
 class CmdBuilder(object):
     """
-    build the cmd functions for a specific config client
+    build the cmd functions for a specific config_registry client
     """
 
     def __init__(self, config_getter: Callable[[str], Value], config_setter: Callable[[str, Value], None]):
@@ -219,13 +219,13 @@ class CmdBuilder(object):
 
     def build_list_out_for(self, config_paths: List[str]) -> Callable[[], str]:
         """
-        Builds and returns a function that lists out the values of the given config paths.
+        Builds and returns a function that lists out the values of the given config_registry paths.
 
         Parameters:
-            config_paths (List[str]): A list of config paths.
+            config_paths (List[str]): A list of config_registry paths.
 
         Returns: Callable[[], str]: A function that, when called, returns a string listing out the values of the
-        config paths.
+        config_registry paths.
         """
 
         def _list_out() -> str:

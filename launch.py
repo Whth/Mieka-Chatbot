@@ -120,7 +120,7 @@ class Mieka(object):
     @classmethod
     def run(cls):
         """
-        run the bot, save config on exit
+        run the bot, save config_registry on exit
         Returns:
 
         """

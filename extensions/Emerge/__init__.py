@@ -1,5 +1,6 @@
 import os
 
+from modules.file_manager import get_pwd
 from modules.plugin_base import AbstractPlugin
 
 __all__ = ["Emerge"]
@@ -7,11 +8,13 @@ __all__ = ["Emerge"]
 
 class Emerge(AbstractPlugin):
     CONFIG_CACHE_DIR_PATH = "cache_dir_path"
+    DefaultConfig = {CONFIG_CACHE_DIR_PATH: f"{get_pwd()}/cache"}
 
     class CMD:
         ROOT = "eme"
 
-    def _get_config_parent_dir(self) -> str:
+    @classmethod
+    def _get_config_dir(cls) -> str:
         return os.path.abspath(os.path.dirname(__file__))
 
     @classmethod
@@ -30,9 +33,6 @@ class Emerge(AbstractPlugin):
     def get_plugin_author(cls) -> str:
         return "whth"
 
-    def __register_all_config(self):
-        self._config_registry.register_config(self.CONFIG_CACHE_DIR_PATH, f"{self._get_config_parent_dir()}/cache")
-
     def install(self):
         from graia.ariadne.message.element import Image
         from colorama import Back
@@ -40,9 +40,6 @@ class Emerge(AbstractPlugin):
         from modules.auth.resources import required_perm_generator
         from modules.auth.permissions import Permission, PermissionCode
         from .api import EmojiMerge
-
-        self.__register_all_config()
-        self._config_registry.load_config()
 
         cache_dir = self._config_registry.get_config(self.CONFIG_CACHE_DIR_PATH)
         merger = EmojiMerge(cache_dir)
