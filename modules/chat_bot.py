@@ -111,7 +111,7 @@ class ChatBot(object):
 
         for message_type in bot_config.accepted_message_types:
             self._ariadne_app.broadcast.receiver(message_type)(self._make_cmd_interpreter())
-
+        self._ariadne_app.stop()
         self._is_running: bool = False
 
     def _make_cmd_interpreter(self):
@@ -208,28 +208,31 @@ class ChatBot(object):
         Returns:
             None
         """
-        self.init_utils() if init_utils else None
         if self._is_running:
             return
         try:
+            self.init_utils() if init_utils else None
             self._is_running = True
             self._ariadne_app.launch_blocking()
 
         except KeyboardInterrupt:
-            self._is_running = False
-            self.stop(with_save=True)
+            self.stop()
+        finally:
+            self.save_config()
 
-    def stop(self, with_save: bool = True) -> None:
+    def stop(self) -> None:
         """
         Stop the bot
         """
         if self._is_running:
             self._ariadne_app.stop()
             self._is_running = False
-            if with_save:
-                self._auth_manager.save()
-                for extension in self._extensions.plugins_view.values():
-                    extension.config_registry.save_config()
+
+    def save_config(self) -> None:
+        print("Saving config...")
+        self._auth_manager.save()
+        for extension in self._extensions.plugins_view.values():
+            extension.config_registry.save_config(True)
 
     def reboot(self):
         if self._is_running:
@@ -239,4 +242,5 @@ class ChatBot(object):
             subprocess.Popen("cls", shell=True)
             subprocess.Popen(USER_BATCH_SCRIPT_PATH, shell=True)
             self.stop()
+            self.save_config()
             exit(0)

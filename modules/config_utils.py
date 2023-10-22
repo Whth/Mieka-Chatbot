@@ -208,7 +208,7 @@ class ConfigRegistry(object):
         for config_registry in cls.__config_registry_instance:
             if not config_registry.config_file_path:
                 continue
-            config_registry.save_config()
+            config_registry.save_config(True)
 
             print(Back.CYAN + Fore.RED + f"\rRemaining {config_count} configs to save..." + Style.RESET_ALL)
             config_count -= 1
@@ -277,9 +277,12 @@ class ConfigRegistry(object):
                 continue
             self._config_registry_table[key] = config
 
-    def save_config(self):
+    def save_config(self, logging: bool = True):
         """
         save config_registry to file
+        Args:
+            logging ():
+
         Returns:
 
         """
@@ -290,6 +293,9 @@ class ConfigRegistry(object):
             make_config(temp, registry_path_to_chain(k), v)
         with open(self._config_file_path, mode="w+", encoding="utf-8") as f:
             dump(temp, f, indent=2, ensure_ascii=False)
+        print(
+            Back.BLACK + Fore.GREEN + f"Save config to {self._config_file_path} successfully" + Style.RESET_ALL
+        ) if logging else None
 
     @property
     def registered_configs(self) -> Tuple[str]:
