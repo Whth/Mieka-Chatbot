@@ -14,6 +14,8 @@ from modules.cmd import NameSpaceNode, set_su_permissions
 from modules.extension_manager import ExtensionManager
 from modules.plugin_base import PluginsView
 
+HELP_KEYWORD = "doc"
+
 
 class BotInfo(NamedTuple):
     """
@@ -106,7 +108,11 @@ class ChatBot(object):
         )
 
         set_su_permissions([self._auth_manager.__su_permission__])
-        self._root: NameSpaceNode = NameSpaceNode(name="root")
+        self._root: NameSpaceNode = NameSpaceNode(
+            name="root",
+            help_message=f"{self._bot_name} commands interpreter\n"
+            f'tips: append "{HELP_KEYWORD}" to the end of the cmd to get help, only works for EXECUTABLE NODES',
+        )
         self._extensions: ExtensionManager = ExtensionManager(self._bot_config.extension_dir, [])
 
         for message_type in bot_config.accepted_message_types:
@@ -151,7 +157,7 @@ class ChatBot(object):
             for role in owned_roles:
                 with role as perms:
                     try:
-                        stdout = await self._root.interpret(str(message), perms)
+                        stdout = await self._root.interpret(str(message), perms, HELP_KEYWORD)
                         success = True
                     except PermissionError:
                         pass
