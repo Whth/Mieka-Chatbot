@@ -8,7 +8,7 @@ from graia.broadcast import Broadcast
 
 from constant import REQUIREMENTS_FILE_NAME
 from modules.auth.core import AuthorizationManager
-from modules.cmd import CmdClient, NameSpaceNode
+from modules.cmd import NameSpaceNode
 from modules.file_manager import get_all_sub_dirs
 from modules.launch_utils import install_requirements
 from modules.plugin_base import AbstractPlugin, PluginsView
@@ -50,20 +50,17 @@ class ExtensionManager:
         enable_plugins: bool = True,
     ) -> None:
         """
-        Installs all extensions for the given app and bot client.
+        Installs all extensions.
 
         Args:
-
-            auth_manager ():
-            broadcast ():
-            root_namespace_node (CmdClient): The bot client instance.
-            proxy (MappingProxyType[str, AbstractPlugin]): The proxy mapping of plugin names to plugin instances.
+            broadcast (Broadcast): The broadcast object.
+            root_namespace_node (NameSpaceNode): The root namespace node.
+            proxy (PluginsView): The plugins view.
+            auth_manager (AuthorizationManager): The authorization manager.
+            enable_plugins (bool, optional): Whether to enable plugins. Defaults to True.
 
         Returns:
-            None: This function does not return anything.
-
-        Raises:
-            None: This function does not raise any exceptions.
+            None
         """
         detected_plugins = self._detect_plugins()
         string_buffer = "\n".join(
@@ -103,6 +100,18 @@ class ExtensionManager:
             self.uninstall_plugin(plugin_name)
 
     def uninstall_plugin(self, plugin_name):
+        """
+        Uninstalls a plugin.
+
+        Parameters:
+            plugin_name (str): The name of the plugin to uninstall.
+
+        Raises:
+            KeyError: If the specified plugin does not exist.
+
+        Returns:
+            None
+        """
         if plugin_name not in self.plugins_view:
             raise KeyError(f"{plugin_name} not exists")
         plugin = self.plugins_view.get(plugin_name)
@@ -237,14 +246,13 @@ class ExtensionManager:
     @staticmethod
     def _import_plugin(extension_attr_chain: str) -> Sequence[Type[AbstractPlugin]]:
         """
-        load the extension and return the plugins in it
-        :param extension_attr_chain:
-        :type extension_attr_chain:
-        :return:
-        :rtype:
+        Import a plugin from the specified extension attribute chain.
 
-        notes:
-            one extension is allowed to contain multiple extensions
+        Args:
+            extension_attr_chain (str): The chain of attributes specifying the location of the plugin.
+
+        Returns:
+            Sequence[Type[AbstractPlugin]]: A sequence of plugin classes that are subclasses of AbstractPlugin.
         """
         try:
             module = import_module(extension_attr_chain)  # load extension
