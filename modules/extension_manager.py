@@ -259,7 +259,8 @@ class ExtensionManager:
         except ModuleNotFoundError:
             return []
         plugins: List[Type[AbstractPlugin]] = []  # init yield list
-
+        if not hasattr(module, "__all__"):
+            return []
         for plugin_name in module.__all__:
             # load plugins
             plugin_name: str
