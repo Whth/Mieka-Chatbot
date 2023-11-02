@@ -1,4 +1,3 @@
-import os
 from typing import List
 
 from modules.file_manager import get_pwd
@@ -21,10 +20,6 @@ class BegForMercy(AbstractPlugin):
         CONFIG_BEGGING_GIF_ASSET_PATH: f"{get_pwd()}/asset",
         CONFIG_DETECTED_KEYWORD_LIST: ["sb"],
     }
-
-    @classmethod
-    def _get_config_dir(cls) -> str:
-        return os.path.abspath(os.path.dirname(__file__))
 
     @classmethod
     def get_plugin_name(cls) -> str:

@@ -8,7 +8,7 @@ from typing import final, Callable, Type, List, Dict
 
 from graia.broadcast import Namespace, BaseDispatcher, Decorator, Dispatchable, Broadcast
 
-from constant import CONFIG_FILE_NAME, Value
+from constant import Value, EXTENSION_CONFIG_DIR
 from modules.auth.core import AuthorizationManager
 from modules.cmd import NameSpaceNode
 from modules.config_utils import ConfigRegistry
@@ -50,7 +50,7 @@ class AbstractPlugin(ABC):
         self._namespace_uninstaller = broadcast.removeNamespace
 
         self._plugin_view: MappingProxyType[str, "AbstractPlugin"] = plugins_viewer
-        self._config_registry: ConfigRegistry = ConfigRegistry(f"{self._get_config_dir()}/{CONFIG_FILE_NAME}")
+        self._config_registry: ConfigRegistry = ConfigRegistry(f"{EXTENSION_CONFIG_DIR}/{self.get_plugin_name()}.json")
         self._root_namespace_node: NameSpaceNode = root_namespace_node
         self.register_default_config()
         self._config_registry.load_config()
@@ -109,16 +109,6 @@ class AbstractPlugin(ABC):
 
         """
         return self._namespace
-
-    @classmethod
-    @abstractmethod
-    def _get_config_dir(cls) -> str:
-        """
-        Get the config parent dir, absolute path
-        :return:
-        :rtype:
-        """
-        pass
 
     @classmethod
     @abstractmethod

@@ -1,6 +1,7 @@
 import inspect
 import os
 import re
+import warnings
 from functools import singledispatch
 from json import load, dump
 from types import MappingProxyType
@@ -197,9 +198,12 @@ class ConfigRegistry(object):
     __config_registry_instance: List["ConfigRegistry"] = []
 
     @classmethod
-    def save_all_configs(cls):
+    def save_all_configs(cls, ignore_null: bool = False):
         """
         save all ConfigRegistry instance
+        Args:
+            ignore_null ():
+
         Returns:
 
         """
@@ -208,7 +212,7 @@ class ConfigRegistry(object):
         for config_registry in cls.__config_registry_instance:
             if not config_registry.config_file_path:
                 continue
-            config_registry.save_config(True)
+            config_registry.save_config(True, ignore_null)
 
             print(Back.CYAN + Fore.RED + f"\rRemaining {config_count} configs to save..." + Style.RESET_ALL)
             config_count -= 1
@@ -277,15 +281,19 @@ class ConfigRegistry(object):
                 continue
             self._config_registry_table[key] = config
 
-    def save_config(self, logging: bool = True):
+    def save_config(self, logging: bool = True, ignore_null: bool = False):
         """
         save config_registry to file
         Args:
+            ignore_null ():
             logging ():
 
         Returns:
 
         """
+        if ignore_null and not self._config_registry_table:
+            warnings.warn("There is no config to save!")
+            return
         if not self._config_file_path:
             raise ValueError("config_registry file path is not set!")
         temp = {}

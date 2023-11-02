@@ -238,7 +238,7 @@ class ChatBot(object):
         print("Saving config...")
         self._auth_manager.save()
         for extension in self._extensions.plugins_view.values():
-            extension.config_registry.save_config(True)
+            extension.config_registry.save_config(True, ignore_null=True)
 
     def reboot(self):
         if self._is_running:

@@ -1,5 +1,3 @@
-import os
-
 from modules.file_manager import generate_random_string
 from modules.plugin_base import AbstractPlugin
 
@@ -10,10 +8,6 @@ class HeartBeat(AbstractPlugin):
     CONFIG_HEART_BEAT_INTERVAL = "HeartBeatInterval"
 
     DefaultConfig = {CONFIG_HEART_BEAT_INTERVAL: 40}
-
-    @classmethod
-    def _get_config_dir(cls) -> str:
-        return os.path.abspath(os.path.dirname(__file__))
 
     @classmethod
     def get_plugin_name(cls) -> str:

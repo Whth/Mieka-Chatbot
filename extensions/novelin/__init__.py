@@ -1,4 +1,3 @@
-import os
 import pathlib
 
 from modules.file_manager import get_pwd
@@ -14,10 +13,6 @@ class Novelin(AbstractPlugin):
         CONFIG_NOVEL_ASSET_PATH: f"{get_pwd()}/asset",
         CONFIG_DETECTED_KEYWORD: "nvlin",
     }
-
-    @classmethod
-    def _get_config_dir(cls) -> str:
-        return os.path.abspath(os.path.dirname(__file__))
 
     @classmethod
     def get_plugin_name(cls) -> str:

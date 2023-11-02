@@ -1,4 +1,3 @@
-import os
 from typing import List, Optional, Sequence
 
 from graia.ariadne import Ariadne
@@ -20,10 +19,6 @@ class ReC(AbstractPlugin):
         CONFIG_DETECTED_KEYWORD: "recallall",
         CONFIG_MAX_LOOK_BACK: 30,
     }
-
-    @classmethod
-    def _get_config_dir(cls) -> str:
-        return os.path.abspath(os.path.dirname(__file__))
 
     @classmethod
     def get_plugin_name(cls) -> str:

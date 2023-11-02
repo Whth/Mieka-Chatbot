@@ -1,5 +1,3 @@
-import os
-
 from modules.file_manager import get_pwd
 from modules.plugin_base import AbstractPlugin
 
@@ -12,10 +10,6 @@ class Emerge(AbstractPlugin):
 
     class CMD:
         ROOT = "eme"
-
-    @classmethod
-    def _get_config_dir(cls) -> str:
-        return os.path.abspath(os.path.dirname(__file__))
 
     @classmethod
     def get_plugin_name(cls) -> str:

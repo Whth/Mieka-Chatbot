@@ -1,4 +1,3 @@
-import os
 from random import sample
 from typing import Sequence
 
@@ -25,10 +24,6 @@ class RandomMeme(AbstractPlugin):
     DefaultConfig = {
         GIF_ASSET_PATH: f"{get_pwd()}/asset",
     }
-
-    @classmethod
-    def _get_config_dir(cls) -> str:
-        return os.path.abspath(os.path.dirname(__file__))
 
     @classmethod
     def get_plugin_name(cls) -> str:
