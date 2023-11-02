@@ -3,6 +3,7 @@ import random
 from typing import List
 
 from modules.plugin_base import AbstractPlugin
+from modules.shared import get_pwd
 
 __all__ = ["CodeTalker"]
 
@@ -22,6 +23,17 @@ class CodeTalker(AbstractPlugin):
     CONFIG_RE_GENERATE_PROBABILITY = "re_generate_probability"
     CONFIG_MAX_TOKENS = "max_tokens"
 
+    DefaultConfig = {
+        CONFIG_SECRETS_APPID: "your appid",
+        CONFIG_SECRETS_APIKEY: "your api key",
+        CONFIG_SECRETS_API_SECRETS: "your api secret",
+        CONFIG_API_VERSION: 2.1,
+        CONFIG_PRE_APPEND_HISTORY: [],
+        CONFIG_DICTIONARY_PATH: f"{get_pwd()}/fuzzy_dictionary.json",
+        CONFIG_RE_GENERATE_PROBABILITY: 0.3,
+        CONFIG_MAX_TOKENS: 150,
+    }
+
     @classmethod
     def get_plugin_name(cls) -> str:
         return "CodeTalker"
@@ -38,21 +50,6 @@ class CodeTalker(AbstractPlugin):
     def get_plugin_author(cls) -> str:
         return "whth"
 
-    def __register_all_config(self):
-        self._config_registry.register_config(self.CONFIG_SECRETS_APPID, "your appid")
-        self._config_registry.register_config(self.CONFIG_SECRETS_APIKEY, "your api key")
-        self._config_registry.register_config(self.CONFIG_SECRETS_API_SECRETS, "your api secret")
-        self._config_registry.register_config(self.CONFIG_API_VERSION, 2.1)
-        self._config_registry.register_config(
-            self.CONFIG_PRE_APPEND_HISTORY,
-            [],
-        )
-        self._config_registry.register_config(
-            self.CONFIG_DICTIONARY_PATH, f"{self._get_config_dir()}/fuzzy_dictionary.json"
-        )
-        self._config_registry.register_config(self.CONFIG_RE_GENERATE_PROBABILITY, 0.3)
-        self._config_registry.register_config(self.CONFIG_MAX_TOKENS, 100)
-
     def install(self):
         from sparkdesk_api.core import SparkAPI
         from .fuzzy import FuzzyDictionary
@@ -60,9 +57,6 @@ class CodeTalker(AbstractPlugin):
         from modules.auth.resources import required_perm_generator
         from modules.auth.permissions import Permission, PermissionCode
         from modules.cmd import ExecutableNode
-
-        self.__register_all_config()
-        self._config_registry.load_config()
 
         # 默认api接口版本为1.5，开启v2.0版本只需指定 version=2.1 即可
         sparkAPI = SparkAPI(
