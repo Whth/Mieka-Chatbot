@@ -200,35 +200,42 @@ def compress_image_max_res(input_image_path: str, output_image_path: str, size: 
 
 
 def compress_image_max_vol(
-    input_image_path: str, output_image_path: str, max_file_size: int, min_quality: int = 85
+    input_image_path: str,
+    output_image_path: str,
+    max_file_size: int,
+    search_best: bool = True,
+    min_quality: int = 85,
 ) -> int:
     """
-    Compresses an image to reduce its file size while maintaining a minimum quality.
+    Compresses an image to a maximum file size.
+
     Args:
-        input_image_path (str): The path of the input image file.
+        input_image_path (str): The path to the input image file.
         output_image_path (str): The path to save the compressed image file.
-        max_file_size (int): The maximum size in bytes that the compressed image file should have.
-        min_quality (int, optional): The minimum quality level (0-100) to maintain while compressing the image.
-         Defaults to 85.
+        max_file_size (int): The maximum file size in bytes.
+        search_best (bool, optional): Whether to search for the best quality that meets the maximum
+            file size requirement. Defaults to True.
+        min_quality (int, optional): The minimum quality of the compressed image. Must be a multiple of 5.
+            Defaults to 85.
+
     Returns:
-        int: the quality level that the image has been
-    Raises:
-        ValueError: If the `min_quality` is not a multiple of 5.
+        int: The quality of the compressed image that meets the maximum file size requirement.
     """
     step = 5
     if min_quality % step != 0:
         raise ValueError(f"min_quality must be a multiple of {step}")
     img = Image.open(input_image_path)
-    current_quality = 100
-    while current_quality > min_quality:
+    compressed_img_vol = 0
+    current_quality = min_quality
+    while compressed_img_vol < max_file_size:
         img.save(output_image_path, quality=current_quality)
-
         compressed_img_vol = os.path.getsize(output_image_path)
-
-        if compressed_img_vol < max_file_size:
-            break
         img = Image.open(output_image_path)
-        current_quality -= step
+        if search_best:
+            current_quality += step
+        else:
+            break
+
     return current_quality
 
 
