@@ -36,7 +36,6 @@ class AbstractPlugin(ABC):
         for items in self.DefaultConfig.items():
             self.config_registry.register_config(*items)
 
-    @final
     def __init__(
         self,
         plugins_viewer: MappingProxyType[str, "AbstractPlugin"],
