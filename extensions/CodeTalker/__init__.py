@@ -1,5 +1,6 @@
 import copy
 import random
+from functools import partial
 from typing import List
 
 from sparkdesk_api.core import SparkAPI
@@ -116,4 +117,19 @@ class CodeTalker(AbstractPlugin):
         self._root_namespace_node.add_node(tree)
 
     def chat(self, string: str) -> str:
-        return self.sparkAPI.chat(query=string)
+        spark_par = partial(
+            SparkAPI,
+            app_id=self._config_registry.get_config(self.CONFIG_SECRETS_APPID),
+            api_secret=self._config_registry.get_config(self.CONFIG_SECRETS_API_SECRETS),
+            api_key=self._config_registry.get_config(self.CONFIG_SECRETS_APIKEY),
+        )
+
+        self._config_registry.get_config(self.CONFIG_API_VERSION),
+        available_versions = {3.1, 2.1, 1.5}
+        for ver in available_versions:
+            stdout = spark_par(version=ver).chat(
+                query=string, max_tokens=self.config_registry.get_config(self.CONFIG_MAX_TOKENS)
+            )
+            if stdout:
+                return stdout
+        return ""
