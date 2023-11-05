@@ -1,7 +1,7 @@
 import pathlib
 from importlib import import_module
 from types import MappingProxyType
-from typing import List, Dict, Type, Sequence
+from typing import List, Dict, Type, Sequence, Optional
 
 from colorama import Fore, Back, Style
 from graia.broadcast import Broadcast
@@ -12,6 +12,22 @@ from modules.cmd import NameSpaceNode
 from modules.file_manager import get_all_sub_dirs
 from modules.launch_utils import install_requirements
 from modules.plugin_base import AbstractPlugin, PluginsView
+
+
+def stdout_decoration(txt_color: str, line_wrap: bool, line_color: str, title: Optional[str] = None):
+    def wrapper(func):
+        def inner(*args, **kwargs):
+            print(f"{line_color}----------------------------------------{Style.RESET_ALL}") if line_wrap else None
+            print(f"{txt_color}", end="")
+            print(title) if title else None
+            result = func(*args, **kwargs)
+            print(f"{Style.RESET_ALL}", end="")
+            print(f"{line_color}----------------------------------------{Style.RESET_ALL}") if line_wrap else None
+            return result
+
+        return inner
+
+    return wrapper
 
 
 class ExtensionManager:
@@ -81,19 +97,21 @@ class ExtensionManager:
             + Style.RESET_ALL
         )
         print(string_buffer)
+        print(Fore.LIGHTRED_EX)
         for plugin in detected_plugins:
             if plugin.get_plugin_name() in self._black_list:
                 continue
-            print(Fore.LIGHTRED_EX)
-            self.install_plugin(
+
+            self.load_plugin(
                 plugin=plugin,
                 broadcast=broadcast,
                 root_namespace_node=root_namespace_node,
                 proxy=proxy,
                 auth_manager=auth_manager,
-                enable_plugin=enable_plugins,
             )
-            print(Fore.RESET)
+        for plugin_name in self.plugins:
+            self.install_plugin(plugin_name, enable_plugins)
+        print(Fore.RESET)
 
     def uninstall_all_extensions(self):
         for plugin_name in list(self.plugins.keys()):
@@ -123,14 +141,13 @@ class ExtensionManager:
         del self.plugins[plugin_name]
         print(f"----------------------------------------{Fore.RESET}")
 
-    def install_plugin(
+    def load_plugin(
         self,
         plugin: Type[AbstractPlugin],
         broadcast: Broadcast,
         root_namespace_node: NameSpaceNode,
         proxy: PluginsView,
         auth_manager: AuthorizationManager,
-        enable_plugin: bool = True,
     ) -> None:
         """
         Installs a plugin into the system.
@@ -141,7 +158,7 @@ class ExtensionManager:
             root_namespace_node (NameSpaceNode): The root namespace node.
             proxy (PluginsView): The plugins view.
             auth_manager (AuthorizationManager): The authorization manager.
-            enable_plugin (bool, optional): Whether to enable the plugin. Defaults to True.
+
 
         Raises:
             ValueError: If the plugin is already registered.
@@ -153,23 +170,24 @@ class ExtensionManager:
         if plugin.get_plugin_name in self._plugins:
             raise ValueError("Plugin already registered")
         plugin_instance = plugin(proxy, root_namespace_node, broadcast, auth_manager)
+
+        self._plugins[plugin.get_plugin_name()] = plugin_instance
+        print(f"{Fore.GREEN}Loaded {plugin.get_plugin_name()}")
+
+    @stdout_decoration(Fore.YELLOW, True, Fore.YELLOW)
+    def install_plugin(self, plugin_name: str, enable: bool = True) -> bool:
+        plugin_instance = self.plugins.get(plugin_name)
         try:
+            print(f"Installing {plugin_instance.get_plugin_name()}")
             plugin_instance.install()
-            plugin_instance.enable() if enable_plugin else plugin_instance.disable()
+            plugin_instance.enable() if enable else plugin_instance.disable()
         except Exception as e:
             import traceback
 
             traceback.print_exc()
-            print(
-                f"{Fore.RED}Failed to install {plugin.get_plugin_name()}: {e}{Fore.RESET}\n"
-                f"{Fore.MAGENTA}----------------------------------------------\n"
-            )
-            return
-        self._plugins[plugin.get_plugin_name()] = plugin_instance
-        print(
-            f"{Fore.GREEN}Installed {plugin.get_plugin_name()}\n"
-            f"{Fore.MAGENTA}----------------------------------------------\n"
-        )
+            print(f"{Fore.RED}Failed to install {plugin_instance.get_plugin_name()}: {e}{Fore.RESET}")
+            return False
+        return True
 
     def disable_plugin(self, plugin_name: str) -> bool:
         """
