@@ -15,7 +15,6 @@ from .file_manager import (
     rename_image_with_hash,
     img_to_base64,
     base64_to_img,
-    ContentCacher,
 )
 from .plugin_base import AbstractPlugin
 
@@ -45,5 +44,4 @@ __all__ = [
     "rename_image_with_hash",
     "img_to_base64",
     "base64_to_img",
-    "ContentCacher",
 ]

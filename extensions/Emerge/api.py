@@ -1,8 +1,9 @@
 import pathlib
-import requests
 from enum import Enum
 
-from modules.file_manager import ContentCacher
+import requests
+
+from modules.file_manager import explore_folder
 
 
 class EmojiMerge:
@@ -17,7 +18,6 @@ class EmojiMerge:
         pathlib.Path(cache_dir).mkdir(parents=True, exist_ok=True)
 
         self._cache_dir = cache_dir
-        self._cacher: ContentCacher = ContentCacher(self._cache_dir)
 
     def merge(self, emoji_1: str, emoji_2: str) -> str | None:
         """
@@ -37,18 +37,17 @@ class EmojiMerge:
         uni_emoji_2 = f"u{hex(ord(emoji_2))[2:]}"
         fname = f"{uni_emoji_1}_{uni_emoji_2}.png"
         url = f"{self.API.HOST.value}/{uni_emoji_1}/{fname}"
-        get = self._cacher.get(url)
 
-        if get:
-            return get
+        cached_file = explore_folder(self._cache_dir, max_depth=1)
+        matched = [file for file in cached_file if fname in file]
+
+        if matched:
+            return matched[0]
 
         ret = requests.get(url)
         if ret.ok:
             save_path = f"{self._cache_dir}/{fname}"
             with open(save_path, "wb") as f:
                 f.write(ret.content)
-            self._cacher.register(url, save_path)
-            self._cacher.save()
-
             return save_path
         return None

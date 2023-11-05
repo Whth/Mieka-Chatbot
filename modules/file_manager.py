@@ -1,17 +1,16 @@
 import base64
 import hashlib
 import inspect
-import json
 import os
 import pathlib
 import random
 import string
-import time
 from pathlib import Path
-from typing import List, Sequence, Dict, Optional
+from typing import List, Sequence
 from typing import Tuple
 
 import aiohttp
+import time
 from PIL import Image
 
 
@@ -26,16 +25,17 @@ def get_current_file_path() -> str:
     return inspect.getabsfile(inspect.currentframe())
 
 
-def explore_folder(root_path: str, ignore_list: Sequence[str] = tuple()) -> List[str]:
+def explore_folder(root_path: str, ignore_list: Sequence[str] = tuple(), max_depth: int = -1) -> List[str]:
     """
-    Recursively explores a folder and returns a list of all file paths.
+    Recursively explores a folder and returns a list of all file paths up to the specified depth.
 
     Args:
         root_path (str): The root path of the folder to explore.
         ignore_list (Sequence[str]): A list of folder names to ignore.
+        max_depth (int): The maximum depth to explore. If -1, explore all levels.
 
     Returns:
-        List[str]: A list of all file paths found in the folder.
+        List[str]: A list of all file paths found in the folder up to the specified depth.
     """
     # Store all file paths
     file_paths = []
@@ -54,8 +54,12 @@ def explore_folder(root_path: str, ignore_list: Sequence[str] = tuple()) -> List
         if not any(str(ignored_path) in file_path for ignored_path in ignored_paths)
     ]
 
-    # Return the list of all file paths
-    return file_paths
+    # Return the list of all file paths up to the specified depth
+    if max_depth == -1:
+        return file_paths
+    else:
+        current_depth = len(Path(root_path).relative_to(Path(root_path)).parts)
+        return [file_path for file_path in file_paths if current_depth <= max_depth]
 
 
 def get_all_sub_dirs(directory: str) -> List[str]:
@@ -295,35 +299,6 @@ def rename_image_with_hash(image_path: str) -> str:
 
     # Return the renamed image path
     return new_image_path
-
-
-class ContentCacher:
-    __CACHE_REGISTRY_FNAME = "cache_registry.json"
-
-    def __init__(self, cache_dir: str):
-        pathlib.Path(cache_dir).mkdir(parents=True, exist_ok=True)
-        self._cache_dir = cache_dir
-        self._registry: Dict[str, str] = {}
-        if pathlib.Path(f"{self._cache_dir}/{self.__CACHE_REGISTRY_FNAME}").exists():
-            self.load()
-
-    def register(self, key: str, content: str):
-        if key in self._registry:
-            raise KeyError(f"Key {key} already exists")
-        self._registry[key] = content
-
-    def get(self, key: str, default: Optional[str] = None) -> str:
-        if key not in self._registry:
-            return default
-        return self._registry[key]
-
-    def save(self):
-        with open(os.path.join(self._cache_dir, self.__CACHE_REGISTRY_FNAME), "w") as f:
-            json.dump(self._registry, f, ensure_ascii=False, indent=2)
-
-    def load(self):
-        with open(os.path.join(self._cache_dir, self.__CACHE_REGISTRY_FNAME), "r") as f:
-            self._registry.update(json.load(f))
 
 
 def generate_random_string(length: int) -> str:
