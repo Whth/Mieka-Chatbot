@@ -21,12 +21,31 @@ class AbstractPlugin(ABC):
 
     DefaultConfig: Dict[str, Value] = {}
 
+    @final
     @property
     def config_registry(self) -> ConfigRegistry:
         return self._config_registry
 
     @final
-    def register_default_config(self):
+    @property
+    def namespace(self) -> Namespace:
+        """
+        Returns: the namespace of the object.
+        """
+        return self._namespace
+
+    @final
+    @property
+    def auth_manager(self) -> AuthorizationManager:
+        return self._auth_manager
+
+    @final
+    @property
+    def plugin_view(self) -> MappingProxyType[str, "AbstractPlugin"]:
+        return self._plugin_view
+
+    @final
+    def __register_default_config(self):
         """
         Registers the default configuration settings.
         Returns:
@@ -51,7 +70,7 @@ class AbstractPlugin(ABC):
         self._plugin_view: MappingProxyType[str, "AbstractPlugin"] = plugins_viewer
         self._config_registry: ConfigRegistry = ConfigRegistry(f"{EXTENSION_CONFIG_DIR}/{self.get_plugin_name()}.json")
         self._root_namespace_node: NameSpaceNode = root_namespace_node
-        self.register_default_config()
+        self.__register_default_config()
         self._config_registry.load_config()
 
     @final
@@ -98,16 +117,6 @@ class AbstractPlugin(ABC):
         return self._receiver(
             event=event, priority=priority, dispatchers=dispatchers, decorators=decorators, namespace=self._namespace
         )
-
-    @final
-    @property
-    def namespace(self) -> Namespace:
-        """
-
-        Returns: the namespace of the object.
-
-        """
-        return self._namespace
 
     @classmethod
     @abstractmethod
