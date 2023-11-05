@@ -2,8 +2,18 @@ import copy
 import random
 from typing import List
 
-from modules.plugin_base import AbstractPlugin
-from modules.shared import get_pwd
+from sparkdesk_api.core import SparkAPI
+
+from modules.shared import (
+    get_pwd,
+    AbstractPlugin,
+    ExecutableNode,
+    Permission,
+    PermissionCode,
+    required_perm_generator,
+    RequiredPermission,
+)
+from .fuzzy import FuzzyDictionary
 
 __all__ = ["CodeTalker"]
 
@@ -50,21 +60,17 @@ class CodeTalker(AbstractPlugin):
     def get_plugin_author(cls) -> str:
         return "whth"
 
-    def install(self):
-        from sparkdesk_api.core import SparkAPI
-        from .fuzzy import FuzzyDictionary
-        from modules.cmd import RequiredPermission
-        from modules.auth.resources import required_perm_generator
-        from modules.auth.permissions import Permission, PermissionCode
-        from modules.cmd import ExecutableNode
-
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         # 默认api接口版本为1.5，开启v2.0版本只需指定 version=2.1 即可
-        sparkAPI = SparkAPI(
+        self.sparkAPI = SparkAPI(
             app_id=self._config_registry.get_config(self.CONFIG_SECRETS_APPID),
             api_secret=self._config_registry.get_config(self.CONFIG_SECRETS_API_SECRETS),
             api_key=self._config_registry.get_config(self.CONFIG_SECRETS_APIKEY),
             version=self._config_registry.get_config(self.CONFIG_API_VERSION),
         )
+
+    def install(self):
         fuzzy_dictionary = FuzzyDictionary(save_path=self._config_registry.get_config(self.CONFIG_DICTIONARY_PATH))
         print(f"Loading Fuzzy Dictionary Size:{len(fuzzy_dictionary.dictionary.keys())}")
         history = copy.deepcopy(self._config_registry.get_config(self.CONFIG_PRE_APPEND_HISTORY))
@@ -82,7 +88,7 @@ class CodeTalker(AbstractPlugin):
             if random.random() <= self._config_registry.get_config(self.CONFIG_RE_GENERATE_PROBABILITY) or not search:
                 max_tokens = max_tokens if max_tokens else self._config_registry.get_config(self.CONFIG_MAX_TOKENS)
                 # Generate a response using the Spark API
-                response: str = sparkAPI.chat(
+                response: str = self.sparkAPI.chat(
                     query=message,
                     history=history,
                     max_tokens=max_tokens,
@@ -108,3 +114,6 @@ class CodeTalker(AbstractPlugin):
         )
         self._auth_manager.add_perm_from_req(req_perm)
         self._root_namespace_node.add_node(tree)
+
+    def chat(self, string: str) -> str:
+        return self.sparkAPI.chat(query=string)
