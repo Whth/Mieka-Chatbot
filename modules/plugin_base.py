@@ -4,7 +4,7 @@ plugin_base that is used in create a standard plugin
 from abc import ABC, abstractmethod
 from functools import partial
 from types import MappingProxyType
-from typing import final, Callable, Type, List, Dict
+from typing import final, Callable, Type, List, Dict, TypeAlias, TypeVar
 
 from graia.broadcast import Namespace, BaseDispatcher, Decorator, Dispatchable, Broadcast
 
@@ -14,6 +14,9 @@ from modules.auth.permissions import Permission, PermissionCode
 from modules.auth.resources import required_perm_generator, RequiredPermission
 from modules.cmd import NameSpaceNode
 from modules.config_utils import ConfigRegistry
+
+Plugin: TypeAlias = TypeVar("Plugin", bound="AbstractPlugin")
+PluginsView: TypeAlias = MappingProxyType[str, Plugin]
 
 
 class AbstractPlugin(ABC):
@@ -43,7 +46,7 @@ class AbstractPlugin(ABC):
 
     @final
     @property
-    def plugin_view(self) -> MappingProxyType[str, "AbstractPlugin"]:
+    def plugin_view(self) -> PluginsView:
         return self._plugin_view
 
     @final
@@ -75,7 +78,7 @@ class AbstractPlugin(ABC):
 
     def __init__(
         self,
-        plugins_viewer: MappingProxyType[str, "AbstractPlugin"],
+        plugins_viewer: PluginsView,
         root_namespace_node: NameSpaceNode,
         broadcast: Broadcast,
         auth_manager: AuthorizationManager,
@@ -85,7 +88,7 @@ class AbstractPlugin(ABC):
         self._namespace: Namespace = broadcast.createNamespace(name=self.get_plugin_name(), disabled=True)
         self._namespace_uninstaller = broadcast.removeNamespace
 
-        self._plugin_view: MappingProxyType[str, "AbstractPlugin"] = plugins_viewer
+        self._plugin_view: PluginsView = plugins_viewer
         self._config_registry: ConfigRegistry = ConfigRegistry(f"{EXTENSION_CONFIG_DIR}/{self.get_plugin_name()}.json")
         self._root_namespace_node: NameSpaceNode = root_namespace_node
         self.__register_default_config()
@@ -217,6 +220,3 @@ class AbstractPlugin(ABC):
         A description of the extra_uninstall function.
         """
         pass
-
-
-PluginsView: Type = MappingProxyType[str, AbstractPlugin]
