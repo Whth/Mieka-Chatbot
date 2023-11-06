@@ -10,6 +10,8 @@ from graia.broadcast import Namespace, BaseDispatcher, Decorator, Dispatchable, 
 
 from constant import Value, EXTENSION_CONFIG_DIR
 from modules.auth.core import AuthorizationManager
+from modules.auth.permissions import Permission, PermissionCode
+from modules.auth.resources import required_perm_generator, RequiredPermission
 from modules.cmd import NameSpaceNode
 from modules.config_utils import ConfigRegistry
 
@@ -45,13 +47,29 @@ class AbstractPlugin(ABC):
         return self._plugin_view
 
     @final
+    @property
+    def root_namespace_node(self) -> NameSpaceNode:
+        return self._root_namespace_node
+
+    @final
+    @property
+    def required_permission(self) -> RequiredPermission:
+        return self._req_perm
+
+    @final
+    @property
+    def su_permission(self) -> Permission:
+        return self._su_perm
+
+    @final
     def __register_default_config(self):
         """
         Registers the default configuration settings.
         Returns:
             None
         """
-
+        if not isinstance(self.DefaultConfig, dict):
+            raise ValueError("DefaultConfig must be a dictionary")
         for items in self.DefaultConfig.items():
             self.config_registry.register_config(*items)
 
@@ -72,6 +90,15 @@ class AbstractPlugin(ABC):
         self._root_namespace_node: NameSpaceNode = root_namespace_node
         self.__register_default_config()
         self._config_registry.load_config()
+        self._su_perm = Permission(
+            id=PermissionCode.SuperPermission.value,
+            name=self.get_plugin_name(),
+        )
+        self._req_perm: RequiredPermission = required_perm_generator(
+            target_resource_name=self.get_plugin_name(),
+            super_permissions=[self._su_perm],
+        )
+        self._auth_manager.add_perm_from_req(self._req_perm)
 
     @final
     def receiver(
