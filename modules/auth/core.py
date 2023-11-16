@@ -1,8 +1,9 @@
 import inspect
 import pathlib
 from functools import wraps
-from pydantic import PrivateAttr, validator
 from typing import Optional, NamedTuple, Any, Dict, Iterable, List, Callable, Type
+
+from pydantic import PrivateAttr, validator
 
 from .permissions import Permission, PermissionCode, PermissionManager
 from .resources import ResourceManager, Resource, required_perm_generator, RequiredPermission
@@ -65,6 +66,14 @@ def final_handler(final_method: str, exception: Optional[Type[Exception]] = Exce
 
 
 class AuthorizationManager(AuthBaseModel):
+    """
+    AuthorizationManager:
+    manages the permissions, roles, resources, and users.
+
+    Notes:
+        the change is required to reboot the bot to take effect.
+    """
+
     class Config:
         allow_mutation = True
 

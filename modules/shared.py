@@ -1,5 +1,5 @@
-from .auth.core import Permission, Resource, User, RequiredPermission, Role, PermissionCode, required_perm_generator
-from .cmd import NameSpaceNode, ExecutableNode, CmdBuilder
+from .auth import Permission, Resource, User, RequiredPermission, Role, PermissionCode, required_perm_generator
+from .cmd import NameSpaceNode, ExecutableNode, CmdBuilder, make_stdout_seq_string
 from .config_utils import ConfigRegistry
 from .file_manager import (
     download_file,
@@ -44,4 +44,5 @@ __all__ = [
     "rename_image_with_hash",
     "img_to_base64",
     "base64_to_img",
+    "make_stdout_seq_string",
 ]

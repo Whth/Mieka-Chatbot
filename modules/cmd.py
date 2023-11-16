@@ -6,8 +6,7 @@ from typing import Dict, Any, List, Union, Callable, Type, Unpack, final, TypeVa
 from pydantic import BaseModel, Field, PrivateAttr
 
 from constant import Value
-from modules.auth.permissions import Permission, auth_check
-from modules.auth.resources import RequiredPermission
+from modules.auth import Permission, auth_check, RequiredPermission
 from modules.config_utils import (
     get_signature_with_annotations,
 )
