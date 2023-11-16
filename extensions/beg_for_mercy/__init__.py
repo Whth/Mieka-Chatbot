@@ -10,6 +10,7 @@ class CMD:
     ROOT: str = "bfm"
     ADD: str = "add"
     LIST: str = "list"
+    DEL: str = "del"
 
 
 class BegForMercy(AbstractPlugin):
@@ -45,77 +46,97 @@ class BegForMercy(AbstractPlugin):
         from graia.ariadne.event.message import GroupMessage
         from graia.ariadne.model import Group
         from colorama import Back
-        from modules.file_manager import explore_folder
-        from modules.cmd import RequiredPermission, ExecutableNode, NameSpaceNode
-        from modules.auth.resources import required_perm_generator
-        from modules.auth.permissions import Permission, PermissionCode
+
+        from modules.shared import explore_folder, ExecutableNode, NameSpaceNode, make_stdout_seq_string
+        from graia.ariadne import Ariadne
 
         gif_dir_path = self._config_registry.get_config(self.CONFIG_BEGGING_GIF_ASSET_PATH)
 
         def _add_new_keyword(new_kw: str) -> str:
-            kw_list: List[str] = self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD_LIST)
+            """
+            Adds a new keyword to the keyword list.
+
+            Parameters:
+                new_kw (str): The new keyword to be added.
+
+            Returns:
+                str: A message indicating the addition of the keyword and the current size of the keyword list.
+            """
+            kw_list: List[str] = self.config_registry.get_config(self.CONFIG_DETECTED_KEYWORD_LIST)
             kw_list.append(new_kw)
             kw_list = list(set(kw_list))
-            self._config_registry.set_config(self.CONFIG_DETECTED_KEYWORD_LIST, kw_list)
+            self.config_registry.set_config(self.CONFIG_DETECTED_KEYWORD_LIST, kw_list)
             return f"add [{new_kw}], now kw_list sizes {len(kw_list)}"
 
+        def _delete_keyword(new_kw: str) -> str:
+            """
+            Delete a keyword from the keyword list.
+
+            Parameters:
+                new_kw (str): The keyword to be deleted.
+
+            Returns:
+                str: A string indicating the result of the deletion operation.
+            """
+            kw_list: List[str] = self.config_registry.get_config(self.CONFIG_DETECTED_KEYWORD_LIST)
+            kw_list.remove(new_kw)
+            kw_list = list(set(kw_list))
+            self.config_registry.set_config(self.CONFIG_DETECTED_KEYWORD_LIST, kw_list)
+            return f"delete [{new_kw}], now kw_list sizes {len(kw_list)}"
+
         def _list_kws() -> str:
+            """
+            Get a list of detected keywords.
+
+            Returns:
+                str: A string representation of the detected keyword list.
+            """
             kw_list: List[str] = self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD_LIST)
 
-            return "\n".join(kw_list)
-
-        su_perm = Permission(id=PermissionCode.SuperPermission.value, name=self.get_plugin_name())
-        req_perm: RequiredPermission = required_perm_generator(
-            target_resource_name=self.get_plugin_name(), super_permissions=[su_perm]
-        )
+            return make_stdout_seq_string(kw_list)
 
         tree = NameSpaceNode(
             name=CMD.ROOT,
-            required_permissions=req_perm,
+            required_permissions=self.required_permission,
             children_node=[
                 ExecutableNode(
                     name=CMD.ADD,
-                    required_permissions=req_perm,
+                    required_permissions=self.required_permission,
                     source=_add_new_keyword,
+                    help_message=_add_new_keyword.__doc__,
                 ),
                 ExecutableNode(
                     name=CMD.LIST,
-                    required_permissions=req_perm,
+                    required_permissions=self.required_permission,
                     source=_list_kws,
+                    help_message=_list_kws.__doc__,
+                ),
+                ExecutableNode(
+                    name=CMD.DEL,
+                    required_permissions=self.required_permission,
+                    source=_delete_keyword,
+                    help_message=_delete_keyword.__doc__,
                 ),
             ],
         )
-        self._auth_manager.add_perm_from_req(req_perm)
-        self._root_namespace_node.add_node(tree)
 
-        from graia.ariadne import Ariadne
+        self._root_namespace_node.add_node(tree)
 
         @self.receiver(event=GroupMessage, decorators=[MentionMe()])
         async def begging_for_mercy(app: Ariadne, group: Group, message: MessageChain):
             """
-            A decorator that receives `GroupMessage` events and checks if they contain certain keywords.
-            If the message contains any of the specified keywords, the `begging_for_mercy` function is triggered.
-            The function takes two parameters: `group` and `message`. `group` is of type `Group` and represents
-            the group in which the message was sent. `message` is of type `MessageChain` and represents the
-            message that triggered the event.
+            Decorator for a function that handles a GroupMessage event when the bot is mentioned.
 
-            The function first converts the `message` object to a string. Then, it checks if none of the keywords
-            specified in the configuration are present in the string. If none of the keywords are found, the
-            function returns immediately.
-
-            If at least one keyword is found in the message, the function proceeds to select a random file from
-            the `gif_dir_path` folder using the `explore_folder` function. It then prints a debug message indicating
-            the file that is being sent. Finally, it sends the selected file as an image to the group using the
-            `ariadne_app.send_message` function.
-
-            The function is asynchronous and therefore is decorated with the `async` keyword.
-
-            Parameters:
-            - `group` (Group): The group in which the message was sent.
-            - `message` (MessageChain): The message that triggered the event.
+            Args:
+                app (Ariadne): The Ariadne instance.
+                group (Group): The group where the message was sent.
+                message (MessageChain): The message chain of the received message.
 
             Returns:
-            - None
+                None
+
+            Raises:
+                None
             """
             string = str(message)
             if all(
