@@ -1,2 +1,2 @@
 wordcloud
-matplotlib
+jieba

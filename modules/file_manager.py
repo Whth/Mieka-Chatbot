@@ -1,17 +1,40 @@
 import base64
 import hashlib
 import inspect
+import json
 import os
 import pathlib
 import random
 import string
+import time
+from json import JSONDecodeError
 from pathlib import Path
-from typing import List, Sequence
+from typing import List, Sequence, Any, Dict
 from typing import Tuple
 
 import aiohttp
-import time
 from PIL import Image
+from pydantic import BaseModel, Field
+
+
+class PersistentDict(BaseModel):
+    class Config:
+        validate_assignment = True
+        allow_mutation = False
+
+    container: Dict[Any, Any] = Field(default_factory=dict, const=True)
+
+    def load(self, path: str | Path) -> bool:
+        with open(path, "r", encoding="utf-8") as f:
+            try:
+                self.container.update(json.load(f))
+                return True
+            except JSONDecodeError:
+                return False
+
+    def save(self, path: str | Path) -> None:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(self.container, f, indent=2, ensure_ascii=False)
 
 
 def get_current_file_path() -> str:
