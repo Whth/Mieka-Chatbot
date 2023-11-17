@@ -1,4 +1,4 @@
-from .auth import Permission, Resource, User, RequiredPermission, Role, PermissionCode, required_perm_generator
+from .auth.core import Permission, Resource, User, RequiredPermission, Role, PermissionCode, required_perm_generator
 from .cmd import NameSpaceNode, ExecutableNode, CmdBuilder, make_stdout_seq_string
 from .config_utils import ConfigRegistry
 from .file_manager import (
@@ -15,6 +15,7 @@ from .file_manager import (
     rename_image_with_hash,
     img_to_base64,
     base64_to_img,
+    PersistentDict,
 )
 from .plugin_base import AbstractPlugin
 
@@ -44,5 +45,6 @@ __all__ = [
     "rename_image_with_hash",
     "img_to_base64",
     "base64_to_img",
+    "PersistentDict",
     "make_stdout_seq_string",
 ]
