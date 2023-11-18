@@ -48,6 +48,7 @@ class MessageRecorder(BaseModel):
         ):
             if isinstance(msg_event, GroupMessage):
                 self.add_data(msg_event.sender.group.id, msg_event.message_chain)
+                self.add_data(msg_event.sender.id, msg_event.message_chain)
             elif isinstance(msg_event, FriendMessage):
                 self.add_data(msg_event.sender.id, msg_event.message_chain)
             elif isinstance(msg_event, ActiveGroupMessage):
