@@ -1,3 +1,4 @@
+from random import choice, randint
 from typing import Dict
 
 import jieba
@@ -16,6 +17,7 @@ class CMD:
     DEL: str = "del"
     MAKE: str = "c"
     CLEAN: str = "clear"
+    HOT: str = "hot"
 
 
 class Kotoba(AbstractPlugin):
@@ -273,6 +275,25 @@ class Kotoba(AbstractPlugin):
             key = list(recorder.data_base.container.keys())[index]
             recorder.del_data(key)
 
+        def _hot(sentence: str):
+            """
+            Generates a list of tokens from a given sentence by performing tokenization using jieba.cut.
+
+            Args:
+                sentence (str): The input sentence to tokenize.
+
+            Returns:
+                str: The concatenation of tokens generated from the sentence.
+            """
+            if not sentence:
+                return
+
+            hot_words = ["😍", "🥵", "🥰", "🤤", "...", "...", "..."]
+            tokens = list(jieba.cut(sentence))
+            for hot_w in [choice(hot_words) for _ in range(int(len(tokens) / 2.2))]:
+                tokens.insert(randint(0, len(tokens) - 1), hot_w)
+            return "".join(tokens)
+
         tree = NameSpaceNode(
             name=CMD.ROOT,
             help_message=self.get_plugin_description(),
@@ -282,6 +303,7 @@ class Kotoba(AbstractPlugin):
                 ExecutableNode(name=CMD.MAKE, help_message=_make_wordcloud.__doc__, source=_make_wordcloud),
                 ExecutableNode(name=CMD.CLEAN, help_message=_clean.__doc__, source=_clean),
                 ExecutableNode(name=CMD.DEL, help_message=_delete.__doc__, source=_delete),
+                ExecutableNode(name=CMD.HOT, help_message=_hot.__doc__, source=_hot),
             ],
         )
 
