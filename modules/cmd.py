@@ -48,8 +48,11 @@ def tokenize_cmd(cmd: str) -> List[str]:
     return final_tokens
 
 
-def make_stdout_seq_string(seq: Iterable[Any]) -> str:
-    return "\n".join(f"[{i}]: {s}" for i, s in enumerate(seq, 1))
+def make_stdout_seq_string(seq: Iterable[Any], title: str = "") -> str:
+    output = ""
+    if title:
+        output += f"{title}\n----------------\n"
+    return output + "\n".join(f"[{i}]: {s}" for i, s in enumerate(seq))
 
 
 class CmdBuilder(object):
