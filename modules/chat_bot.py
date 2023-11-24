@@ -1,4 +1,4 @@
-from typing import List, NamedTuple, Union
+from typing import List, NamedTuple, Union, Awaitable, Any
 
 from graia.ariadne.app import Ariadne
 from graia.ariadne.connection.config import WebsocketClientConfig
@@ -149,7 +149,6 @@ class ChatBot(object):
                 self._auth_manager.get_user(user_id=person.id)
             )  # if this fails, then there is no need to go further
 
-            success = False
             roles_bunch: List[List[Role]] = [user.roles for user in stack]
             owned_roles: List[Role] = []
             for role in roles_bunch:
@@ -157,18 +156,19 @@ class ChatBot(object):
             for role in owned_roles:
                 with role as perms:
                     try:
-                        stdout = await self._root.interpret(str(message), perms, HELP_KEYWORD)
-                        success = True
+                        interpret_result: str | Awaitable[Any] = await self._root.interpret(
+                            str(message), perms, HELP_KEYWORD
+                        )
+                        break
                     except PermissionError:
                         pass
                     except KeyError:
-                        # keyError is raised only when the cmd is not defined. on that account, exit will be proceeded
-                        return
-                if success:
-                    break
+                        pass
+            else:
+                return
 
-            target = group if group else person
-            (await self._ariadne_app.send_message(target, message=stdout)) if stdout else None
+            stdout = interpret_result if isinstance(interpret_result, str) else await interpret_result
+            (await self._ariadne_app.send_message(group or person, message=stdout)) if stdout else None
 
         return _cmd_interpret
 

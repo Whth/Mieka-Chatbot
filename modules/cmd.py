@@ -1,7 +1,7 @@
 import re
 from abc import abstractmethod
 from inspect import iscoroutinefunction
-from typing import Dict, Any, List, Union, Callable, Type, Unpack, final, TypeVar, Iterable
+from typing import Dict, Any, List, Union, Callable, Type, Unpack, final, TypeVar, Iterable, Awaitable
 
 from pydantic import BaseModel, Field, PrivateAttr
 
@@ -463,7 +463,7 @@ class NameSpaceNode(BaseCmdNode):
 
     async def interpret(
         self, string: str, permissions: Iterable[Permission] = tuple(), documentation_keyword: str = "doc"
-    ) -> Any:
+    ) -> str | Awaitable[Any]:
         """
         Asynchronously interprets a command string and executes the corresponding command.
 
@@ -508,7 +508,7 @@ class NameSpaceNode(BaseCmdNode):
                 if len(args) == 1 and args[0] == documentation_keyword:
                     # return the documentation
                     return target_node.help_message
-                return await target_node.get_execute(permissions, *args)
+                return target_node.get_execute(permissions, *args)
 
         # If the node is a NameSpaceNode, return its documentation
         if isinstance(target_node, NameSpaceNode):
