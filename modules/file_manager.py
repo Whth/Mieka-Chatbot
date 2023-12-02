@@ -251,7 +251,7 @@ def compress_image_max_vol(
     compressed_img_vol = 0
     current_quality = min_quality
     while compressed_img_vol < max_file_size:
-        img.save(output_image_path, quality=current_quality)
+        img.save(output_image_path, quality=current_quality, bitmap_format="png")
         compressed_img_vol = os.path.getsize(output_image_path)
         if search_best:
             current_quality += step
