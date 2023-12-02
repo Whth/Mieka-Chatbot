@@ -1,3 +1,4 @@
+from math import log10
 from typing import List
 
 
@@ -79,9 +80,6 @@ def get_estimate_power_sizing(
         book: "Engineering Economics",page: 19
     """
     return base_production * ((new_production / base_production) ** pay_return_index) * fix_constant
-
-
-from math import log10
 
 
 def get_work_time_learning_curve(base_time: float, learning_rate: float, step: float) -> float:
