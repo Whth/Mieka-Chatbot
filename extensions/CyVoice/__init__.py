@@ -28,6 +28,7 @@ class CyVoice(AbstractPlugin):
     CONFIG_NOISE_W = "NoiseW"
     CONFIG_MAX = "Max"
     CONFIG_ENABLE_TRANSLATE = "EnableTrans"
+    CONFIG_LENGTH = "Length"
     CONFIG_TARGET_LANGUAGE = "TargetLang"
 
     CONFIG_ANNOTATE_STATEMENT = "AnnotateStatement"
@@ -39,8 +40,9 @@ class CyVoice(AbstractPlugin):
     DefaultConfig = {
         CONFIG_NOISE: 0.667,
         CONFIG_NOISE_W: 0.8,
-        CONFIG_MAX: 50,
+        CONFIG_MAX: 448,
         CONFIG_ENABLE_TRANSLATE: 1,
+        CONFIG_LENGTH: 1.0,
         CONFIG_TARGET_LANGUAGE: "jp",
         CONFIG_ANNOTATE_STATEMENT: "ちゃんと聞いてくださいね、私の名前は",
         CONFIG_DETECTED_KEYWORD: "cv",
@@ -68,9 +70,7 @@ class CyVoice(AbstractPlugin):
     def install(self):
         from graia.ariadne.message.element import Voice
         from modules.cmd import CmdBuilder
-        from modules.cmd import RequiredPermission, NameSpaceNode, ExecutableNode
-        from modules.auth.resources import required_perm_generator
-        from modules.auth.permissions import Permission, PermissionCode
+        from modules.cmd import NameSpaceNode, ExecutableNode
         from .api import VITS
 
         translater: Optional[AbstractPlugin] = self._plugin_view.get(self.__TRANSLATE_PLUGIN_NAME, None)
@@ -88,6 +88,7 @@ class CyVoice(AbstractPlugin):
             self.CONFIG_NOISE_W,
             self.CONFIG_MAX,
             self.CONFIG_ENABLE_TRANSLATE,
+            self.CONFIG_LENGTH,
             self.CONFIG_TARGET_LANGUAGE,
         ]
 
@@ -117,7 +118,7 @@ class CyVoice(AbstractPlugin):
             self._config_registry.set_config(self.CONFIG_USED_CV_INDEX, index)
             return f"change cv index [{temp}] to [{index}]"
 
-        def get_current_cv() -> Voice:
+        async def get_current_cv() -> Voice:
             """
             Retrieves the current voice (cv) used for text-to-speech conversion.
 
@@ -125,16 +126,16 @@ class CyVoice(AbstractPlugin):
                 Voice: The voice object representing the current cv voice.
             """
             cv_id: int = self._config_registry.get_config(self.CONFIG_USED_CV_INDEX)
-            speaker_names = VITS.get_voice_speakers()
+            speaker_names = await VITS.get_voice_speakers()
             return Voice(
-                path=VITS.voice_vits(
+                path=await VITS.voice_vits(
                     f"{self._config_registry.get_config(self.CONFIG_ANNOTATE_STATEMENT)}{speaker_names[cv_id]}ですわ！",
-                    id=cv_id,
+                    cv_id=cv_id,
                     save_dir=self._config_registry.get_config(self.CONFIG_TEMP_FILE_DIR_PATH),
                 )
             )
 
-        def read_sentence(sentence: str) -> Voice:
+        async def read_sentence(sentence: str) -> Voice:
             """
             Generates a voice using the given sentence.
 
@@ -148,18 +149,20 @@ class CyVoice(AbstractPlugin):
                 None.
             """
             if self._config_registry.get_config(self.CONFIG_ENABLE_TRANSLATE) and translate:
-                save_path = VITS.voice_vits(
-                    translate(self._config_registry.get_config(self.CONFIG_TARGET_LANGUAGE), sentence, "auto"),
-                    id=self._config_registry.get_config(self.CONFIG_USED_CV_INDEX),
-                    save_dir=temp_dir,
-                )
-            else:
-                save_path = VITS.voice_vits(
-                    sentence, id=self._config_registry.get_config(self.CONFIG_USED_CV_INDEX), save_dir=temp_dir
-                )
+                sentence = translate(self._config_registry.get_config(self.CONFIG_TARGET_LANGUAGE), sentence, "auto")
+
+            save_path = await VITS.voice_vits(
+                sentence,
+                cv_id=self._config_registry.get_config(self.CONFIG_USED_CV_INDEX),
+                noise_w=self._config_registry.get_config(self.CONFIG_NOISE_W),
+                noise=self._config_registry.get_config(self.CONFIG_NOISE),
+                length=self._config_registry.get_config(self.CONFIG_LENGTH),
+                max_seg_length=self._config_registry.get_config(self.CONFIG_MAX),
+                save_dir=temp_dir,
+            )
             return Voice(path=save_path)
 
-        def list_out_speakers() -> str:
+        async def list_out_speakers(page: int = 1, page_size: int = 100) -> str:
             """
             Generate a string containing the names of the speakers available in the VITS voice recognition system.
 
@@ -167,83 +170,74 @@ class CyVoice(AbstractPlugin):
                 str: A string containing the names of the speakers.
 
             """
-            speaker_names = VITS.get_voice_speakers()
-            temp_string = ""
-            if translate:
-                for index, name in enumerate(speaker_names):
-                    temp_string += f" ID: {index:<4}|{name:<8}|{translate('zh',name,'auto')}\n"
+            speaker_names: List[str] = await VITS.get_voice_speakers()
+            speakers_count = len(speaker_names)
+            all_pages = (speakers_count // page_size) + 1
+            temp_string = f"Page ({page}/{all_pages})\n"
+            start = (page - 1) * page_size
+            end = page * page_size
+            page_content = speaker_names[start : end if end < speakers_count else speakers_count]
+            if self.config_registry.get_config(self.CONFIG_ENABLE_TRANSLATE) and translate:
+                temp_string += f" ID |CV Name|Translated Name\n"
+                for index, name in enumerate(page_content, start=page_size * (page - 1)):
+                    temp_string += f" ID: {index:<4}|{name:<8}|{translate('zh', name, 'auto')}\n"
             else:
-                for index, name in enumerate(speaker_names):
+                for index, name in enumerate(page_content, start=page_size * (page - 1)):
                     temp_string += f" ID: {index:<4}|{name:<8}\n"
             return temp_string
 
-        su_perm = Permission(id=PermissionCode.SuperPermission.value, name=self.get_plugin_name())
-        req_perm: RequiredPermission = required_perm_generator(
-            target_resource_name=self.get_plugin_name(), super_permissions=[su_perm]
-        )
-
         tree = NameSpaceNode(
             name=self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD),
-            required_permissions=req_perm,
+            required_permissions=self.required_permission,
             children_node=[
                 ExecutableNode(
                     name=self.__LIST_CV_CMD,
-                    required_permissions=req_perm,
                     source=list_out_speakers,
                     help_message=f"{list_out_configs.__doc__}",
                 ),
                 ExecutableNode(
                     name=self.__CHANGE_CV_CMD,
-                    required_permissions=req_perm,
                     source=change_cv_index,
                     help_message=f"{change_cv_index.__doc__}",
                 ),
                 ExecutableNode(
                     name=self.__READ_CMD,
-                    required_permissions=req_perm,
                     source=read_sentence,
                     help_message=f"{read_sentence.__doc__}",
                 ),
                 ExecutableNode(
                     name=self.__CURRENT_CV_CMD,
-                    required_permissions=req_perm,
                     source=get_current_cv,
                     help_message=f"{get_current_cv.__doc__}",
                 ),
                 NameSpaceNode(
                     name=self.__CONFIG_CMD,
-                    required_permissions=req_perm,
                     children_node=[
                         ExecutableNode(
                             name=self.__CONFIG_LIST_CMD,
-                            required_permissions=req_perm,
                             source=list_out_configs,
                             help_message=f"{list_out_configs.__doc__}",
                         ),
                         ExecutableNode(
                             name=self.__CONFIG_SET_CMD,
-                            required_permissions=req_perm,
                             source=cmd_builder.build_setter_hall(),
                         ),
                     ],
                 ),
                 NameSpaceNode(
                     name=self.__TRANSLATE_CMD,
-                    required_permissions=req_perm,
                     children_node=[
                         ExecutableNode(
                             name=self.__TRANSLATE_ENABLE_CMD,
-                            required_permissions=req_perm,
                             source=cmd_builder.build_setter_for(self.CONFIG_ENABLE_TRANSLATE),
                         ),
                         ExecutableNode(
                             name=self.__TRANSLATE_TO_LANG_CMD,
-                            required_permissions=req_perm,
                             source=cmd_builder.build_setter_for(self.CONFIG_TARGET_LANGUAGE),
                         ),
                     ],
                 ),
             ],
         )
-        self._auth_manager.add_perm_from_req(req_perm)
+
         self._root_namespace_node.add_node(tree)

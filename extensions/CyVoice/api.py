@@ -1,13 +1,23 @@
-import os
-import random
 import re
-import string
 from typing import Dict, List
 
-import requests
-from requests_toolbelt.multipart.encoder import MultipartEncoder
+from aiohttp import ClientSession
+from pydantic import BaseModel
+
+from modules.shared import get_pwd
 
 TIMEOUT = 30
+
+
+class CVData(BaseModel):
+    text: str
+    id: int
+    format: str
+    lang: str
+    length: float
+    noise: float
+    noisew: float
+    max: int
 
 
 class VITS(object):
@@ -16,7 +26,7 @@ class VITS(object):
     base: str = "http://127.0.0.1:23456"
 
     @classmethod
-    def voice_speakers(cls) -> str:
+    async def voice_speakers(cls) -> str:
         """
         Fetches the voice speakers data from the API and returns a formatted string.
 
@@ -27,25 +37,28 @@ class VITS(object):
 
         url = f"{cls.base}/{cls.__API_VOICE_APP_KEY_WORD}/{cls.__API_REQUEST_SPEAKERS_KEY_WORD}"
         # Construct the URL for fetching voice speakers data
-        temp_string: str = ""
 
-        json: Dict[str, List[Dict[str]]] = requests.get(url=url, timeout=TIMEOUT).json()  # Fetch the JSON response
+        async with ClientSession() as session:
+            async with session.get(url=url, timeout=TIMEOUT) as response:
+                json: Dict[str, List[Dict[str]]] = await response.json()  # Fetch the JSON response
 
         for model_type in json:
-            temp_string += f"{model_type}:\n\n"  # Add the model type to the string
+            temp_string = f"{model_type}:\n\n"  # Add the model type to the string
             for speakers in json[model_type]:
                 temp_string += (
                     f" ID: {speakers.get('id'):<4}|{speakers.get('name')}\n"  # Add the speaker details to the string
                 )
-            temp_string += "-----------------\n"  # Add a separator after each model type
-
-        return temp_string  # Return the formatted string containing the voice speakers data
+                yield temp_string
 
     @classmethod
-    def get_voice_speakers(cls):
+    async def get_voice_speakers(cls):
         speaker_names: List[str] = []
-        url = f"{cls.base}/{cls.__API_VOICE_APP_KEY_WORD}/{cls.__API_REQUEST_SPEAKERS_KEY_WORD}"  # Construct the URL for fetching voice speakers data
-        json: Dict[str, List[Dict[str]]] = requests.get(url=url, timeout=TIMEOUT).json()  # Fetch the JSON response
+        url = f"{cls.base}/{cls.__API_VOICE_APP_KEY_WORD}/{cls.__API_REQUEST_SPEAKERS_KEY_WORD}"
+        # Construct the URL for fetching voice speakers data
+
+        async with ClientSession() as session:
+            async with session.get(url=url, timeout=TIMEOUT) as response:
+                json: Dict[str, List[Dict[str]]] = await response.json()  # Fetch the JSON response
 
         for model_type in json:
             for speakers in json[model_type]:
@@ -56,61 +69,64 @@ class VITS(object):
     # 语音合成 voice vits
 
     @classmethod
-    def voice_vits(
+    async def voice_vits(
         cls,
         text,
-        id=0,
-        format="wav",
+        cv_id=0,
+        file_format="wav",
         lang="auto",
-        length=1,
+        length=1.0,
         noise=0.667,
-        noisew=0.8,
-        max=50,
-        save_dir=os.path.dirname(__file__),
-    ):
+        noise_w=0.8,
+        max_seg_length=50,
+        save_dir=get_pwd(),
+    ) -> str:
         """
-        Sends a text to the voice conversion API and saves the resulting audio file.
+        Asynchronous method that generates a voice file using the Voice API.
 
         Args:
-            text (str): The text to convert to speech.
-            id (int, optional): The ID of the audio file. Defaults to 0.
-            format (str, optional): The format of the audio file. Defaults to "wav".
-            lang (str, optional): The language of the text. Defaults to "auto".
-            length (float, optional): The length of the audio file in seconds. Defaults to 1.
-            noise (float, optional): The amount of noise to add to the audio. Defaults to 0.667.
-            noisew (float, optional): The intensity of the added noise. Defaults to 0.8.
-            max (int, optional): The maximum number of characters in the text. Defaults to 50.
+            text (str): The text that will be used to generate the voice file.
+            cv_id (int, optional): The ID of the CV. Defaults to 0.
+            file_format (str, optional): The format of the voice file. Defaults to "wav".
+            lang (str, optional): The language of the voice. Defaults to "auto".
+            length (int, optional): The length of the voice file in seconds. Defaults to 1.
+            noise (float, optional): The level of noise to be added to the voice file. Defaults to 0.667.
+            noise_w (float, optional): The level of noise weight to be added to the voice file. Defaults to 0.8.
+            max_seg_length (int, optional): The maximum temperature. Defaults to 50.
+            save_dir (str, optional): The directory where the voice file will be saved.
+                Defaults to the current working directory.
+
+        Examples:
+            >>> VITS.voice_vits(text="hello world", cv_id=0, file_format="wav", lang="auto", length=1, noise=0.667, noise_w=0.8, max_seg_length=50, save_dir=get_pwd())
 
         Returns:
-            str: The path to the saved audio file.
+            str: The path of the saved voice file.
         """
-        # Prepare the fields and boundary for the multipart form data
-        fields = {
-            "text": text,
-            "id": str(id),
-            "format": format,
-            "lang": lang,
-            "length": str(length),
-            "noise": str(noise),
-            "noisew": str(noisew),
-            "max": str(max),
-        }
-        boundary = "----VoiceConversionFormBoundary" + "".join(random.sample(string.ascii_letters + string.digits, 16))
-
-        # Create the multipart encoder and set the headers
-        m = MultipartEncoder(fields=fields, boundary=boundary)
-        headers = {"Content-Type": m.content_type}
-
-        # Make the API request, response is raw binary
+        # Prepare the request body
+        cvdata = CVData(
+            text=text,
+            id=cv_id,
+            format=file_format,
+            lang=lang,
+            length=length,
+            noise=noise,
+            noisew=noise_w,
+            max=max_seg_length,
+        )
+        # Construct the API endpoint URL
         url = f"{cls.base}/{cls.__API_VOICE_APP_KEY_WORD}"
-        res = requests.post(url=url, data=m, headers=headers, timeout=TIMEOUT)
 
-        # Extract the file name from the response headers
-        fname = re.findall("filename=(.+)", res.headers["Content-Disposition"])[0]
-        path = f"{save_dir}/{fname}"
+        # Send the POST request to the API and get the response
+        async with ClientSession() as session:
+            async with session.post(url=url, json=cvdata.dict(), timeout=TIMEOUT) as response:
+                # Extract the filename from the response headers
+                fname = re.findall("filename=(.+)", response.headers["Content-Disposition"])[0]
 
-        # Save the audio file
-        with open(path, "wb") as f:
-            f.write(res.content)
+                # Create the path where the voice file will be saved
+                path = f"{save_dir}/{fname}"
+
+                # Save the voice file
+                with open(path, "wb") as f:
+                    f.write(await response.read())
 
         return path
