@@ -1,9 +1,9 @@
 import re
 from abc import abstractmethod
 from inspect import iscoroutinefunction
-from typing import Dict, Any, List, Union, Callable, Type, Unpack, final, TypeVar, Iterable, Awaitable
+from typing import Dict, Any, List, Union, Callable, Type, Unpack, final, TypeVar, Iterable, Awaitable, TypeAlias
 
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic import BaseModel, Field
 
 from constant import Value
 from modules.auth import Permission, auth_check, RequiredPermission
@@ -253,7 +253,7 @@ class BaseCmdNode(BaseModel):
         pass
 
 
-T_CmdNode = TypeVar("T_CmdNode", bound=BaseCmdNode)
+T_CmdNode: TypeAlias = TypeVar("T_CmdNode", bound=BaseCmdNode)
 
 
 class ExecutableNode(BaseCmdNode):
@@ -287,15 +287,16 @@ class ExecutableNode(BaseCmdNode):
         return self.source.__name__
 
     def __doc__(self) -> str:
-        return self.source.__doc__
+        if hasattr(self.source, "__doc__"):
+            return self.source.__doc__
+        return "no help provided"
 
 
 class NameSpaceNode(BaseCmdNode):
     children_node: List[T_CmdNode] = Field(default_factory=list, unique_items=True, validate_assignment=True)
-    _children_node: List[T_CmdNode] = PrivateAttr(default_factory=list)
 
     def __doc__(self) -> str:
-        nodes = "\n".join(f"[{node[0]}]: {node[1]}" for node in enumerate(self._children_node))
+        nodes = "\n".join(f"[{node[0]}]: {node[1]}" for node in enumerate(self.children_node))
         return f"{self.name}\n\n{nodes}\n\n{self.help_message}"
 
     def _read(self) -> Any:
@@ -309,29 +310,13 @@ class NameSpaceNode(BaseCmdNode):
                 continue
             merge_queue.append(param)
 
-        self._children_node.extend(filter(lambda x: isinstance(x, (ExecutableNode, NameSpaceNode)), merge_queue))
+        self.children_node.extend(filter(lambda x: isinstance(x, (ExecutableNode, NameSpaceNode)), merge_queue))
 
     def _delete(self, *delete_params: Unpack) -> Any:
-        self._children_node.clear()
+        self.children_node.clear()
 
     async def _execute(self, *execute_params: Unpack) -> Any:
         raise NotImplementedError(f"{self.name} does not support execute operation")
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self._children_node.extend(self.children_node)
-        self.children_node.clear()
-
-    def dict(
-        self,
-        *args,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        self.children_node.clear()
-        self.children_node.extend(self._children_node)
-        res = super().dict(*args, **kwargs)
-        self.children_node.clear()
-        return res
 
     def get_node(
         self,
@@ -365,7 +350,7 @@ class NameSpaceNode(BaseCmdNode):
 
         # Filter the children nodes to find the target node with the first name in the chain
         target_node: List[Union["NameSpaceNode", "ExecutableNode"]] = list(
-            filter(lambda x: x.name == chain[0], self._children_node)
+            filter(lambda x: x.name == chain[0], self.children_node)
         )
 
         # Check if multiple nodes with the same name are found
@@ -413,8 +398,8 @@ class NameSpaceNode(BaseCmdNode):
         ):
             if not isinstance(node, (NameSpaceNode, ExecutableNode)):
                 raise TypeError(f"Node must be of type {NameSpaceNode} or {ExecutableNode}")
-            if node not in self._children_node:
-                self._children_node.append(node)
+            if node not in self.children_node:
+                self.children_node.append(node)
                 return
             raise KeyError(f"Node with name {node.name} already exists")
         raise PermissionError("Illegal Modify operation, insufficient permissions")
@@ -453,9 +438,9 @@ class NameSpaceNode(BaseCmdNode):
                 parent_node.remove_node(node[-1], permissions)
                 return
 
-            if node not in self._children_node:
+            if node not in self.children_node:
                 raise KeyError(f"Node with name {node.name} does not exist")
-            self._children_node.remove(node)
+            self.children_node.remove(node)
             return
         raise PermissionError(
             "Illegal Delete operation, insufficient permissions, you need have the read and delete permissions"
