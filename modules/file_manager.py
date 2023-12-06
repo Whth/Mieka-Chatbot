@@ -297,6 +297,19 @@ def base64_to_img(base64_string: str, output_path: str) -> None:
         f.write(image_data)
 
 
+def sha256_string(s: str) -> str:
+    """
+    Generates the SHA-256 hash of a given string.
+
+    Args:
+        s (str): The string to be hashed.
+
+    Returns:
+        str: The SHA-256 hash of the input string.
+    """
+    return hashlib.sha256(s.encode("utf-8")).hexdigest()
+
+
 def rename_image_with_hash(image_path: str) -> str:
     """
     Renames the image file at the specified path by appending a 6-character hash value
@@ -304,30 +317,29 @@ def rename_image_with_hash(image_path: str) -> str:
     Returns the renamed image path.
     """
     # Check if the image file exists
-    if not os.path.exists(image_path):
+    image_path = Path(image_path)
+    if not image_path.exists():
         raise FileNotFoundError(f"{image_path} does not exist")
 
     # Get the image file name
-    image_name = os.path.basename(image_path)
+    image_name = image_path.name
 
     # Get the image file name prefix and suffix
-    image_name_prefix, image_name_suffix = os.path.splitext(image_name)
+    image_name_prefix, image_name_suffix = image_name.split(".")
 
     # Read the image file
     with open(image_path, "rb") as f:
-        image_content = f.read()
-
-    # Calculate the hash value of the image file content
-    image_hash = hashlib.md5(image_content).hexdigest()[:6]
+        # Calculate the hash value of the image file content
+        image_hash = hashlib.md5(f.read()).hexdigest()[:6]
 
     # Rename the image file
-    new_image_name = f"{image_name_prefix}_{image_hash}{image_name_suffix}"
-    image_dir = os.path.dirname(image_path)
-    new_image_path = os.path.join(image_dir, new_image_name)
-    os.rename(image_path, new_image_path)
+    new_image_name = f"{image_name_prefix}_{image_hash}.{image_name_suffix}"
+    new_image_path = image_path.parent / new_image_name
+    if not new_image_path.exists():
+        image_path.rename(new_image_path)
 
     # Return the renamed image path
-    return new_image_path
+    return str(new_image_path)
 
 
 def generate_random_string(length: int) -> str:

@@ -16,6 +16,7 @@ from .file_manager import (
     img_to_base64,
     base64_to_img,
     PersistentDict,
+    sha256_string,
 )
 from .plugin_base import AbstractPlugin
 
@@ -47,4 +48,5 @@ __all__ = [
     "base64_to_img",
     "PersistentDict",
     "make_stdout_seq_string",
+    "sha256_string",
 ]
