@@ -321,11 +321,8 @@ def rename_image_with_hash(image_path: str) -> str:
     if not image_path.exists():
         raise FileNotFoundError(f"{image_path} does not exist")
 
-    # Get the image file name
-    image_name = image_path.name
-
     # Get the image file name prefix and suffix
-    image_name_prefix, image_name_suffix = image_name.split(".")
+    image_name_stem, image_name_suffix = image_path.stem, image_path.suffix
 
     # Read the image file
     with open(image_path, "rb") as f:
@@ -333,7 +330,7 @@ def rename_image_with_hash(image_path: str) -> str:
         image_hash = hashlib.md5(f.read()).hexdigest()[:6]
 
     # Rename the image file
-    new_image_name = f"{image_name_prefix}_{image_hash}.{image_name_suffix}"
+    new_image_name = f"{image_name_stem}_{image_hash}.{image_name_suffix}"
     new_image_path = image_path.parent / new_image_name
     if not new_image_path.exists():
         image_path.rename(new_image_path)
