@@ -1,7 +1,25 @@
-from typing import List
+import pathlib
+from random import choice
+from typing import Set, Tuple
 
-from modules.file_manager import get_pwd
-from modules.plugin_base import AbstractPlugin
+from colorama import Back
+from graia.ariadne import Ariadne
+from graia.ariadne.event.message import GroupMessage
+from graia.ariadne.message.chain import MessageChain
+from graia.ariadne.message.element import Image
+from graia.ariadne.message.parser.base import MentionMe
+from graia.ariadne.model import Group
+
+from modules.shared import (
+    explore_folder,
+    ExecutableNode,
+    NameSpaceNode,
+    make_stdout_seq_string,
+    AbstractPlugin,
+    get_pwd,
+    generate_random_string,
+)
+from .rank import ProfanityRank, create_ranker_broad
 
 __all__ = ["BegForMercy"]
 
@@ -11,15 +29,21 @@ class CMD:
     ADD: str = "add"
     LIST: str = "list"
     DEL: str = "del"
+    RANK: str = "rank"
 
 
 class BegForMercy(AbstractPlugin):
     CONFIG_BEGGING_GIF_ASSET_PATH = "gif_asset_path"
     CONFIG_DETECTED_KEYWORD_LIST = "detected_keyword_list"
+    CONFIG_PF_RANK_PATH = "pf_rank_path"
+    CONFIG_TEMP_DIR = "temp_dir"
+    CONFIG_FONT_FILE = "font_file"
 
     DefaultConfig = {
         CONFIG_BEGGING_GIF_ASSET_PATH: f"{get_pwd()}/asset",
-        CONFIG_DETECTED_KEYWORD_LIST: ["sb"],
+        CONFIG_PF_RANK_PATH: f"{get_pwd()}/rank.json",
+        CONFIG_TEMP_DIR: f"{get_pwd()}/temp",
+        CONFIG_FONT_FILE: f"{get_pwd()}/得意黑 TTF.ttf",
     }
 
     @classmethod
@@ -39,18 +63,13 @@ class BegForMercy(AbstractPlugin):
         return "whth"
 
     def install(self):
-        from random import choice
-        from graia.ariadne.message.chain import MessageChain
-        from graia.ariadne.message.element import Image
-        from graia.ariadne.message.parser.base import MentionMe
-        from graia.ariadne.event.message import GroupMessage
-        from graia.ariadne.model import Group
-        from colorama import Back
-
-        from modules.shared import explore_folder, ExecutableNode, NameSpaceNode, make_stdout_seq_string
-        from graia.ariadne import Ariadne
-
         gif_dir_path = self._config_registry.get_config(self.CONFIG_BEGGING_GIF_ASSET_PATH)
+        pf_rank_path = pathlib.Path(self._config_registry.get_config(self.CONFIG_PF_RANK_PATH))
+        if pf_rank_path.exists():
+            pf_rank: ProfanityRank = ProfanityRank.parse_file(pf_rank_path)
+        else:
+            pf_rank = ProfanityRank()
+            pf_rank.save(pf_rank_path)
 
         def _add_new_keyword(new_kw: str) -> str:
             """
@@ -62,10 +81,9 @@ class BegForMercy(AbstractPlugin):
             Returns:
                 str: A message indicating the addition of the keyword and the current size of the keyword list.
             """
-            kw_list: List[str] = self.config_registry.get_config(self.CONFIG_DETECTED_KEYWORD_LIST)
-            kw_list.append(new_kw)
-            kw_list = list(set(kw_list))
-            self.config_registry.set_config(self.CONFIG_DETECTED_KEYWORD_LIST, kw_list)
+            kw_list: Set[str] = pf_rank.profanities
+            kw_list.add(new_kw)
+            pf_rank.save(pf_rank_path)
             return f"add [{new_kw}], now kw_list sizes {len(kw_list)}"
 
         def _delete_keyword(new_kw: str) -> str:
@@ -78,10 +96,9 @@ class BegForMercy(AbstractPlugin):
             Returns:
                 str: A string indicating the result of the deletion operation.
             """
-            kw_list: List[str] = self.config_registry.get_config(self.CONFIG_DETECTED_KEYWORD_LIST)
+            kw_list: Set[str] = pf_rank.profanities
             kw_list.remove(new_kw)
-            kw_list = list(set(kw_list))
-            self.config_registry.set_config(self.CONFIG_DETECTED_KEYWORD_LIST, kw_list)
+            pf_rank.save(pf_rank_path)
             return f"delete [{new_kw}], now kw_list sizes {len(kw_list)}"
 
         def _list_kws() -> str:
@@ -91,9 +108,40 @@ class BegForMercy(AbstractPlugin):
             Returns:
                 str: A string representation of the detected keyword list.
             """
-            kw_list: List[str] = self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD_LIST)
+            kw_list: Set[str] = pf_rank.profanities
 
             return make_stdout_seq_string(kw_list)
+
+        async def _get_rank(pure_txt: bool = False) -> str | Image:
+            """
+            Retrieves the rankers and returns either a string or an Image based on the value of `pure_txt`.
+
+            Args:
+                pure_txt (bool): A boolean value indicating whether the output should be in plain text format.
+
+            Returns:
+                str | Image: Either a string containing the rankers information or an Image object.
+            """
+            rankers = await pf_rank.get_rankers(app=Ariadne.current())
+            if pure_txt:
+                stdout = ""
+                for i, ranker_data in enumerate(rankers.items(), start=1):
+                    i: int
+                    ranker_data: Tuple[Tuple[int, str], int]
+                    ranker_info, ranker_score = ranker_data
+                    stdout += f"[{i}] {ranker_info[0]}-{ranker_info[1]}\nNG-Word检测次数：{ranker_score}\n\n"
+
+                return stdout
+            else:
+                temp_dir = self.config_registry.get_config(self.CONFIG_TEMP_DIR)
+                font_file = self.config_registry.get_config(self.CONFIG_FONT_FILE)
+                png_file = f"{temp_dir}/{generate_random_string(6)}.png"
+                create_ranker_broad(
+                    ranker_data=rankers,
+                    save_path=png_file,
+                    font_file=font_file,
+                )
+                return Image(path=png_file)
 
         tree = NameSpaceNode(
             name=CMD.ROOT,
@@ -101,21 +149,23 @@ class BegForMercy(AbstractPlugin):
             children_node=[
                 ExecutableNode(
                     name=CMD.ADD,
-                    required_permissions=self.required_permission,
                     source=_add_new_keyword,
                     help_message=_add_new_keyword.__doc__,
                 ),
                 ExecutableNode(
                     name=CMD.LIST,
-                    required_permissions=self.required_permission,
                     source=_list_kws,
                     help_message=_list_kws.__doc__,
                 ),
                 ExecutableNode(
                     name=CMD.DEL,
-                    required_permissions=self.required_permission,
                     source=_delete_keyword,
                     help_message=_delete_keyword.__doc__,
+                ),
+                ExecutableNode(
+                    name=CMD.RANK,
+                    source=_get_rank,
+                    help_message=_get_rank.__doc__,
                 ),
             ],
         )
@@ -146,3 +196,20 @@ class BegForMercy(AbstractPlugin):
             file = choice(explore_folder(gif_dir_path))
             print(f"{Back.BLUE}BEG_FOR_MERCY: Sending file at [{file}]{Back.RESET}")
             await app.send_message(group, Image(path=file))
+
+        @self.receiver(event=GroupMessage)
+        async def recording(msg_event: GroupMessage):
+            """
+            Decorator for a function that handles a GroupMessage event.
+
+            Args:
+                msg_event (GroupMessageEvent): The GroupMessageEvent instance.
+
+            Returns:
+                None
+
+            Raises:
+                None
+            """
+            if pf_rank.update_records(msg_event.sender.id, message=str(msg_event.message_chain)):
+                pf_rank.save(pf_rank_path)
