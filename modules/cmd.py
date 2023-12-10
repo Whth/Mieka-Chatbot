@@ -1,9 +1,9 @@
 import re
 from abc import abstractmethod
 from inspect import iscoroutinefunction
-from typing import Dict, Any, List, Union, Callable, Type, Unpack, final, TypeVar, Iterable, Awaitable, TypeAlias
+from typing import Dict, Any, List, Union, Callable, Type, Unpack, final, TypeVar, Iterable, Awaitable, TypeAlias, Set
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, root_validator, validator
 
 from constant import Value
 from modules.auth import Permission, auth_check, RequiredPermission
@@ -48,11 +48,32 @@ def tokenize_cmd(cmd: str) -> List[str]:
     return final_tokens
 
 
-def make_stdout_seq_string(seq: Iterable[Any], title: str = "") -> str:
+def make_stdout_seq_string(seq: Iterable[Any], title: str = "", extra: str = "") -> str:
+    """
+    Generates a formatted string representation of a sequence, with an optional title and extra information.
+
+    Args:
+        seq (Iterable[Any]): The sequence to be converted to a string.
+        title (str, optional): An optional title for the string representation. Defaults to "".
+        extra (str, optional): Any extra information to be appended to the string representation. Defaults to "".
+
+    Returns:
+        str: The formatted string representation of the sequence.
+
+    Example:
+        >>> seq = [1, 2, 3]
+        >>> make_stdout_seq_string(seq, title="Numbers", extra="Total count: 3")
+        'Numbers\n----------------\n[0]: 1\n[1]: 2\n[2]: 3\n\nTotal count: 3'
+    """
     output = ""
     if title:
         output += f"{title}\n----------------\n"
-    return output + "\n".join(f"[{i}]: {s}" for i, s in enumerate(seq))
+
+    output += "\n".join(f"[{i}]: {s}" for i, s in enumerate(seq))
+
+    if extra:
+        output += f"\n----------------\n\n{extra}"
+    return output
 
 
 class CmdBuilder(object):
@@ -175,10 +196,54 @@ class BaseCmdNode(BaseModel):
     class Config:
         allow_mutation = False
         validate_assignment = True
+        validate_all = True
 
-    name: str = Field()
+    name: str = Field(min_length=1)
+
+    aliases: List[str] = Field(default_factory=set, unique_items=True)
     help_message: str = Field(default="no help provided")
     required_permissions: RequiredPermission = Field(default_factory=RequiredPermission)
+
+    @root_validator
+    def name_and_aliases(cls, values) -> Dict[str, Any]:
+        """
+        Validates the 'name_and_aliases' field in the input values dictionary.
+
+        Parameters:
+            cls (Type): The class of the model being validated.
+            values (Dict[str, Any]): The input values dictionary.
+
+        Returns:
+            Dict[str, Any]: The validated values' dictionary.
+
+        Raises:
+            ValueError: If the name and aliases are the same.
+        """
+        if values["name"] in values["aliases"]:
+            raise ValueError(
+                f"Name and aliases must be different. Name: {values['name']}, Aliases: {values['aliases']}"
+            )
+
+        return values
+
+    @validator("aliases")
+    def validate_aliases(cls, aliases: List[str]) -> List[str]:
+        """
+        Validates a list of aliases.
+
+        Args:
+            cls (type): The class that the validator is attached to.
+            aliases (List[str]): The list of aliases to validate.
+
+        Returns:
+            List[str]: The validated list of aliases.
+
+        Raises:
+            ValueError: If any alias in the list is an empty string.
+        """
+        if any(len(alias) == 0 for alias in aliases):
+            raise ValueError("Aliases must not be empty strings")
+        return aliases
 
     @final
     def __eq__(self, other) -> bool:
@@ -287,17 +352,45 @@ class ExecutableNode(BaseCmdNode):
         return self.source.__name__
 
     def __doc__(self) -> str:
-        if hasattr(self.source, "__doc__"):
-            return self.source.__doc__
-        return "no help provided"
+        output = f"{self.name:<10}|{self.aliases}\n\n"
+
+        output += f"{self.source.__doc__}\n\n"
+        if self.help_message != self.source.__doc__:
+            output += self.help_message
+
+        return output
 
 
 class NameSpaceNode(BaseCmdNode):
     children_node: List[T_CmdNode] = Field(default_factory=list, unique_items=True, validate_assignment=True)
 
+    @validator("children_node")
+    def validate_children_node(cls, children_node: List[T_CmdNode]) -> List[T_CmdNode]:
+        """
+        Validates the `children_node` parameter of the `validate_children_node` function.
+
+        Parameters:
+            cls (Type): The class of the `validate_children_node` function.
+            children_node (List[T_CmdNode]): The list of `T_CmdNode` objects to be validated.
+
+        Returns:
+            List[T_CmdNode]: The validated list of `T_CmdNode` objects.
+
+        Raises:
+            ValueError: If the aliases in the `children_node` are not unique.
+
+        """
+        collide_group = has_identifier_collision(children_node)
+        if collide_group:
+            raise ValueError(
+                f"Under, Aliases must be unique,check node under to find duplicates\n"
+                f"{make_stdout_seq_string(collide_group)}"
+            )
+        return children_node
+
     def __doc__(self) -> str:
-        nodes = "\n".join(f"[{node[0]}]: {node[1]}" for node in enumerate(self.children_node))
-        return f"{self.name}\n\n{nodes}\n\n{self.help_message}"
+        nodes = [f"{child.name:<10}|{child.aliases}" for child in self.children_node]
+        return make_stdout_seq_string(nodes, title=f"{self.name:<10}|{self.aliases}", extra=self.help_message)
 
     def _read(self) -> Any:
         return self
@@ -350,12 +443,14 @@ class NameSpaceNode(BaseCmdNode):
 
         # Filter the children nodes to find the target node with the first name in the chain
         target_node: List[Union["NameSpaceNode", "ExecutableNode"]] = list(
-            filter(lambda x: x.name == chain[0], self.children_node)
+            filter(lambda x: x.name == chain[0] or chain[0] in x.aliases, self.children_node)
         )
 
         # Check if multiple nodes with the same name are found
         if len(target_node) > 1:
-            raise KeyError(f"Multiple nodes with name {chain[0]} found")
+            raise KeyError(
+                f"Multiple nodes with name {chain[0]} found,see below\n{make_stdout_seq_string(target_node)}"
+            )
         # Check if a single node is found
         elif len(target_node) == 1:
             # If there are more names in the chain, recursively call get_node on the target node
@@ -400,6 +495,9 @@ class NameSpaceNode(BaseCmdNode):
                 raise TypeError(f"Node must be of type {NameSpaceNode} or {ExecutableNode}")
             if node not in self.children_node:
                 self.children_node.append(node)
+                if has_identifier_collision(self.children_node):
+                    self.children_node.pop()
+                    raise KeyError(f"Node with name {node.name} already exists")
                 return
             raise KeyError(f"Node with name {node.name} already exists")
         raise PermissionError("Illegal Modify operation, insufficient permissions")
@@ -492,10 +590,32 @@ class NameSpaceNode(BaseCmdNode):
                 args = tokens[i:]
                 if len(args) == 1 and args[0] == documentation_keyword:
                     # return the documentation
-                    return target_node.help_message
+                    return target_node.__doc__()
                 return target_node.get_execute(permissions, *args)
 
         # If the node is a NameSpaceNode, return its documentation
         if isinstance(target_node, NameSpaceNode):
             # TODO doc access is not a permission restricted-option, shall give it one?
             return target_node.__doc__()
+
+
+def has_identifier_collision(children_node: List[T_CmdNode]) -> List[T_CmdNode]:
+    """
+    Check if there are any identifier collisions among the given list of command nodes.
+
+    Parameters:
+        children_node (List[T_CmdNode]): A list of command nodes.
+
+    Returns:
+        List[T_CmdNode]: A list of command nodes that have identifier collisions.
+    """
+    aliases_seq: List[str] = []
+    aliases_set: Set[str] = set()
+    for i, child in enumerate(children_node, start=1):
+        aliases_seq.extend(child.aliases)
+        aliases_seq.append(child.name)
+        aliases_set.update(child.aliases)
+        aliases_set.add(child.name)
+        if len(aliases_seq) != len(aliases_set):
+            return children_node[:i]
+    return []
