@@ -1,5 +1,12 @@
 from .auth.core import Permission, Resource, User, RequiredPermission, Role, PermissionCode, required_perm_generator
-from .cmd import NameSpaceNode, ExecutableNode, CmdBuilder, make_stdout_seq_string
+from .cmd import (
+    NameSpaceNode,
+    ExecutableNode,
+    CmdBuilder,
+    make_stdout_seq_string,
+    make_regex_part_from_enum,
+    assemble_cmd_regex_parts,
+)
 from .config_utils import ConfigRegistry
 from .file_manager import (
     download_file,
@@ -49,4 +56,6 @@ __all__ = [
     "PersistentDict",
     "make_stdout_seq_string",
     "sha256_string",
+    "make_regex_part_from_enum",
+    "assemble_cmd_regex_parts",
 ]

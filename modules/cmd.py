@@ -1,5 +1,6 @@
 import re
 from abc import abstractmethod
+from enum import Enum
 from inspect import iscoroutinefunction
 from typing import Dict, Any, List, Union, Callable, Type, Unpack, final, TypeVar, Iterable, Awaitable, TypeAlias, Set
 
@@ -11,6 +12,37 @@ from modules.config_utils import (
     get_signature_with_annotations,
 )
 from modules.file_manager import generate_random_string
+
+
+def make_regex_part_from_enum(enum: Enum) -> str:
+    """
+    Generate a regex pattern part from an enumeration.
+
+    Args:
+        enum (Enum): The enumeration object.
+
+    Returns:
+        str: The regex pattern part.
+
+    """
+    base = enum.name
+    if enum.value:
+        base += "|" + "|".join(enum.value)
+    return f"(?:{base})"
+
+
+def assemble_cmd_regex_parts(cmd_parts: Iterable[str]) -> str:
+    """
+    Generate a regular expression pattern by joining the elements of the given list with the separator "\\s+".
+
+    Parameters:
+        cmd_parts (List[str]): A list of strings representing the parts of a command.
+
+    Returns:
+        str: The regular expression pattern created by joining the elements of cmd_parts with "\\s+" as the separator.
+    """
+    chunk = r"\s+".join(cmd_parts)
+    return chunk
 
 
 def tokenize_cmd(cmd: str) -> List[str]:
