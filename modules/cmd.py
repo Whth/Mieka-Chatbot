@@ -48,6 +48,25 @@ def tokenize_cmd(cmd: str) -> List[str]:
     return final_tokens
 
 
+def format_aliases(aliases: List[str]) -> str:
+    """
+    Formats a list of aliases into a string.
+
+    Args:
+        aliases (List[str]): The list of aliases to format.
+
+    Returns:
+        str: The formatted string representation of the list of aliases.
+    """
+    output = ""
+    if not aliases:
+        return output
+
+    output += "  ".join(map(lambda alias: "-" + alias, aliases))
+
+    return f"{output}"
+
+
 def make_stdout_seq_string(seq: Iterable[Any], title: str = "", extra: str = "") -> str:
     """
     Generates a formatted string representation of a sequence, with an optional title and extra information.
@@ -200,7 +219,7 @@ class BaseCmdNode(BaseModel):
 
     name: str = Field(min_length=1)
 
-    aliases: List[str] = Field(default_factory=set, unique_items=True)
+    aliases: List[str] = Field(default_factory=list, unique_items=True)
     help_message: str = Field(default="no help provided")
     required_permissions: RequiredPermission = Field(default_factory=RequiredPermission)
 
@@ -259,7 +278,7 @@ class BaseCmdNode(BaseModel):
 
     @abstractmethod
     def __doc__(self) -> str:
-        return self.help_message
+        pass
 
     def get_read(self, permissions: Iterable[Permission]) -> Any:
         global __su_permissions__
@@ -352,7 +371,7 @@ class ExecutableNode(BaseCmdNode):
         return self.source.__name__
 
     def __doc__(self) -> str:
-        output = f"{self.name:<10}|{self.aliases}\n\n"
+        output = f"{self.name}\t\t{format_aliases(self.aliases)}\n\n"
 
         output += f"{self.source.__doc__}\n\n"
         if self.help_message != self.source.__doc__:
@@ -389,8 +408,10 @@ class NameSpaceNode(BaseCmdNode):
         return children_node
 
     def __doc__(self) -> str:
-        nodes = [f"{child.name:<10}|{child.aliases}" for child in self.children_node]
-        return make_stdout_seq_string(nodes, title=f"{self.name:<10}|{self.aliases}", extra=self.help_message)
+        nodes = [f"{child.name}\t\t{format_aliases(child.aliases)}" for child in self.children_node]
+        return make_stdout_seq_string(
+            nodes, title=f"{self.name}\t\t{format_aliases(self.aliases)}", extra=self.help_message
+        )
 
     def _read(self) -> Any:
         return self
