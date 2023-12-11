@@ -2,7 +2,22 @@ import re
 from abc import abstractmethod
 from enum import Enum
 from inspect import iscoroutinefunction
-from typing import Dict, Any, List, Union, Callable, Type, Unpack, final, TypeVar, Iterable, Awaitable, TypeAlias, Set
+from itertools import zip_longest
+from typing import (
+    Dict,
+    Any,
+    List,
+    Union,
+    Callable,
+    Type,
+    Unpack,
+    final,
+    TypeVar,
+    Iterable,
+    Awaitable,
+    TypeAlias,
+    Set,
+)
 
 from pydantic import BaseModel, Field, root_validator, validator
 
@@ -387,17 +402,34 @@ class ExecutableNode(BaseCmdNode):
         setattr(self, "source", None)
 
     async def _execute(self, *execute_params: Unpack) -> Any:
-        sig = get_signature_with_annotations(self.source)
-        converted = []
-        for para, param_type in zip(execute_params, sig.values()):
-            try:
-                # try to convert it to the right type
-                converted.append(param_type(para))
-            except TypeError:
-                # if the force conversion fails, use the original value
-                converted.append(para)
+        """
+        Executes the function with the given parameters.
 
-        return await self.source(*converted) if iscoroutinefunction(self.source) else self.source(*converted)
+        Args:
+            execute_params: The parameters to be passed to the function.
+
+        Returns:
+            The result of executing the function with the given parameters.
+        """
+        sig: Dict[str, Any] = get_signature_with_annotations(self.source)
+        converted = []
+
+        # Convert the parameters to the correct types
+        for para, param_type in zip_longest(execute_params, sig.values()):
+            if param_type:
+                try:
+                    # Try to convert the parameter to the right type
+                    converted.append(param_type(para))
+                except TypeError:
+                    # If the force conversion fails, use the original value
+                    pass
+            converted.append(para)
+
+        # Execute the function with the converted parameters
+        if iscoroutinefunction(self.source):
+            return await self.source(*converted)
+        else:
+            return self.source(*converted)
 
     def _read(self) -> Any:
         return self.source.__name__
@@ -644,6 +676,8 @@ class NameSpaceNode(BaseCmdNode):
                 if len(args) == 1 and args[0] == documentation_keyword:
                     # return the documentation
                     return target_node.__doc__()
+                print(f"Executing {target_node.name} with args: {args}")
+
                 return target_node.get_execute(permissions, *args)
 
         # If the node is a NameSpaceNode, return its documentation
@@ -672,3 +706,19 @@ def has_identifier_collision(children_node: List[T_CmdNode]) -> List[T_CmdNode]:
         if len(aliases_seq) != len(aliases_set):
             return children_node[:i]
     return []
+
+
+class EnumCMD(Enum):
+    def export(self) -> Dict[str, Any]:
+        """
+        Export the enum as a dictionary.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing the name of the enum and its aliases.
+
+        Raises:
+            ValueError: If the value of the enum is not a list.
+        """
+        if not isinstance(self.value, list):
+            raise ValueError("The value of the enum must be a list.")
+        return {"name": self.name, "aliases": self.value}

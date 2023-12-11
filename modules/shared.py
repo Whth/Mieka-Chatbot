@@ -6,6 +6,7 @@ from .cmd import (
     make_stdout_seq_string,
     make_regex_part_from_enum,
     assemble_cmd_regex_parts,
+    EnumCMD,
 )
 from .config_utils import ConfigRegistry
 from .file_manager import (
@@ -58,4 +59,5 @@ __all__ = [
     "sha256_string",
     "make_regex_part_from_enum",
     "assemble_cmd_regex_parts",
+    "EnumCMD",
 ]
