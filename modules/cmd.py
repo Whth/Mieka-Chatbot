@@ -166,6 +166,22 @@ class CmdBuilder(object):
         origin_config_type = type(origin_config)
 
         def _setter(new_config: str) -> str:
+            """
+            A private method that sets a new configuration value for a given config path.
+
+            Parameters:
+                new_config (str): The new configuration value to be set.
+
+            Returns:
+                str: A string indicating the result of the configuration update.
+
+            Raises:
+                ValueError: If the new configuration value is invalid.
+
+            Example:
+                >>> _setter("new_value")
+                "Set [config_path]:\nFrom [origin_config] to [new_config]"
+            """
             try:
                 converted = origin_config_type(new_config)
             except ValueError as e:
@@ -174,6 +190,62 @@ class CmdBuilder(object):
             return f"Set [{config_path}]:\nFrom [{origin_config}] to [{new_config}]"
 
         _setter(origin_config)  # test if it works
+        return _setter
+
+    def build_group_setter_for(self, config_paths: Set[str]) -> Callable[[str], str]:
+        """
+        Generates a group setter function for the given `config_paths`.
+
+        Args:
+            config_paths (Set[str]): A set of configuration paths.
+
+        Returns:
+            Callable[[str], str]: The generated group setter function that takes a `config_path` and a `new_config` as
+            parameters and returns a string.
+
+        Raises:
+            ValueError: If the `new_config` cannot be converted to the type of the original configuration.
+
+        Example:
+            Usage example of the generated group setter function:
+
+            >>> set_group = build_group_setter_for({'config_path1', 'config_path2'})
+            >>> result = set_group('config_path1', 'new_config_value')
+            >>> print(result)
+            Set ['config_path1', 'config_path2']:
+            From [original_config_value] to [new_config_value]
+        """
+
+        def _setter(config_path, new_config: str) -> str:
+            """
+            Sets the value of a configuration parameter.
+
+            Args:
+                config_path (str): The path of the configuration parameter.
+                new_config (str): The new value to set for the configuration parameter.
+
+            Returns:
+                str: A message indicating the result of the operation. If the new_config is not
+                a valid value for the configuration parameter, an error message is returned.
+                Otherwise, a success message is returned.
+
+            Raises:
+                ValueError: If the new_config is not a valid value for the configuration parameter.
+            """
+            if config_path not in config_paths:
+                return (
+                    f"Can not set [{config_path}] to [{new_config}]\n\n"
+                    f"{make_stdout_seq_string(config_paths, title='Available configs')}"
+                )
+            origin_config = self._config_getter(config_path)
+            origin_config_type = type(origin_config)
+            try:
+                converted = origin_config_type(new_config)
+            except ValueError as e:
+                return f"Can not set [{origin_config}] to [{new_config}]\nERROR:\n\t[{e}]"
+            self._config_setter(config_path, converted)
+            return f"Set [{config_path}]:\nFrom [{origin_config}] to [{new_config}]"
+
         return _setter
 
     def build_setter_hall(self) -> Callable[[str, str], str]:
@@ -209,18 +281,24 @@ class CmdBuilder(object):
 
         return _setter
 
-    def build_list_out_for(self, config_paths: List[str]) -> Callable[[], str]:
+    def build_list_out_for(self, config_paths: Set[str]) -> Callable[[], str]:
         """
-        Builds and returns a function that lists out the values of the given config_registry paths.
+        Returns a function that lists out the values of the config paths.
 
-        Parameters:
-            config_paths (List[str]): A list of config_registry paths.
+        Args:
+            config_paths (Set[str]): The set of config paths.
 
-        Returns: Callable[[], str]: A function that, when called, returns a string listing out the values of the
-        config_registry paths.
+        Returns:
+            Callable[[], str]: A function that lists out the values of the config paths.
         """
 
         def _list_out() -> str:
+            """
+            Returns a string that lists out the values of the config paths.
+
+            Returns:
+                str: A string that lists out the values of the config paths.
+            """
             temp_string: str = ""
             for config_path in config_paths:
                 temp_string += f"{config_path} = {self._config_getter(config_path)}\n"
@@ -677,7 +755,6 @@ class NameSpaceNode(BaseCmdNode):
                 if len(args) == 1 and args[0] == documentation_keyword:
                     # return the documentation
                     return target_node.__doc__()
-                print(f"Executing {target_node.name} with args: {args}")
 
                 return target_node.get_execute(permissions, *args)
 
