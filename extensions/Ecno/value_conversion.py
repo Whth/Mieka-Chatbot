@@ -193,7 +193,7 @@ class Worth(BaseModel):
         Returns a new instance of the 'Worth' class with modified values.
 
         Args:
-            index_rate (float, optional): The index rate.
+            index_rate (float): The index rate.
             abs_sequential_index (int, optional): The absolute sequential index. Defaults to None.
             rel_sequential_index (int, optional): The relative sequential index. Defaults to 0.
             target_duration (int, optional): The target duration. Defaults to 1.
@@ -204,66 +204,44 @@ class Worth(BaseModel):
         Raises:
             ValueError: If both 'abs_sequential_index' and 'rel_sequential_index' are specified.
             RuntimeError: If the code reaches an unexpected point.
-
         """
-        # Make sure only one of 'abs_sequential_index' and 'rel_sequential_index' is specified
+
+        # Check if both abs_sequential_index and rel_sequential_index are specified
         if abs_sequential_index is not None and rel_sequential_index != 0:
             raise ValueError("Cannot specify both abs_sequential_index and rel_sequential_index")
 
-        # If no index is specified or the indices are equal to the current indices
-        if (abs_sequential_index is None and rel_sequential_index == 0) or (
-            abs_sequential_index == self.sequential_index and rel_sequential_index == 0
-        ):
-            # If the target duration is equal to the current duration, return a deep copy of the current instance
-            if target_duration == self.duration:
-                return copy.deepcopy(self)
+        # Calculate the target index based on the specified values
+        if abs_sequential_index is not None:
+            target_index = abs_sequential_index
+        else:
+            target_index = rel_sequential_index + self.sequential_index
 
-            # Calculate the modified value using 'present_to_addup' and 'addup_to_present' functions
-            modified_value = present_to_addup(
-                addup_to_present(self.value, rate=index_rate, period_length=self.duration),
-                rate=index_rate,
-                period_length=target_duration,
-            )
-
-            # Return a new instance of 'Worth' class with modified values
-            return Worth(
-                value=modified_value,
-                sequential_index=self.sequential_index,
-                duration=target_duration,
-            )
-
-        # Calculate the target index based on the given indices
-        target_index = abs_sequential_index or (rel_sequential_index + self.sequential_index)
-
-        # If the target index is less than the current index
+        # Calculate the target value based on the target index and duration
         if target_index < self.sequential_index:
-            # Calculate the distance between the current index and the target index
             distance = self.sequential_index - target_index
-
-            # Calculate the modified value using
-            # 'present_to_addup', 'future_to_present', and 'addup_to_present' functions
             target_value = present_to_addup(
                 future_to_present(addup_to_present(self.value, index_rate, self.duration), index_rate, distance),
                 index_rate,
                 target_duration,
             )
-        # If the target index is greater than the current index
         elif target_index > self.sequential_index:
-            # Calculate the distance between the target index and the current index
             distance = target_index - self.sequential_index
-
-            # Calculate the modified value using
-            # 'present_to_addup', 'present_to_future', and 'addup_to_present' functions
             target_value = present_to_addup(
                 present_to_future(addup_to_present(self.value, index_rate, self.duration), index_rate, distance),
                 index_rate,
                 target_duration,
             )
+        elif target_index == self.sequential_index:
+            if target_duration == self.duration:
+                return copy.deepcopy(self)
+            target_value = present_to_addup(
+                addup_to_present(self.value, rate=index_rate, period_length=self.duration),
+                rate=index_rate,
+                period_length=target_duration,
+            )
         else:
-            # This should not be reached
-            raise RuntimeError("Should not reach here")
+            raise RuntimeError("Unexpected point reached")
 
-        # Return a new instance of 'Worth' class with modified values
         return Worth(value=target_value, sequential_index=target_index, duration=target_duration)
 
     def __add__(self, other: Self | float) -> "Worth":
@@ -353,7 +331,7 @@ class Worth(BaseModel):
 
 
         """
-        sum_up: "Worth" = Worth(value=0)
+        sum_up: "Worth" = Worth(value=0, sequential_index=target_sequential_index)
         for value in values:
             sum_up += value.to_(index_rate, target_sequential_index)
         return sum_up
