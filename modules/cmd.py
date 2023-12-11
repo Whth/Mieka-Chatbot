@@ -420,6 +420,7 @@ class ExecutableNode(BaseCmdNode):
                 try:
                     # Try to convert the parameter to the right type
                     converted.append(param_type(para))
+                    continue
                 except TypeError:
                     # If the force conversion fails, use the original value
                     pass
