@@ -31,4 +31,4 @@ jobs:
     - name: Install dependencies
       run: pip install -r requirements.txt
     - name: Install Bot
-      run: bash user.sh
+      run: bash user.sh --test
