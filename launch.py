@@ -127,8 +127,28 @@ class Mieka(object):
 
         cls.__bot.run(init_utils=True)
 
+    @classmethod
+    def init_utils(cls):
+        cls.__bot.init_utils()
+
+
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--test", action="store_true", help="test mode", default=False)
 
 if __name__ == "__main__":
+    args = parser.parse_args()
+    print(args)
     bot = Mieka()
+    if args.test:
+        print("test mode")
+        try:
+            bot.init_utils()
+        except Exception as e:
+            print(e)
+            exit(1)
+        print("test mode done")
+        exit(0)
 
     bot.run()
