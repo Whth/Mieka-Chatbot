@@ -1,5 +1,7 @@
+import asyncio
 import pathlib
-from random import choice
+import warnings
+from random import choice, uniform
 from typing import Set, Tuple
 
 from colorama import Back
@@ -18,18 +20,22 @@ from modules.shared import (
     AbstractPlugin,
     get_pwd,
     generate_random_string,
+    EnumCMD,
+    CmdBuilder,
 )
 from .rank import ProfanityRank, create_ranker_broad
 
 __all__ = ["BegForMercy"]
 
 
-class CMD:
-    ROOT: str = "bfm"
-    ADD: str = "add"
-    LIST: str = "list"
-    DEL: str = "del"
-    RANK: str = "rank"
+class CMD(EnumCMD):
+    begformercy = ["bfm"]
+    add = ["a", "ad"]
+    list = ["l", "ls"]
+    delete = ["d", "del"]
+    rank = ["r", "rk"]
+    config = ["c", "cfg"]
+    set = ["s", "st"]
 
 
 class BegForMercy(AbstractPlugin):
@@ -38,12 +44,16 @@ class BegForMercy(AbstractPlugin):
     CONFIG_PF_RANK_PATH = "pf_rank_path"
     CONFIG_TEMP_DIR = "temp_dir"
     CONFIG_FONT_FILE = "font_file"
+    CONFIG_ENABLE_FEEDBACK = "enable_feedback"
+    CONFIG_AWAITTIME = "awaittime"
 
     DefaultConfig = {
         CONFIG_BEGGING_GIF_ASSET_PATH: f"{get_pwd()}/asset",
         CONFIG_PF_RANK_PATH: f"{get_pwd()}/rank.json",
         CONFIG_TEMP_DIR: f"{get_pwd()}/temp",
         CONFIG_FONT_FILE: f"{get_pwd()}/得意黑 TTF.ttf",
+        CONFIG_ENABLE_FEEDBACK: True,
+        CONFIG_AWAITTIME: 5,
     }
 
     @classmethod
@@ -56,7 +66,7 @@ class BegForMercy(AbstractPlugin):
 
     @classmethod
     def get_plugin_version(cls) -> str:
-        return "0.0.2"
+        return "0.0.3"
 
     @classmethod
     def get_plugin_author(cls) -> str:
@@ -70,6 +80,16 @@ class BegForMercy(AbstractPlugin):
         else:
             pf_rank = ProfanityRank()
             pf_rank.save(pf_rank_path)
+
+        builder = CmdBuilder(
+            config_getter=self.config_registry.get_config,
+            config_setter=self.config_registry.set_config,
+        )
+
+        configurable = {
+            self.CONFIG_ENABLE_FEEDBACK,
+            self.CONFIG_AWAITTIME,
+        }
 
         def _add_new_keyword(new_kw: str) -> str:
             """
@@ -144,33 +164,38 @@ class BegForMercy(AbstractPlugin):
                 return Image(path=png_file)
 
         tree = NameSpaceNode(
-            name=CMD.ROOT,
+            **CMD.begformercy.export(),
             required_permissions=self.required_permission,
+            help_message=self.get_plugin_description(),
             children_node=[
                 ExecutableNode(
-                    name=CMD.ADD,
+                    **CMD.add.export(),
                     source=_add_new_keyword,
-                    help_message=_add_new_keyword.__doc__,
                 ),
                 ExecutableNode(
-                    name=CMD.LIST,
+                    **CMD.list.export(),
                     source=_list_kws,
-                    help_message=_list_kws.__doc__,
                 ),
                 ExecutableNode(
-                    name=CMD.DEL,
+                    **CMD.delete.export(),
                     source=_delete_keyword,
-                    help_message=_delete_keyword.__doc__,
                 ),
                 ExecutableNode(
-                    name=CMD.RANK,
+                    **CMD.rank.export(),
                     source=_get_rank,
-                    help_message=_get_rank.__doc__,
+                ),
+                NameSpaceNode(
+                    **CMD.config.export(),
+                    help_message="the config management utils",
+                    children_node=[
+                        ExecutableNode(**CMD.list.export(), source=builder.build_list_out_for(configurable)),
+                        ExecutableNode(**CMD.set.export(), source=builder.build_group_setter_for(configurable)),
+                    ],
                 ),
             ],
         )
 
-        self._root_namespace_node.add_node(tree)
+        self.root_namespace_node.add_node(tree)
 
         @self.receiver(event=GroupMessage, decorators=[MentionMe()])
         async def begging_for_mercy(app: Ariadne, group: Group, message: MessageChain):
@@ -188,11 +213,20 @@ class BegForMercy(AbstractPlugin):
             Raises:
                 None
             """
+            if not self.config_registry.get_config(self.CONFIG_ENABLE_FEEDBACK):
+                return
             string = str(message)
             if all(keyword not in string for keyword in pf_rank.profanities):
                 return
-            file = choice(explore_folder(gif_dir_path))
-            print(f"{Back.BLUE}BEG_FOR_MERCY: Sending file at [{file}]{Back.RESET}")
+            files = explore_folder(gif_dir_path)
+            if not files:
+                warnings.warn(f"{Back.BLUE}BEG_FOR_MERCY: No GIF files found in [{gif_dir_path}]{Back.RESET}")
+                return
+            file = choice(files)
+
+            await_time = uniform(0, self.config_registry.get_config(self.CONFIG_AWAITTIME))
+            print(f"{Back.BLUE}BEG_FOR_MERCY: Sending file at [{file}], at {await_time} seconds{Back.RESET}")
+            await asyncio.sleep(await_time)
             await app.send_message(group, Image(path=file))
 
         @self.receiver(event=GroupMessage)
