@@ -34,7 +34,7 @@ class CMD:
 
 class BegForMercy(AbstractPlugin):
     CONFIG_BEGGING_GIF_ASSET_PATH = "gif_asset_path"
-    CONFIG_DETECTED_KEYWORD_LIST = "detected_keyword_list"
+
     CONFIG_PF_RANK_PATH = "pf_rank_path"
     CONFIG_TEMP_DIR = "temp_dir"
     CONFIG_FONT_FILE = "font_file"
@@ -189,9 +189,7 @@ class BegForMercy(AbstractPlugin):
                 None
             """
             string = str(message)
-            if all(
-                keyword not in string for keyword in self._config_registry.get_config(self.CONFIG_DETECTED_KEYWORD_LIST)
-            ):
+            if all(keyword not in string for keyword in pf_rank.profanities):
                 return
             file = choice(explore_folder(gif_dir_path))
             print(f"{Back.BLUE}BEG_FOR_MERCY: Sending file at [{file}]{Back.RESET}")
