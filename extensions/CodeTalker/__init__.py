@@ -4,6 +4,7 @@ from functools import partial
 from typing import List
 
 from sparkdesk_api.core import SparkAPI
+from sparkdesk_api.utils import VERSIONS, is_support_version
 
 from modules.shared import get_pwd, AbstractPlugin, ExecutableNode, EnumCMD, CmdBuilder, NameSpaceNode
 from .fuzzy import FuzzyDictionary
@@ -36,7 +37,7 @@ class CodeTalker(AbstractPlugin):
         CONFIG_SECRETS_APPID: "your appid",
         CONFIG_SECRETS_APIKEY: "your api key",
         CONFIG_SECRETS_API_SECRETS: "your api secret",
-        CONFIG_API_VERSION: 2.1,
+        CONFIG_API_VERSION: 3.1,
         CONFIG_DICTIONARY_PATH: f"{get_pwd()}/fuzzy_dictionary.json",
         CONFIG_RE_GENERATE_PROBABILITY: 0.3,
         CONFIG_MAX_TOKENS: 150,
@@ -62,7 +63,7 @@ class CodeTalker(AbstractPlugin):
 
     @classmethod
     def get_plugin_version(cls) -> str:
-        return "0.0.5"
+        return "0.0.6"
 
     @classmethod
     def get_plugin_author(cls) -> str:
@@ -70,12 +71,13 @@ class CodeTalker(AbstractPlugin):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # 默认api接口版本为1.5，开启v2.0版本只需指定 version=2.1 即可
+        # 默认api接口版本为3.1，开启v2.0版本只需指定 version=2.1 即可
+        version = self.config_registry.get_config(self.CONFIG_API_VERSION)
         self.sparkAPI = SparkAPI(
-            app_id=self._config_registry.get_config(self.CONFIG_SECRETS_APPID),
-            api_secret=self._config_registry.get_config(self.CONFIG_SECRETS_API_SECRETS),
-            api_key=self._config_registry.get_config(self.CONFIG_SECRETS_APIKEY),
-            version=self._config_registry.get_config(self.CONFIG_API_VERSION),
+            app_id=self.config_registry.get_config(self.CONFIG_SECRETS_APPID),
+            api_secret=self.config_registry.get_config(self.CONFIG_SECRETS_API_SECRETS),
+            api_key=self.config_registry.get_config(self.CONFIG_SECRETS_APIKEY),
+            version=version if is_support_version(version) else random.choice(VERSIONS),
         )
 
     def install(self):
@@ -183,8 +185,8 @@ class CodeTalker(AbstractPlugin):
         )
 
         self._config_registry.get_config(self.CONFIG_API_VERSION),
-        available_versions = {3.1, 2.1, 1.5}
-        for ver in available_versions:
+
+        for ver in sorted(list(VERSIONS), reverse=True):
             stdout = spark_par(version=ver).chat(
                 query=string, max_tokens=self.config_registry.get_config(self.CONFIG_MAX_TOKENS)
             )
