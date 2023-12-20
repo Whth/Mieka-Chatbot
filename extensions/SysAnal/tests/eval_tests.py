@@ -9,20 +9,20 @@ class MyTestCase(unittest.TestCase):
         baselines = [0, 5, 10]
         evaler = disp_evaler_constructor(score_level, baselines)
         self.assertEqual(1, evaler(-5))
-        self.assertEqual(2, evaler(0))
+        self.assertEqual(1, evaler(0))
         self.assertEqual(2, evaler(3))
-        self.assertEqual(3, evaler(5))
+        self.assertEqual(2, evaler(5))
         self.assertEqual(3, evaler(7))
-        self.assertEqual(4, evaler(10))
+        self.assertEqual(3, evaler(10))
         self.assertEqual(4, evaler(15))
 
         evaler = disp_evaler_constructor(score_level, sorted(baselines, reverse=True))
         self.assertEqual(4, evaler(-5))
-        self.assertEqual(4, evaler(0))
+        self.assertEqual(3, evaler(0))
         self.assertEqual(3, evaler(3))
-        self.assertEqual(3, evaler(5))
+        self.assertEqual(2, evaler(5))
         self.assertEqual(2, evaler(7))
-        self.assertEqual(2, evaler(10))
+        self.assertEqual(1, evaler(10))
         self.assertEqual(1, evaler(15))
 
     def test_something(self):
@@ -44,8 +44,11 @@ class MyTestCase(unittest.TestCase):
             dimensions_type=[float] * 5,
             dimensions_score_weight=[0.25, 0.25, 0.1, 0.2, 0.2],
         )
-        for en in a1:
+        shall_scores = [2.85, 3.2, 1.95]
+        for en, score in zip(a1, shall_scores):
+            en: Entity
             mapping.eval_entity(en)
+            self.assertEqual(score, en.score)
 
             print(en)
 
