@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import hashlib
 import inspect
@@ -7,13 +8,15 @@ import pathlib
 import random
 import string
 import time
+from functools import singledispatch
 from json import JSONDecodeError
 from pathlib import Path
-from typing import List, Sequence, Any, Dict
+from typing import List, Sequence, Any, Dict, TypeVar
 from typing import Tuple
 
 import aiohttp
 from PIL import Image
+from aiohttp import ClientResponse
 from pydantic import BaseModel, Field
 
 
@@ -144,7 +147,11 @@ def is_image(file_path) -> bool:
         return False
 
 
-async def download_file(url: str, save_dir: str, force_download: bool = False) -> str:
+T_Generic = TypeVar("T_Generic")
+
+
+@singledispatch
+async def download_file(url: T_Generic, save_dir: str, force_download: bool = False) -> T_Generic:
     """
     Downloads a file from the given URL and saves it to the specified directory.
 
@@ -157,33 +164,61 @@ async def download_file(url: str, save_dir: str, force_download: bool = False) -
     Returns:
         str: The path to the downloaded file.
     """
+
+
+@download_file.register(str)
+async def download_file(url: str, save_dir: str, force_download: bool = False) -> str:
     # Generate the file name using the MD5 hash of the URL
-    url_hash = hashlib.md5(url.encode()).hexdigest()
+    url_hash = sha256_string(url)
 
-    # Create the save directory if it doesn't exist
-    os.makedirs(save_dir, exist_ok=True)
-
-    # Generate the file path
-    path = os.path.join(save_dir, f"{url_hash}.png")
-
+    path = pathlib.Path(f"{save_dir}/{url_hash}.png")
+    path.parent.mkdir(parents=True, exist_ok=True)
     # Check if the file already exists and force_download is False
-    if not force_download and os.path.exists(path):
-        return path
+    if not force_download and path.exists():
+        return str(path)
 
     # Download the file using aiohttp
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
-            if response.status == 200:
-                # Write the file in chunks
-                with open(path, "wb") as f:
-                    while True:
-                        chunk = await response.content.read(1024)
-                        if not chunk:
-                            break
-                        f.write(chunk)
-                return path
+            if response.status != 200:
+                raise aiohttp.ClientResponseError(response.request_info, history=response.history)
+            with open(path, "wb") as f:
+                f.write(await response.read())
+    return str(path)
 
-    return ""
+
+@download_file.register(list)
+async def download_list(url: List[str], save_dir: str, force_download: bool = False) -> List[str]:
+    """
+    该函数用于下载列表中所有URL对应的文件并保存到指定目录。
+
+    参数：
+    - url: 待下载文件的URL列表。
+    - save_dir: 下载后保存文件的目录。
+    - force_download: 是否强制下载文件，默认为False。
+
+    返回值：
+    - 下载完成后对应的文件路径列表。
+    """
+    save_dir = pathlib.Path(save_dir)
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    file_list = [f"{save_dir}/{sha256_string(url_string)}.png" for url_string in url]
+    original_file_list = file_list
+
+    if not force_download:
+        pack = [(url[i], file_list[i]) for i in range(len(url)) if not pathlib.Path(file_list[i]).exists()]
+        url, file_list = zip(*pack)
+    async with aiohttp.ClientSession() as session:
+        responses: Tuple[ClientResponse] = await asyncio.gather(*[session.get(url_string) for url_string in url])
+        for response, save_path in zip(responses, file_list):
+            response: ClientResponse
+            save_path: str
+            if response.status != 200:
+                raise aiohttp.ClientResponseError(response.request_info, history=response.history)
+            with open(save_path, "wb") as f:
+                f.write(await response.content.read())
+    return original_file_list
 
 
 def compress_image_max_res(input_image_path: str, output_image_path: str, size: Tuple[int, int]) -> None:
