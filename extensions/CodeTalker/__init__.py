@@ -6,6 +6,7 @@ from typing import List
 from sparkdesk_api.core import SparkAPI
 
 from modules.shared import get_pwd, AbstractPlugin, ExecutableNode, EnumCMD, CmdBuilder, NameSpaceNode
+from .external_gpt import run_all, api
 from .fuzzy import FuzzyDictionary
 
 __all__ = ["CodeTalker"]
@@ -19,6 +20,7 @@ class CMD(EnumCMD):
     cache = ["c", "cac"]
     clear = ["cls", "clr"]
     size = ["s", "sz"]
+    talk = ["dd"]
 
 
 class CodeTalker(AbstractPlugin):
@@ -81,7 +83,6 @@ class CodeTalker(AbstractPlugin):
     def install(self):
         fuzzy_dictionary = FuzzyDictionary(save_path=self._config_registry.get_config(self.CONFIG_DICTIONARY_PATH))
         print(f"Loading Fuzzy Dictionary Size:{len(fuzzy_dictionary.dictionary.keys())}")
-        history = copy.deepcopy(self._config_registry.get_config(self.CONFIG_PRE_APPEND_HISTORY))
 
         configurable = {
             self.CONFIG_API_VERSION,
@@ -113,7 +114,7 @@ class CodeTalker(AbstractPlugin):
                 # Generate a response using the Spark API
                 response: str = self.sparkAPI.chat(
                     query=message,
-                    history=history,
+                    history=copy.deepcopy(self._config_registry.get_config(self.CONFIG_PRE_APPEND_HISTORY)),
                     max_tokens=max_tokens,
                 )
                 if response:
@@ -127,6 +128,7 @@ class CodeTalker(AbstractPlugin):
                 # Select a random response from the search results
                 response = random.choice(search)
                 print(f"Use Cache: {response}")
+
             return response
 
         tree = ExecutableNode(
@@ -161,6 +163,13 @@ class CodeTalker(AbstractPlugin):
                     ],
                 ),
             ],
+        )
+        self.root_namespace_node.add_node(
+            ExecutableNode(
+                **CMD.talk.export(),
+                source=api,
+                help_message="External GPT chat",
+            ),
         )
         self.root_namespace_node.add_node(config_tree)
 

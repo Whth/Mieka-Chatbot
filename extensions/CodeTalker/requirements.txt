@@ -1,2 +1,3 @@
 sparkdesk-api
 websocket-client
+g4f
