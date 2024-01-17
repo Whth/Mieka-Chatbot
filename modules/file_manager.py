@@ -167,7 +167,7 @@ async def download_file(url: T_Generic, save_dir: str, force_download: bool = Fa
 
 
 @download_file.register(str)
-async def download_file(url: str, save_dir: str, force_download: bool = False) -> str:
+async def download_sigle_file(url: str, save_dir: str, force_download: bool = False) -> str:
     # Generate the file name using the MD5 hash of the URL
     url_hash = sha256_string(url)
 
