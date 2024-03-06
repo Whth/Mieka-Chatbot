@@ -135,11 +135,39 @@ def make_stdout_seq_string(seq: Iterable[Any], title: str = "", extra: str = "")
     if title:
         output += f"{title}\n----------------\n"
 
-    output += "\n".join(f"[{i}]: {s}" for i, s in enumerate(seq))
+    output += "\n".join(f"[{i}]: {s}" for i, s in enumerate(sorted(seq)))
 
     if extra:
         output += f"\n----------------\n\n{extra}"
     return output
+
+
+def dict_to_markdown_table_complex(data_dict: Dict[str, List[Any]], add_index: bool = True) -> str:
+    """
+    Convert a dictionary with complex values to a markdown table. Optionally adds an index column.
+
+    Args:
+        data_dict (Dict[str, List[Any]]): The dictionary to convert to a markdown table.
+        add_index (bool, optional): If True, includes an index column in the table. Defaults to False.
+
+    Returns:
+        str: The markdown table representation of the dictionary.
+    """
+    headers = ["Index"] + list(data_dict.keys()) if add_index else list(data_dict.keys())
+    rows = []
+
+    for i, value_list in enumerate(zip(*data_dict.values())):
+        row_data = [str(i)] if add_index else []
+        row_data.extend([str(item) for item in value_list])
+        rows.append(row_data)
+
+    markdown_table = "| " + " | ".join(headers) + " |\n"
+    markdown_table += "| " + " | ".join(["---" for _ in headers]) + " |\n"
+
+    for row in rows:
+        markdown_table += "| " + " | ".join(row) + " |\n"
+
+    return markdown_table
 
 
 class CmdBuilder(object):

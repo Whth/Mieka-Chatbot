@@ -4,6 +4,7 @@ from .cmd import (
     ExecutableNode,
     CmdBuilder,
     make_stdout_seq_string,
+    dict_to_markdown_table_complex,
     make_regex_part_from_enum,
     assemble_cmd_regex_parts,
     EnumCMD,
@@ -60,4 +61,5 @@ __all__ = [
     "make_regex_part_from_enum",
     "assemble_cmd_regex_parts",
     "EnumCMD",
+    "dict_to_markdown_table_complex",
 ]
