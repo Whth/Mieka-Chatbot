@@ -4,12 +4,15 @@ from functools import partial
 from typing import List
 
 from sparkdesk_api.core import SparkAPI
+from sparkdesk_api.utils import VERSIONS
 
 from modules.shared import get_pwd, AbstractPlugin, ExecutableNode, EnumCMD, CmdBuilder, NameSpaceNode
 from .external_gpt import run_all, api
 from .fuzzy import FuzzyDictionary
 
 __all__ = ["CodeTalker"]
+
+VERSIONS.add(3.5)
 
 
 class CMD(EnumCMD):
@@ -192,8 +195,8 @@ class CodeTalker(AbstractPlugin):
         )
 
         self._config_registry.get_config(self.CONFIG_API_VERSION),
-        available_versions = {3.1, 2.1, 1.5}
-        for ver in available_versions:
+
+        for ver in sorted(list(VERSIONS), reverse=True):
             stdout = spark_par(version=ver).chat(
                 query=string, max_tokens=self.config_registry.get_config(self.CONFIG_MAX_TOKENS)
             )
