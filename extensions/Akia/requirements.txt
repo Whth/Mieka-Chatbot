@@ -1,0 +1,6 @@
+packaging==23.2
+unstructured
+faiss-cpu
+langchain-openai
+langchain
+spacy
