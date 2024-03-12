@@ -1,9 +1,9 @@
 pydantic
 graia-ariadne
 graia-scheduler==0.2.0
-colorama==0.4.6
-packaging==23.1
-requests==2.31.0
+colorama
+packaging
+requests
 
-Pillow==10.0.0
+Pillow
 aiohttp

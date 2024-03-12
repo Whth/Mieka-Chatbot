@@ -9,6 +9,7 @@ from modules.auth.resources import RequiredPermission
 from modules.chat_bot import ChatBot, BotInfo, BotConfig, BotConnectionConfig
 from modules.cmd import ExecutableNode, NameSpaceNode
 from modules.config_utils import ConfigRegistry
+from modules.shared import EnumCMD
 
 
 class DefaultConfig(Enum):
@@ -36,16 +37,15 @@ def make_installed_plugins_cmd(plugins_view):
     return _plugins
 
 
-class CMD:
-    ROOT = "bot"
-    VERSION = "version"
-    PLUGINS = "plugins"
-    HELP = "cmds"
-    DISABLE = "disable"
-
-    ENABLE = "enable"
-    REBOOT = "reboot"
-    SU = "su"
+class CMD(EnumCMD):
+    bot = ["b", "bt"]
+    version = ["v", "V", "ver"]
+    plugins = ["pl", "plg", "plug"]
+    cmds = ["c", "cds"]
+    disable = ["di", "dis"]
+    enable = ["en", "ena"]
+    reboot = ["r", "rbt"]
+    superuser = ["su"]
 
 
 class Mieka(object):
@@ -81,39 +81,40 @@ class Mieka(object):
 
     def __init__(self):
         bot_tree: NameSpaceNode = NameSpaceNode(
-            name=CMD.ROOT,
+            **CMD.bot.export(),
             children_node=[
                 ExecutableNode(
-                    name=CMD.PLUGINS, source=make_installed_plugins_cmd(plugins_view=self.__bot.get_installed_plugins)
+                    **CMD.plugins.export(),
+                    source=make_installed_plugins_cmd(plugins_view=self.__bot.get_installed_plugins),
                 ),
                 ExecutableNode(
-                    name=CMD.HELP,
+                    **CMD.cmds.export(),
                     source=make_help_cmd(client=self.__bot.root),
                     help_message="These cmds are both built-in and extensions",
                 ),
                 ExecutableNode(
-                    name=CMD.VERSION,
+                    **CMD.version.export(),
                     source=lambda: DefaultConfig.VERSION.value,
                     help_message="The core version of the bot",
                 ),
                 ExecutableNode(
-                    name=CMD.DISABLE,
+                    **CMD.disable.export(),
                     help_message="Disable the target plugin",
                     source=lambda x: f'Disable the "{x}" plugin\nSuccess={self.__bot.extensions.disable_plugin(x)}',
                 ),
                 ExecutableNode(
-                    name=CMD.ENABLE,
+                    **CMD.enable.export(),
                     help_message="Enable the target plugin",
                     source=lambda x: f'Enable the "{x}" plugin\nSuccess={self.__bot.extensions.enable_plugin(x)}',
                 ),
                 ExecutableNode(
-                    name=CMD.REBOOT,
+                    **CMD.reboot.export(),
                     required_permissions=RequiredPermission(execute=[self.__bot.auth_manager.__su_permission__]),
                     help_message="Reboot the bot",
                     source=lambda: f"Reboot the bot\nSuccess={self.__bot.reboot()}",
                 ),
             ],
-            help_message="BotInfo provided",
+            help_message="ChatBot coral management tool",
         )
         self.__bot.root.add_node(bot_tree)
 

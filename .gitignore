@@ -166,3 +166,4 @@ config
 config.json
 temp
 asset
+requirements_extensions.txt

@@ -2,6 +2,8 @@ import importlib.metadata
 import os
 import re
 import subprocess
+from pathlib import Path
+from typing import List, Set
 
 from packaging import version
 
@@ -42,6 +44,29 @@ def requirements_met(requirements_file: str) -> bool:
                 return False
 
     return True
+
+
+def merge_requirements(req_files: List[Path], output_path: Path):
+    # 确保输出路径的父目录存在
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    written_deps: Set[str] = set()
+
+    with output_path.open("w", encoding="utf-8") as outfile:
+        for req_file in req_files:
+            if not req_file.is_file():
+                print(f"Warning: 文件 {req_file} 不存在，将被跳过.")
+                continue
+
+            with req_file.open("r", encoding="utf-8") as infile:
+                for line in infile.readlines():
+                    # 去除行尾换行符，并过滤掉空白行和以#开头的注释行
+                    line = line.strip()
+                    if line and not line.startswith("#"):
+                        package_name = line.split("==")[0].strip()  # 提取包名部分
+                        if package_name not in written_deps:
+                            written_deps.add(package_name)
+                            outfile.write(line + "\n")
 
 
 # Whether to default to printing command output

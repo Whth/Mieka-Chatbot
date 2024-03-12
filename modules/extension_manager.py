@@ -10,7 +10,7 @@ from constant import REQUIREMENTS_FILE_NAME
 from modules.auth.core import AuthorizationManager
 from modules.cmd import NameSpaceNode
 from modules.file_manager import get_all_sub_dirs
-from modules.launch_utils import install_requirements
+from modules.launch_utils import install_requirements, merge_requirements
 from modules.plugin_base import AbstractPlugin, PluginsView
 
 
@@ -223,8 +223,11 @@ class ExtensionManager:
             None
         """
         detected_requirements = self._detect_requirements()
-        for requirement_file in detected_requirements:
-            install_requirements(requirement_file)
+        req_paths = list(map(lambda x: pathlib.Path(x), detected_requirements))
+        output_req = "./requirements_extensions.txt"
+        merge_requirements(req_paths, pathlib.Path(output_req))
+
+        install_requirements(output_req)
 
     def _detect_plugins(self) -> List[Type[AbstractPlugin]]:
         """
