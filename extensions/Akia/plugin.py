@@ -1,3 +1,4 @@
+import hashlib
 import re
 from pathlib import Path
 from typing import Dict, List, Any
@@ -11,11 +12,12 @@ from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_community.document_loaders import UnstructuredFileLoader
 from langchain_community.vectorstores.faiss import FAISS
+from langchain_core.documents import Document
+from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
 from langchain_core.vectorstores import VectorStoreRetriever
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain_text_splitters import SpacyTextSplitter
 from pydantic import SecretStr
 
 from modules.shared import AbstractPlugin, EnumCMD, get_pwd, NameSpaceNode, ExecutableNode, CmdBuilder, explore_folder
@@ -43,7 +45,9 @@ class Akia(AbstractPlugin):
     CONFIG_TOP_P = "top_p"
     CONFIG_STOP_SIGN = "stop_sign"
     CONFIG_DEBUG = "debug"
+    CONFIG_TEMP_DIR = "temp_dir"
     DefaultConfig: Dict = {
+        CONFIG_TEMP_DIR: f"{get_pwd()}/temp",
         CONFIG_API_HOST: "http://localhost:8000",
         CONFIG_API_KEY: "sk-",
         CONFIG_OUTPUT_DIR: f"{get_pwd()}/output",
@@ -55,7 +59,7 @@ class Akia(AbstractPlugin):
         CONFIG_PRESENCE_PENALTY: 0.0,
         CONFIG_TEMPERATURE: 1.0,
         CONFIG_TOP_P: 0.3,
-        CONFIG_STOP_SIGN: ["\n", "。", "！", "？", "!", "?"],
+        CONFIG_STOP_SIGN: ["。", "！", "？", "!", "?"],
     }
 
     @classmethod
@@ -90,27 +94,32 @@ class Akia(AbstractPlugin):
                 "top_p": self.config_registry.get_config(self.CONFIG_TOP_P),
             }
 
-        _sync_config()
         # create a prompt template
         prompt_template = ChatPromptTemplate.from_messages(
             [
-                ("system", "告诉你一个故事:{context}"),
+                ("system", "{context}\n\n根据上面的文字,完成角色扮演."),
                 ("system", "你的名字是Mieka,你是哥哥的妹妹."),
-                ("ai", "我是Mieka,我是哥哥的妹妹❤。"),
                 ("human", "{input}"),
             ]
         )
         document_chain = create_stuff_documents_chain(chat_client, prompt_template)
 
-        loader = self._make_retriever_loader()
+        def _make_mini_chain():
+            from .presets import MESU_GAKI
+
+            print("Making mini chain")
+            mini_chain = ChatPromptTemplate.from_messages(MESU_GAKI) | chat_client | StrOutputParser()
+            return mini_chain
 
         self.__lang_chain = None
 
         @self.receiver(ApplicationLaunch)
         async def _make_chain() -> None:
-            docs = loader.load()
-            text_splitter = SpacyTextSplitter(separator="\n", pipeline="zh_core_web_lg")
-            documents = text_splitter.split_documents(docs)
+            if self.__lang_chain:
+                return
+
+            documents = self._load_documents()
+
             doc_len = list(map(lambda x: len(x.page_content), documents))
             print(f"Loaded {len(documents)} documents from retriever data dir")
             print(f"Average document length: {sum(doc_len) / len(documents)}")
@@ -120,15 +129,18 @@ class Akia(AbstractPlugin):
                 openai_api_key=SecretStr(self.config_registry.get_config(self.CONFIG_API_KEY)),
                 openai_api_base=self.config_registry.get_config(self.CONFIG_API_HOST),
             )
+            print("Loaded embeddings")
             # use this embedding model to ingest documents into a vectorstore
-            vector = FAISS.from_documents(documents, embeddings)
-            retriever: VectorStoreRetriever = vector.as_retriever()
+            vector: FAISS = await FAISS.afrom_documents(documents, embeddings)
 
-            # First we need a prompt that we can pass into an LLM to generate this search query
+            print("Loaded vectorstore")
+            retriever: VectorStoreRetriever = vector.as_retriever()
+            print("Loaded retriever")
 
             # this retriever chain will be used to retrieve documents
             # that will be fed to the chat chain to generate a accurate response.
             self.__lang_chain = create_retrieval_chain(retriever, document_chain)
+            print("Loaded chain")
 
         async def ainvoke(
             client: Runnable,
@@ -146,8 +158,15 @@ class Akia(AbstractPlugin):
             """
 
             astream_it: Dict[str, Any] = await client.ainvoke(input={"input": message})
+            if isinstance(astream_it, str):
+                ans = astream_it
+            elif isinstance(astream_it, dict):
+                used_doc = astream_it.get("context")
 
-            ans = astream_it.get("answer")
+                print(f"Used doc: {used_doc}")
+                ans = astream_it.get("answer")
+            else:
+                raise Exception(f"Unknown type,{type(astream_it)}")
             if self.config_registry.get_config(self.CONFIG_DEBUG):
                 return ans
             return self._split_sentences(ans, stop_at)[0]
@@ -167,11 +186,19 @@ class Akia(AbstractPlugin):
                 return
             _sync_config()
             print(f"Mute[OFF],Receive:\n {str(message)}")
-            ret_message = await ainvoke(
-                self.__lang_chain,
-                message_string,
-                self.config_registry.get_config(self.CONFIG_STOP_SIGN),
-            )
+            if self.__lang_chain is None:
+                mini_chain = _make_mini_chain()
+                ret_message = await ainvoke(
+                    mini_chain,
+                    message_string,
+                    self.config_registry.get_config(self.CONFIG_STOP_SIGN),
+                )
+            else:
+                ret_message = await ainvoke(
+                    self.__lang_chain,
+                    message_string,
+                    self.config_registry.get_config(self.CONFIG_STOP_SIGN),
+                )
 
             await app.send_message(message_event, ret_message)
 
@@ -210,22 +237,31 @@ class Akia(AbstractPlugin):
 
         self.root_namespace_node.add_node(tree)
 
-    def _make_retriever_loader(self) -> UnstructuredFileLoader:
+    def _load_documents(self) -> List[Document]:
         data_dir = Path(self.config_registry.get_config(self.CONFIG_RETRIEVER_DATA_DIR))
         data_dir.mkdir(parents=True, exist_ok=True)
 
         files_with_extension: List[str] = explore_folder(str(data_dir))
         print(f"Load {len(files_with_extension)} files from {data_dir}")
-        retriever = UnstructuredFileLoader(
-            file_path=files_with_extension,
-            mode="single",
-        )
-        return retriever
+        loaders: List[UnstructuredFileLoader] = [
+            UnstructuredFileLoader(
+                file_path=file,
+                mode="single",
+            )
+            for file in files_with_extension
+        ]
+        loaded_docs: List[Document] = []
+        for l in loaders:
+            loaded_docs.extend(l.load())
+        return loaded_docs
 
     def _split_sentences(self, string: str, stop_at: List[str]) -> List[str]:
         # in fo no stop sign in the string
         if all(map(lambda x: x not in string, stop_at)):
             return [string]
+        messed_extraction: List[str] = split_messed_message(string)
+        if len(messed_extraction) > 1:
+            return messed_extraction
         parts = "".join(stop_at)
 
         regex = f"([{parts}])"
@@ -238,3 +274,82 @@ class Akia(AbstractPlugin):
             new_sents.append(sent)
         new_sents = list(filter(lambda x: x != "\n", new_sents))
         return new_sents
+
+
+def check_file_unchanged(file_path: str) -> bool:
+    """
+    Check the hash of the given file and compare it with the file's stem.
+
+    :param file_path: The path of the file to check.
+    :type file_path: str
+    :return: True if the hash matches the file's stem, False otherwise.
+    :rtype: bool
+    """
+    file_path = Path(file_path)
+    with open(file_path, "rb") as f:
+        file_hash = hashlib.md5(f.read()).hexdigest()
+    return file_hash == file_path.stem
+
+
+def sync_hash_to_stem(file_path: str) -> str:
+    """
+    rename the file according to its md5 hash and return the new path
+    Args:
+        file_path:
+
+    Returns:
+
+    """
+    file_path = Path(file_path)
+    with open(file_path, "rb") as f:
+        file_hash = hashlib.md5(f.read()).hexdigest()
+    new_path = file_path.parent / (file_hash + file_path.suffix)
+    file_path.rename(new_path)
+    return str(new_path)
+
+
+def check_and_sync_hash(dir_path: str) -> List[str]:
+    """
+
+    Args:
+        dir_path:
+
+    Returns:
+
+    """
+    files = explore_folder(dir_path)
+    updated_files = [f for f in files if not check_file_unchanged(f)]
+
+    sync_files = [sync_hash_to_stem(f) for f in updated_files]
+
+    return sync_files
+
+
+def split_messed_message(message: str) -> List[str]:
+    """
+    Especially designed to deal with the extraction from string like "who are you?AI:hello",
+     which should be "who are you?"
+
+    A function that takes a message and extracts the initial part of the message before the occurrence of specific punctuation characters.
+    The function takes a single parameter `message` of type str and returns a string.
+    Args:
+        message:
+
+    Returns:
+
+    """
+    message = message.replace("\n", "")
+    spl = [".", "。", "！", "？", "!", "?"]
+    if all(map(lambda x: x not in message, spl)):
+        return [message]
+    spl_parts = "".join(spl)
+
+    pat_string = f"(?:[{spl_parts}])([^:：{spl_parts}]+[:：])"
+    print(pat_string)
+    pat = re.compile(pat_string)
+    match = pat.findall(message)
+    print(match)
+    if match:
+        return message.split(match[0])
+    else:
+        return [message]
