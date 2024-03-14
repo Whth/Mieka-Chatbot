@@ -1,7 +1,8 @@
 import hashlib
 import re
+import time
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Set
 
 from graia.ariadne import Ariadne
 from graia.ariadne.event.lifecycle import ApplicationLaunch
@@ -30,6 +31,7 @@ class CMD(EnumCMD):
     config = ["c", "con", "conf"]
     list = ["l", "li", "ls", "lis"]
     set = ["s", "se", "st"]
+    pmute = ["pm", "pmu", "pmut"]
 
 
 class Akia(AbstractPlugin):
@@ -46,6 +48,7 @@ class Akia(AbstractPlugin):
     CONFIG_STOP_SIGN = "stop_sign"
     CONFIG_DEBUG = "debug"
     CONFIG_TEMP_DIR = "temp_dir"
+    CONFIG_PERSONAL_MUTE = "personal_mute"
     DefaultConfig: Dict = {
         CONFIG_TEMP_DIR: f"{get_pwd()}/temp",
         CONFIG_API_HOST: "http://localhost:8000",
@@ -53,6 +56,7 @@ class Akia(AbstractPlugin):
         CONFIG_OUTPUT_DIR: f"{get_pwd()}/output",
         CONFIG_RETRIEVER_DATA_DIR: f"{get_pwd()}/data",
         CONFIG_MUTE: 0,
+        CONFIG_PERSONAL_MUTE: 0,
         CONFIG_DEBUG: 0,
         CONFIG_FREQ_PENALTY: 1.0,
         CONFIG_MAX_TOKENS: 200,
@@ -97,8 +101,9 @@ class Akia(AbstractPlugin):
         # create a prompt template
         prompt_template = ChatPromptTemplate.from_messages(
             [
-                ("system", "{context}\n\n根据上面的文字,完成角色扮演."),
-                ("system", "你的名字是Mieka,你是哥哥的妹妹."),
+                ("human", "{context}"),
+                ("human", "你是谁呀?"),
+                ("ai", "我是你最喜欢的妹妹mieka哟(用手在巨乳上比出一个心型的手势)❤~"),
                 ("human", "{input}"),
             ]
         )
@@ -130,10 +135,11 @@ class Akia(AbstractPlugin):
                 openai_api_base=self.config_registry.get_config(self.CONFIG_API_HOST),
             )
             print("Loaded embeddings")
+            now = time.time()
             # use this embedding model to ingest documents into a vectorstore
             vector: FAISS = await FAISS.afrom_documents(documents, embeddings)
 
-            print("Loaded vectorstore")
+            print(f"Loaded vectorstore, time used: {time.time()-now:.2f}")
             retriever: VectorStoreRetriever = vector.as_retriever()
             print("Loaded retriever")
 
@@ -169,15 +175,25 @@ class Akia(AbstractPlugin):
                 raise Exception(f"Unknown type,{type(astream_it)}")
             if self.config_registry.get_config(self.CONFIG_DEBUG):
                 return ans
-            return self._split_sentences(ans, stop_at)[0]
+            spl_sentences = self._split_sentences(ans, stop_at)
+            if len(spl_sentences) > 3:
+                return "".join(spl_sentences[:3])
+            else:
+                return "".join(spl_sentences)
 
         @self.receiver(
-            [FriendMessage, GroupMessage],
+            GroupMessage,
             decorators=[
                 MatchRegex(".*?(?i:Mieka).*", full=False),
             ],
         )
-        async def _talk(app: Ariadne, message_event: FriendMessage | GroupMessage):
+        async def group_talk(app: Ariadne, message_event: GroupMessage):
+            """
+            An asynchronous function that processes group messages.
+            Accepts an instance of the Ariadne application and a GroupMessage event as parameters.
+            Returns None.
+            """
+
             message = message_event.message_chain
             message_plain = message.get(Plain)
             message_string = "".join(map(str, message_plain))
@@ -186,24 +202,52 @@ class Akia(AbstractPlugin):
                 return
             _sync_config()
             print(f"Mute[OFF],Receive:\n {str(message)}")
-            if self.__lang_chain is None:
-                mini_chain = _make_mini_chain()
-                ret_message = await ainvoke(
-                    mini_chain,
-                    message_string,
-                    self.config_registry.get_config(self.CONFIG_STOP_SIGN),
-                )
-            else:
-                ret_message = await ainvoke(
-                    self.__lang_chain,
-                    message_string,
-                    self.config_registry.get_config(self.CONFIG_STOP_SIGN),
-                )
+
+            ret_message = await ainvoke(
+                self.__lang_chain or _make_mini_chain(),
+                message_string,
+                self.config_registry.get_config(self.CONFIG_STOP_SIGN),
+            )
 
             await app.send_message(message_event, ret_message)
 
-        list_configs = {
+        @self.receiver(
+            FriendMessage,
+        )
+        async def personal_talk(app: Ariadne, message_event: FriendMessage):
+            """
+            A coroutine function to handle personal talk messages from friends.
+
+            Args:
+                app (Ariadne): The Ariadne application instance.
+                message_event (FriendMessage): The message event from a friend.
+
+            Returns:
+                None
+            """
+
+            message = message_event.message_chain
+            message_plain = message.get(Plain)
+            message_string = "".join(map(str, message_plain))
+            print(f"Receive request from {message_event.sender.id}")
+            if self.config_registry.get_config(self.CONFIG_MUTE) or self.config_registry.get_config(
+                self.CONFIG_PERSONAL_MUTE
+            ):
+                return
+
+            print(f"Mute[OFF],Receive:\n {str(message)}")
+            _sync_config()
+            ret_message = await ainvoke(
+                self.__lang_chain or _make_mini_chain(),
+                message_string,
+                self.config_registry.get_config(self.CONFIG_STOP_SIGN),
+            )
+
+            await app.send_message(message_event, ret_message)
+
+        list_configs: Set[str] = {
             self.CONFIG_MUTE,
+            self.CONFIG_PERSONAL_MUTE,
             self.CONFIG_DEBUG,
             self.CONFIG_FREQ_PENALTY,
             self.CONFIG_MAX_TOKENS,
@@ -232,6 +276,7 @@ class Akia(AbstractPlugin):
                     **CMD.debug.export(),
                     source=cmd_builder.build_setter_for(self.CONFIG_DEBUG),
                 ),
+                ExecutableNode(**CMD.pmute.export(), source=cmd_builder.build_setter_for(self.CONFIG_PERSONAL_MUTE)),
             ],
         )
 
