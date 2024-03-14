@@ -178,7 +178,7 @@ def create_ranker_broad(
         seeker -= 0.105
         ranker_index += 1
     if ranker_data:
-        step_len = seeker / len(ranker_data)
+        step_len = 0.08
         for ranker in ranker_data:
             ranker_txt = plt.text(
                 indent, seeker, make_string_from_ranker(ranker_index, ranker), fontproperties=font, color="yellow"
