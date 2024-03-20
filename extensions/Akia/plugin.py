@@ -1,27 +1,23 @@
 import hashlib
 import re
-import time
 from pathlib import Path
-from typing import Dict, List, Any, Set
+from typing import Dict, List, Set
 
 from graia.ariadne import Ariadne
 from graia.ariadne.event.lifecycle import ApplicationLaunch
 from graia.ariadne.event.message import GroupMessage, FriendMessage
 from graia.ariadne.message.element import Plain
 from graia.ariadne.message.parser.base import MatchRegex
-from langchain.chains import create_retrieval_chain
-from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_community.document_loaders import UnstructuredFileLoader
-from langchain_community.vectorstores.faiss import FAISS
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
-from langchain_core.vectorstores import VectorStoreRetriever
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from pydantic import SecretStr
 
 from modules.shared import AbstractPlugin, EnumCMD, get_pwd, NameSpaceNode, ExecutableNode, CmdBuilder, explore_folder
+from .few_shot import FewShotsCreator, make_derived_fs_examples
 
 
 class CMD(EnumCMD):
@@ -49,12 +45,18 @@ class Akia(AbstractPlugin):
     CONFIG_DEBUG = "debug"
     CONFIG_TEMP_DIR = "temp_dir"
     CONFIG_PERSONAL_MUTE = "personal_mute"
+    CONFIG_NO_NEWLINE = "no_newline"
+    CONFIG_EXAMPLES_PATH = "examples_path"
+    CONFIG_REMAIN_SEGMENT = "remain_segment"
     DefaultConfig: Dict = {
         CONFIG_TEMP_DIR: f"{get_pwd()}/temp",
         CONFIG_API_HOST: "http://localhost:8000",
         CONFIG_API_KEY: "sk-",
         CONFIG_OUTPUT_DIR: f"{get_pwd()}/output",
         CONFIG_RETRIEVER_DATA_DIR: f"{get_pwd()}/data",
+        CONFIG_EXAMPLES_PATH: f"{get_pwd()}/examples.yaml",
+        CONFIG_REMAIN_SEGMENT: 2,
+        CONFIG_NO_NEWLINE: 1,
         CONFIG_MUTE: 0,
         CONFIG_PERSONAL_MUTE: 0,
         CONFIG_DEBUG: 0,
@@ -87,6 +89,10 @@ class Akia(AbstractPlugin):
             openai_api_key=SecretStr(self.config_registry.get_config(self.CONFIG_API_KEY)),
             openai_api_base=self.config_registry.get_config(self.CONFIG_API_HOST),
         )
+        embeddings = OpenAIEmbeddings(
+            openai_api_key=SecretStr(self.config_registry.get_config(self.CONFIG_API_KEY)),
+            openai_api_base=self.config_registry.get_config(self.CONFIG_API_HOST),
+        )
 
         def _sync_config():
             chat_client.max_tokens = self.config_registry.get_config(self.CONFIG_MAX_TOKENS)
@@ -98,23 +104,13 @@ class Akia(AbstractPlugin):
                 "top_p": self.config_registry.get_config(self.CONFIG_TOP_P),
             }
 
-        # create a prompt template
-        prompt_template = ChatPromptTemplate.from_messages(
-            [
-                ("human", "{context}"),
-                ("human", "你是谁呀?"),
-                ("ai", "我是你最喜欢的妹妹mieka哟(用手在巨乳上比出一个心型的手势)❤~"),
-                ("human", "{input}"),
-            ]
+        fsc = FewShotsCreator()
+        fsc.load_data_file(self.config_registry.get_config(self.CONFIG_EXAMPLES_PATH))
+
+        derived_fs_examples = make_derived_fs_examples(fsc)
+        derived_fs_examples.dump_data_file(
+            Path(self.config_registry.get_config(self.CONFIG_RETRIEVER_DATA_DIR)) / "derived_fs_examples.yaml"
         )
-        document_chain = create_stuff_documents_chain(chat_client, prompt_template)
-
-        def _make_mini_chain():
-            from .presets import MESU_GAKI
-
-            print("Making mini chain")
-            mini_chain = ChatPromptTemplate.from_messages(MESU_GAKI) | chat_client | StrOutputParser()
-            return mini_chain
 
         self.__lang_chain = None
 
@@ -123,29 +119,20 @@ class Akia(AbstractPlugin):
             if self.__lang_chain:
                 return
 
-            documents = self._load_documents()
-
-            doc_len = list(map(lambda x: len(x.page_content), documents))
-            print(f"Loaded {len(documents)} documents from retriever data dir")
-            print(f"Average document length: {sum(doc_len) / len(documents)}")
-            print(f"Mean sqrt deviation: {sum(map(lambda x: x ** 2, doc_len)) ** 0.5 / len(doc_len)}")
-
-            embeddings = OpenAIEmbeddings(
-                openai_api_key=SecretStr(self.config_registry.get_config(self.CONFIG_API_KEY)),
-                openai_api_base=self.config_registry.get_config(self.CONFIG_API_HOST),
+            # create a prompt template
+            prompt_template = ChatPromptTemplate.from_messages(
+                [
+                    ("system", "接下来你作为哥哥的妹妹mieka和哥哥聊天。"),
+                    ("human", "我是mieka的哥哥。"),
+                    ("ai", "我是妹妹mieka哟(用手在胸前比出一个心型的手势并眨了一下眼)❤~"),
+                    await derived_fs_examples.make_soft_match_few_shot_prompt(embeddings, ["input"]),
+                    ("human", "{input}"),
+                ]
             )
-            print("Loaded embeddings")
-            now = time.time()
-            # use this embedding model to ingest documents into a vectorstore
-            vector: FAISS = await FAISS.afrom_documents(documents, embeddings)
-
-            print(f"Loaded vectorstore, time used: {time.time()-now:.2f}")
-            retriever: VectorStoreRetriever = vector.as_retriever()
-            print("Loaded retriever")
 
             # this retriever chain will be used to retrieve documents
             # that will be fed to the chat chain to generate a accurate response.
-            self.__lang_chain = create_retrieval_chain(retriever, document_chain)
+            self.__lang_chain = prompt_template | chat_client | StrOutputParser()
             print("Loaded chain")
 
         async def ainvoke(
@@ -153,32 +140,29 @@ class Akia(AbstractPlugin):
             message: str,
             stop_at: List[str],
         ) -> str:
-            """
-            异步读取流式数据，直到遇到指定的停止字符。
+            # 调用客户端的ainvoke方法，并等待返回结果
+            ans: str = await client.ainvoke(input={"input": message})
 
-            :param client: RunnableSerializable类型的客户端，支持异步流式数据读取。
-            :param message: 用于初始化流式数据读取的输入消息。
-            :param stop_at: 一个字符串列表，标识应该停止读取数据的字符。
+            # 根据配置决定是否移除返回结果中的换行符
+            ans = ans.replace("\n", "") if self.config_registry.get_config(self.CONFIG_NO_NEWLINE) else ans
 
-            :return: 从流中读取的字符串。
-            """
-
-            astream_it: Dict[str, Any] = await client.ainvoke(input={"input": message})
-            if isinstance(astream_it, str):
-                ans = astream_it
-            elif isinstance(astream_it, dict):
-                used_doc = astream_it.get("context")
-
-                print(f"Used doc: {used_doc}")
-                ans = astream_it.get("answer")
-            else:
-                raise Exception(f"Unknown type,{type(astream_it)}")
+            # 如果处于调试模式，直接返回处理后的结果
             if self.config_registry.get_config(self.CONFIG_DEBUG):
                 return ans
+
+            # 根据冒号切割
+            messed_extraction: List[str] = split_messed_message(ans)
+            if len(messed_extraction) > 1:
+                return messed_extraction[0]
+
+            # 根据stop_at列表分割答案字符串，并根据配置决定返回多少分割后的段落
             spl_sentences = self._split_sentences(ans, stop_at)
-            if len(spl_sentences) > 3:
-                return "".join(spl_sentences[:3])
+            if len(spl_sentences) > self.config_registry.get_config(self.CONFIG_REMAIN_SEGMENT):
+                # 如果分割后的段落超过配置的最大值，打印信息并返回指定数量的段落
+                print(f"Split sentences, take {len(spl_sentences)} segments.")
+                return "".join(spl_sentences[: self.config_registry.get_config(self.CONFIG_REMAIN_SEGMENT)])
             else:
+                # 如果分割后的段落不超过最大值，直接返回所有段落
                 return "".join(spl_sentences)
 
         @self.receiver(
@@ -204,7 +188,7 @@ class Akia(AbstractPlugin):
             print(f"Mute[OFF],Receive:\n {str(message)}")
 
             ret_message = await ainvoke(
-                self.__lang_chain or _make_mini_chain(),
+                self.__lang_chain,
                 message_string,
                 self.config_registry.get_config(self.CONFIG_STOP_SIGN),
             )
@@ -238,7 +222,7 @@ class Akia(AbstractPlugin):
             print(f"Mute[OFF],Receive:\n {str(message)}")
             _sync_config()
             ret_message = await ainvoke(
-                self.__lang_chain or _make_mini_chain(),
+                self.__lang_chain,
                 message_string,
                 self.config_registry.get_config(self.CONFIG_STOP_SIGN),
             )
@@ -249,12 +233,14 @@ class Akia(AbstractPlugin):
             self.CONFIG_MUTE,
             self.CONFIG_PERSONAL_MUTE,
             self.CONFIG_DEBUG,
+            self.CONFIG_NO_NEWLINE,
             self.CONFIG_FREQ_PENALTY,
             self.CONFIG_MAX_TOKENS,
             self.CONFIG_PRESENCE_PENALTY,
             self.CONFIG_TEMPERATURE,
             self.CONFIG_TOP_P,
             self.CONFIG_STOP_SIGN,
+            self.CONFIG_REMAIN_SEGMENT,
         }
         cmd_builder = CmdBuilder(self.config_registry.get_config, self.config_registry.set_config)
         tree = NameSpaceNode(
