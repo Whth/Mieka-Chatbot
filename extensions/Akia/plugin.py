@@ -301,12 +301,20 @@ class Akia(AbstractPlugin):
         return loaded_docs
 
     def _split_sentences(self, string: str, stop_at: List[str]) -> List[str]:
+        """
+        Splits a string into sentences based on the provided stop characters.
+
+        Parameters:
+            string (str): The input string to split into sentences.
+            stop_at (List[str]): A list of characters to stop at when splitting.
+
+        Returns:
+            List[str]: A list of sentences split from the input string.
+        """
         # in fo no stop sign in the string
-        if all(map(lambda x: x not in string, stop_at)):
+
+        if all(x not in string for x in stop_at):
             return [string]
-        messed_extraction: List[str] = split_messed_message(string)
-        if len(messed_extraction) > 1:
-            return messed_extraction
         parts = "".join(stop_at)
 
         regex = f"([{parts}])"
@@ -317,7 +325,7 @@ class Akia(AbstractPlugin):
         for i in range(0, len(reg_spl) - 1, 2):
             sent = reg_spl[i] + reg_spl[i + 1]
             new_sents.append(sent)
-        new_sents = list(filter(lambda x: x != "\n", new_sents))
+
         return new_sents
 
 
