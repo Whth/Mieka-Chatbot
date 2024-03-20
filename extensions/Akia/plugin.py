@@ -384,7 +384,7 @@ def split_messed_message(message: str) -> List[str]:
 
     """
     message = message.replace("\n", "")
-    spl = [".", "。", "！", "？", "!", "?"]
+    spl = [".", "。", "！", "？", "!", "?", ")", "~", "❤"]
     if all(map(lambda x: x not in message, spl)):
         return [message]
     spl_parts = "".join(spl)
