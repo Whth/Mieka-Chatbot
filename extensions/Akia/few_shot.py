@@ -130,6 +130,7 @@ class FewShotsCreator:
             vectorstore_cls=vectorstore_cls,
             # This is the number of examples to produce.
             k=k,
+            input_keys=input_vars,
         )
 
         prompt = FewShotChatMessagePromptTemplate(
