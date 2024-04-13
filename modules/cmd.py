@@ -114,11 +114,12 @@ def format_aliases(aliases: List[str]) -> str:
     return f"{output}"
 
 
-def make_stdout_seq_string(seq: Iterable[Any], title: str = "", extra: str = "") -> str:
+def make_stdout_seq_string(seq: Iterable[Any], title: str = "", extra: str = "", sort=True) -> str:
     """
     Generates a formatted string representation of a sequence, with an optional title and extra information.
 
     Args:
+        sort:
         seq (Iterable[Any]): The sequence to be converted to a string.
         title (str, optional): An optional title for the string representation. Defaults to "".
         extra (str, optional): Any extra information to be appended to the string representation. Defaults to "".
@@ -128,14 +129,15 @@ def make_stdout_seq_string(seq: Iterable[Any], title: str = "", extra: str = "")
 
     Example:
         >>> seq = [1, 2, 3]
-        >>> make_stdout_seq_string(seq, title="Numbers", extra="Total count: 3")
+        >>> make_stdout_seq_string(seq,title="Numbers",extra="Total count: 3")
         'Numbers\n----------------\n[0]: 1\n[1]: 2\n[2]: 3\n\nTotal count: 3'
     """
+    seq = sorted(seq) if sort else seq
     output = ""
     if title:
         output += f"{title}\n----------------\n"
 
-    output += "\n".join(f"[{i}]: {s}" for i, s in enumerate(sorted(seq)))
+    output += "\n".join(f"[{i}]: {s}" for i, s in enumerate(seq))
 
     if extra:
         output += f"\n----------------\n\n{extra}"
