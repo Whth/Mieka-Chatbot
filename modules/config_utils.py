@@ -341,7 +341,7 @@ class ConfigRegistry(object):
             raise KeyError(f"{config_path} not registered")
         return self._config_registry_table.get(config_path)
 
-    def set_config(self, config_path: str, new_config_value: Value) -> None:
+    def set_config(self, config_path: str, new_config_value: Value, save: bool = True) -> None:
         """
         Sets a new configuration value for the given registry path in the config_registry registry table.
 
@@ -358,6 +358,7 @@ class ConfigRegistry(object):
         if config_path not in self._config_registry_table.keys():
             raise KeyError(f"{config_path} not exists!")
         self._config_registry_table[config_path] = new_config_value
+        self.save_config(logging=True) if save else None
 
 
 Setter = Callable[[...], None]
