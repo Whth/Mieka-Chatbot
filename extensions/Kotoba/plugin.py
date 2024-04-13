@@ -191,10 +191,12 @@ class Kotoba(AbstractPlugin):
             if isinstance(index, int):
                 key = list(recorder.data_base.container.keys())[index]
 
-                return f"{key}:\n" + make_stdout_seq_string(recorder.data_base.container.get(key)[-message_count:])
+                return f"{key}:\n" + make_stdout_seq_string(
+                    recorder.data_base.container.get(key)[-message_count:], sort=False
+                )
             else:
                 temp = [f"{k}<=RecordedSize:{len(v)}" for k, v in recorder.data_base.container.items()]
-                return make_stdout_seq_string(temp)
+                return make_stdout_seq_string(temp, sort=False)
 
         def _make_wordcloud(index: int = None) -> Image:
             """
@@ -219,8 +221,10 @@ class Kotoba(AbstractPlugin):
             """
 
             # Combine the text data based on the provided index or all text data if index is not provided
+
             if isinstance(index, int):
                 key = list(recorder.data_base.container.keys())[index]
+                print(f"Generating word cloud for {key}")
                 temp_string = " ".join(recorder.data_base.container.get(key))
             else:
                 temp_string = " ".join([" ".join(v) for v in recorder.data_base.container.values()])
