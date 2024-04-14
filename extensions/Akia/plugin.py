@@ -1,17 +1,21 @@
 import hashlib
 import re
+import time
 from pathlib import Path
-from typing import Dict, List, Set
+from typing import Dict, List, Set, Any, Optional
 
+import openai
 from graia.ariadne import Ariadne
 from graia.ariadne.event.lifecycle import ApplicationLaunch
 from graia.ariadne.event.message import GroupMessage, FriendMessage
 from graia.ariadne.message.element import Plain
 from graia.ariadne.message.parser.base import MatchRegex
+from langchain.chains import ConversationChain
+from langchain.memory import ConversationTokenBufferMemory
 from langchain_community.document_loaders import UnstructuredFileLoader
 from langchain_core.documents import Document
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.example_selectors import MaxMarginalRelevanceExampleSelector
+from langchain_core.prompts import ChatPromptTemplate, FewShotChatMessagePromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import Runnable
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from pydantic import SecretStr
@@ -28,6 +32,15 @@ class CMD(EnumCMD):
     list = ["l", "li", "ls", "lis"]
     set = ["s", "se", "st"]
     pmute = ["pm", "pmu", "pmut"]
+    clean = ["cl"]
+    memory_len = ["ml"]
+
+    def as_set(self) -> Set[str]:
+        temp = {self.name}
+        for i in self.value:
+            temp.add(i)
+
+        return temp
 
 
 class Akia(AbstractPlugin):
@@ -47,6 +60,9 @@ class Akia(AbstractPlugin):
     CONFIG_PERSONAL_MUTE = "personal_mute"
     CONFIG_NO_NEWLINE = "no_newline"
     CONFIG_EXAMPLES_PATH = "examples_path"
+    CONFIG_MEMORY_LEN = "mem_len"
+    CONFIG_FS_LENGTH = "fs_length"
+
     CONFIG_REMAIN_SEGMENT = "remain_segment"
     DefaultConfig: Dict = {
         CONFIG_TEMP_DIR: f"{get_pwd()}/temp",
@@ -54,7 +70,7 @@ class Akia(AbstractPlugin):
         CONFIG_API_KEY: "sk-",
         CONFIG_OUTPUT_DIR: f"{get_pwd()}/output",
         CONFIG_RETRIEVER_DATA_DIR: f"{get_pwd()}/data",
-        CONFIG_EXAMPLES_PATH: f"{get_pwd()}/examples.yaml",
+        CONFIG_EXAMPLES_PATH: f"{get_pwd()}/data/examples.yaml",
         CONFIG_REMAIN_SEGMENT: 2,
         CONFIG_NO_NEWLINE: 1,
         CONFIG_MUTE: 0,
@@ -65,6 +81,8 @@ class Akia(AbstractPlugin):
         CONFIG_PRESENCE_PENALTY: 0.0,
         CONFIG_TEMPERATURE: 1.0,
         CONFIG_TOP_P: 0.3,
+        CONFIG_MEMORY_LEN: 650,
+        CONFIG_FS_LENGTH: 2,
         CONFIG_STOP_SIGN: ["。", "！", "？", "!", "?"],
     }
 
@@ -103,8 +121,11 @@ class Akia(AbstractPlugin):
                 "presence_penalty": self.config_registry.get_config(self.CONFIG_PRESENCE_PENALTY),
                 "top_p": self.config_registry.get_config(self.CONFIG_TOP_P),
             }
+            self.__lang_chain.memory.max_token_limit = self.config_registry.get_config(self.CONFIG_MEMORY_LEN)
+            selector: MaxMarginalRelevanceExampleSelector = self.__fs_prompt.example_selector
+            selector.k = self.config_registry.get_config(self.CONFIG_FS_LENGTH)
 
-        fsc = FewShotsCreator()
+        fsc = FewShotsCreator("input", "output")
         fsc.load_data_file(self.config_registry.get_config(self.CONFIG_EXAMPLES_PATH))
 
         derived_fs_examples = make_derived_fs_examples(fsc)
@@ -112,27 +133,50 @@ class Akia(AbstractPlugin):
             Path(self.config_registry.get_config(self.CONFIG_RETRIEVER_DATA_DIR)) / "derived_fs_examples.yaml"
         )
 
-        self.__lang_chain = None
+        self.__lang_chain: Optional[ConversationChain] = None
+        self.__fs_prompt: Optional[FewShotChatMessagePromptTemplate] = None
 
         @self.receiver(ApplicationLaunch)
         async def _make_chain() -> None:
             if self.__lang_chain:
                 return
-
+            init_time = time.time()
+            try:
+                self.__fs_prompt = await derived_fs_examples.make_soft_match_few_shot_prompt(embeddings, ["input"])
+            except openai.APIConnectionError:
+                print("Failed to connect to OpenAI API")
+                return
+            print(f"Used {(time.time()-init_time)/60:.1f} min to load the selector")
             # create a prompt template
             prompt_template = ChatPromptTemplate.from_messages(
                 [
-                    ("system", "接下来你作为哥哥的妹妹mieka和哥哥聊天。"),
-                    ("human", "我是mieka的哥哥。"),
-                    ("ai", "我是妹妹mieka哟(用手在胸前比出一个心型的手势并眨了一下眼)❤~"),
-                    await derived_fs_examples.make_soft_match_few_shot_prompt(embeddings, ["input"]),
+                    self.__fs_prompt,
+                    ("system", "不要忘记了,你是Mieka"),
+                    ("human", "不要忘记了,我是你的哥哥"),
+                    ("ai", "我是mieka哟(用手在胸前比出一个心型的手势并抛了一个媚眼)❤~"),
+                    MessagesPlaceholder(variable_name="chat"),
                     ("human", "{input}"),
                 ]
             )
 
+            memory = ConversationTokenBufferMemory(
+                llm=chat_client,
+                max_token_limit=self.config_registry.get_config(self.CONFIG_MEMORY_LEN),
+                human_prefix="",
+                ai_prefix="",
+                return_messages=True,
+                memory_key="chat",
+            )
+
             # this retriever chain will be used to retrieve documents
             # that will be fed to the chat chain to generate a accurate response.
-            self.__lang_chain = prompt_template | chat_client | StrOutputParser()
+            self.__lang_chain = ConversationChain(
+                llm=chat_client,
+                memory=memory,
+                prompt=prompt_template,
+                output_key="output",
+            )
+
             print("Loaded chain")
 
         async def ainvoke(
@@ -141,13 +185,16 @@ class Akia(AbstractPlugin):
             stop_at: List[str],
         ) -> str:
             # 调用客户端的ainvoke方法，并等待返回结果
-            ans: str = await client.ainvoke(input={"input": message})
+            message_pack = {"input": message}
+            data_pack: Dict[str, Any] = await client.ainvoke(input=message_pack)
 
+            ans = data_pack.get("output")
             # 根据配置决定是否移除返回结果中的换行符
             ans = ans.replace("\n", "") if self.config_registry.get_config(self.CONFIG_NO_NEWLINE) else ans
 
             # 如果处于调试模式，直接返回处理后的结果
             if self.config_registry.get_config(self.CONFIG_DEBUG):
+                print(f"Use Few shot {self.__fs_prompt.format_messages(**message_pack)}")
                 return ans
 
             # 根据冒号切割
@@ -211,8 +258,12 @@ class Akia(AbstractPlugin):
             """
 
             message = message_event.message_chain
+
             message_plain = message.get(Plain)
             message_string = "".join(map(str, message_plain))
+            if message_string.split(" ")[0] in CMD.akia.as_set():
+                print(f"Receive command from {message_event.sender.id}, skip personal talk")
+                return
             print(f"Receive request from {message_event.sender.id}")
             if self.config_registry.get_config(self.CONFIG_MUTE) or self.config_registry.get_config(
                 self.CONFIG_PERSONAL_MUTE
@@ -241,6 +292,8 @@ class Akia(AbstractPlugin):
             self.CONFIG_TOP_P,
             self.CONFIG_STOP_SIGN,
             self.CONFIG_REMAIN_SEGMENT,
+            self.CONFIG_MEMORY_LEN,
+            self.CONFIG_FS_LENGTH,
         }
         cmd_builder = CmdBuilder(self.config_registry.get_config, self.config_registry.set_config)
         tree = NameSpaceNode(
@@ -263,6 +316,8 @@ class Akia(AbstractPlugin):
                     source=cmd_builder.build_setter_for(self.CONFIG_DEBUG),
                 ),
                 ExecutableNode(**CMD.pmute.export(), source=cmd_builder.build_setter_for(self.CONFIG_PERSONAL_MUTE)),
+                ExecutableNode(**CMD.clean.export(), source=lambda: self.__lang_chain.memory.clear()),
+                ExecutableNode(**CMD.memory_len.export(), source=cmd_builder.build_setter_for(self.CONFIG_MEMORY_LEN)),
             ],
         )
 
