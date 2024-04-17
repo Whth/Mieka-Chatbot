@@ -389,7 +389,9 @@ def generate_random_string(length: int) -> str:
 
 
 def get_pwd() -> str:
+    from constant import ROOT
+
     current_frame = inspect.currentframe()
     caller_frame = inspect.getouterframes(current_frame, 2)
     caller_file = caller_frame[1][1]
-    return str(pathlib.Path(caller_file).parent)
+    return pathlib.Path(caller_file).parent.relative_to(ROOT).as_posix()

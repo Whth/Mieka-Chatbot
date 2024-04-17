@@ -8,7 +8,7 @@ if not exist venv (
 
 
 
-call venv\Scripts\activate
-%PYTHON_PATH% -m pip install -q -r requirements.txt
-%PYTHON_PATH% launch.py %*
+set V_PYTHON=venv\Scripts\python.exe
+%V_PYTHON% -m pip install -q -r requirements.txt
+%V_PYTHON% launch.py %*
 
