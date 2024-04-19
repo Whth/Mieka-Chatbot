@@ -1,15 +1,20 @@
+from graia.ariadne.event.lifecycle import ApplicationLaunch
+
 from modules.file_manager import get_pwd
 from modules.plugin_base import AbstractPlugin
+from modules.shared import EnumCMD
 
 __all__ = ["Emerge"]
-
+class CMD(EnumCMD):
+    emojimerge = ["eme","emerge"]
 
 class Emerge(AbstractPlugin):
     CONFIG_CACHE_DIR_PATH = "cache_dir_path"
-    DefaultConfig = {CONFIG_CACHE_DIR_PATH: f"{get_pwd()}/cache"}
+    CONFIG_DB_FILE_PATH = "db_file_path"
+    DefaultConfig = {CONFIG_CACHE_DIR_PATH: f"{get_pwd()}/cache",
+                     CONFIG_DB_FILE_PATH: f"{get_pwd()}/data_base.json"}
 
-    class CMD:
-        ROOT = "eme"
+
 
     @classmethod
     def get_plugin_name(cls) -> str:
@@ -21,7 +26,7 @@ class Emerge(AbstractPlugin):
 
     @classmethod
     def get_plugin_version(cls) -> str:
-        return "0.0.1"
+        return "0.0.2"
 
     @classmethod
     def get_plugin_author(cls) -> str:
@@ -36,7 +41,13 @@ class Emerge(AbstractPlugin):
         from .api import EmojiMerge
 
         cache_dir = self._config_registry.get_config(self.CONFIG_CACHE_DIR_PATH)
-        merger = EmojiMerge(cache_dir)
+        data_file= self._config_registry.get_config(self.CONFIG_DB_FILE_PATH)
+        merger = EmojiMerge(cache_dir,data_file)
+
+
+        @self.receiver(ApplicationLaunch)
+        async def init_merger():
+            await merger.init_data_base()
 
         def _merge_emoji(emoji_1: str, emoji_2: str) -> Image | str:
             """
@@ -54,7 +65,7 @@ class Emerge(AbstractPlugin):
             if path is None:
                 from random import choice
 
-                return choice(["合不了", "抽象", "不行", "不可以"])
+                return choice(["合不了哟~", "抽象", "不行", "不可以哟~",])
             return Image(path=path)
 
         su_perm = Permission(id=PermissionCode.SuperPermission.value, name=self.get_plugin_name())
@@ -62,7 +73,7 @@ class Emerge(AbstractPlugin):
             target_resource_name=self.get_plugin_name(), super_permissions=[su_perm]
         )
         tree = ExecutableNode(
-            name=self.CMD.ROOT, source=_merge_emoji, required_permissions=req_perm, help_message=_merge_emoji.__doc__
+            **CMD.emojimerge.export(), source=_merge_emoji, required_permissions=req_perm, help_message=_merge_emoji.__doc__
         )
         self._auth_manager.add_perm_from_req(req_perm)
         self._root_namespace_node.add_node(tree)
