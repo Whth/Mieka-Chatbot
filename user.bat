@@ -1,5 +1,5 @@
 @echo off
-set PYTHON_PATH=python
+set PYTHON_PATH=V:\Matrix\LANG_CORE\python311\python.exe
 
 if not exist venv (
     %PYTHON_PATH% -m venv venv
@@ -8,7 +8,10 @@ if not exist venv (
 
 
 
-set V_PYTHON=venv\Scripts\python.exe
-%V_PYTHON% -m pip install -q -r requirements.txt
-%V_PYTHON% launch.py %*
+call ./venv/Scripts/activate
+
+echo Installing core deps
+pip install -q -r requirements.txt
+echo Booting
+python launch.py %*
 

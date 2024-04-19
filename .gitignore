@@ -167,3 +167,4 @@ config.json
 temp
 asset
 requirements_extensions.txt
+/playground.py
