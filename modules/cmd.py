@@ -137,7 +137,7 @@ def make_stdout_seq_string(seq: Iterable[Any], title: str = "", extra: str = "",
     if title:
         output += f"{title}\n----------------\n"
 
-    output += "\n".join(f"[{i}]: {s}" for i, s in enumerate(seq))
+    output += "\n".join(f"- [{i}]:{s}" for i, s in enumerate(seq))
 
     if extra:
         output += f"\n----------------\n\n{extra}"
@@ -524,6 +524,8 @@ class ExecutableNode(BaseCmdNode):
 
         # Convert the parameters to the correct types
         for para, param_type in zip_longest(execute_params, sig.values()):
+            if para is None:
+                continue
             if param_type:
                 try:
                     # Try to convert the parameter to the right type
