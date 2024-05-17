@@ -49,9 +49,8 @@ class EmojiMerge:
         return index
 
     def seach_cache(self, emoji_1: str, emoji_2: str) -> str | None:
-
         cached_file = explore_folder(self._cache_dir, max_depth=1)
-        matched = [file for file in cached_file if emoji_1 in file and emoji_2 in file]
+        matched = [file for file in cached_file if f"{emoji_1}{emoji_2}" in file and f"{emoji_2}{emoji_1}" in file]
 
         if matched:
             return matched[0]
@@ -94,6 +93,4 @@ def raw_getter(data_file: Dict) -> List[Dict]:
 
 
 def make_index(emojis_dict: List[Dict]) -> Dict[str, str]:
-    return {
-        (item["leftEmoji"] + item["rightEmoji"]): item["gStaticUrl"] for item in emojis_dict
-    }
+    return {(item["leftEmoji"] + item["rightEmoji"]): item["gStaticUrl"] for item in emojis_dict}
