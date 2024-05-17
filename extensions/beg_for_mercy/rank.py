@@ -1,5 +1,6 @@
 import asyncio
 import pathlib
+import re
 from collections import OrderedDict
 from pathlib import Path
 from typing import Dict, Set, TypeAlias, Tuple, Optional, List
@@ -43,10 +44,15 @@ class ProfanityRank(BaseModel):
         """
         result = {}
         for profanity in self.profanities:
-            count = message.count(profanity)
+
+            pat = re.compile(f"(?i){profanity}")
+            find: List[str] = pat.findall(message)
+
+            count = len(find)
             if count == 0:
                 continue
-            result[profanity] = count
+            for fd in find:
+                result[fd] = count
         return result
 
     def update_records(self, user_id: UserAccount, message: str) -> bool:
@@ -107,7 +113,9 @@ def merge_occurrence_dicts(*dicts: OccurrenceDict) -> OccurrenceDict:
         OccurrenceDict: A merged occurrence dictionary.
 
     Description:
-        This function takes in multiple occurrence dictionaries and merges them into a single dictionary. The occurrence dictionaries are represented as key-value pairs, where the key represents an occurrence and the value represents the count of that occurrence.
+        This function takes in multiple occurrence dictionaries and merges them into a single dictionary.
+         The occurrence dictionaries are represented as key-value pairs,
+         where the key represents an occurrence and the value represents the count of that occurrence.
 
         Parameters:
             *dicts (OccurrenceDict): Variable number of occurrence dictionaries to merge.
@@ -138,7 +146,7 @@ def make_string_from_ranker(index: int, ranker: RankerDataPair) -> str:
 
 
 def create_ranker_broad(
-    ranker_data: RankerDataPack, save_path: str | Path, font_file: Optional[str] = None, max_size: int = 10
+        ranker_data: RankerDataPack, save_path: str | Path, font_file: Optional[str] = None, max_size: int = 10
 ):
     # 创建一个画布
     plt.figure(facecolor="lightgray", dpi=100, figsize=(8, int(1.5 * max_size)))
