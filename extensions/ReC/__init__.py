@@ -101,7 +101,7 @@ class ReC(AbstractPlugin):
                 group (Group): The group where the recall action is triggered.
                 message_event (GroupMessage): The group message event triggering the recall action.
             """
-            last_message_id = message_event.id - 1
+            last_message_id = message_event.id
 
             messages_to_recall: List[GroupMessage] = []
             if hasattr(message_event.quote, "origin"):
