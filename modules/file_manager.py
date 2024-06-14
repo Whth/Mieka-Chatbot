@@ -188,7 +188,7 @@ async def download_sigle_file(url: str, save_dir: str, force_download: bool = Fa
 
 
 @download_file.register(list)
-async def download_list(url: List[str], save_dir: str, force_download: bool = False) -> List[str]:
+async def download_list(urls: List[str], save_dir: str, force_download: bool = False) -> List[str]:
     """
     该函数用于下载列表中所有URL对应的文件并保存到指定目录。
 
@@ -203,14 +203,16 @@ async def download_list(url: List[str], save_dir: str, force_download: bool = Fa
     save_dir = pathlib.Path(save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
 
-    file_list = [f"{save_dir}/{sha256_string(url_string)}.png" for url_string in url]
-    original_file_list = file_list
+    file_list = [f"{save_dir}/{sha256_string(url_string)}.png" for url_string in urls]
+    original_file_list = list(file_list)
 
     if not force_download:
-        pack = [(url[i], file_list[i]) for i in range(len(url)) if not pathlib.Path(file_list[i]).exists()]
-        url, file_list = zip(*pack)
+        pack = [(url,f_path) for url ,f_path in zip(urls,file_list) if not pathlib.Path(f_path).exists()]
+        if  pack ==[]:
+            return original_file_list
+        urls, file_list = zip(*pack)
     async with aiohttp.ClientSession() as session:
-        responses: Tuple[ClientResponse] = await asyncio.gather(*[session.get(url_string) for url_string in url])
+        responses: Tuple[ClientResponse] = await asyncio.gather(*[session.get(url_string) for url_string in urls])
         for response, save_path in zip(responses, file_list):
             response: ClientResponse
             save_path: str
