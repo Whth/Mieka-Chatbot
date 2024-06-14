@@ -17,7 +17,7 @@ class ReC(AbstractPlugin):
     DefaultConfig = {
         CONFIG_HALL_RECALL: "recall",
         CONFIG_DETECTED_KEYWORD: "recallall",
-        CONFIG_MAX_LOOK_BACK: 30,
+        CONFIG_MAX_LOOK_BACK: 1000,
     }
 
     @classmethod

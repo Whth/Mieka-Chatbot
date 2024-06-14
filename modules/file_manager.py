@@ -207,8 +207,8 @@ async def download_list(urls: List[str], save_dir: str, force_download: bool = F
     original_file_list = list(file_list)
 
     if not force_download:
-        pack = [(url,f_path) for url ,f_path in zip(urls,file_list) if not pathlib.Path(f_path).exists()]
-        if  pack ==[]:
+        pack = [(url, f_path) for url, f_path in zip(urls, file_list) if not pathlib.Path(f_path).exists()]
+        if not pack:
             return original_file_list
         urls, file_list = zip(*pack)
     async with aiohttp.ClientSession() as session:

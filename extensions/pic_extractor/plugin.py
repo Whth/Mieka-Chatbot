@@ -2,10 +2,11 @@ import re
 from typing import Dict, Union
 
 from graia.ariadne import Ariadne
-from graia.ariadne.event.message import GroupMessage
+from graia.ariadne.event.message import GroupMessage, FriendMessage
 from graia.ariadne.message.chain import MessageChain
 from graia.ariadne.message.element import Forward
 
+from modules.file_manager import download_file
 from modules.shared import (
     AbstractPlugin,
     EnumCMD,
@@ -15,7 +16,7 @@ from modules.shared import (
     assemble_cmd_regex_parts,
     make_regex_part_from_enum,
 )
-from .extractor import extract_images_from_forward, make_image_zipper
+from .extractor import extract_images_from_forward
 
 
 class CMD(EnumCMD):
@@ -54,9 +55,9 @@ class PicExtractor(AbstractPlugin):
         self.root_namespace_node.add_node(tree)
 
         @self.receiver(
-            event=[GroupMessage],
+            event=[GroupMessage, FriendMessage],
         )
-        async def extract(app: Ariadne, msg_event: GroupMessage):
+        async def extract(app: Ariadne, msg_event: GroupMessage | FriendMessage):
             """
             Extract images from the nested forward
             Args:
@@ -72,24 +73,20 @@ class PicExtractor(AbstractPlugin):
             )
             pat = re.compile(parts)
             if not pat.findall(str(msg_event.message_chain)):
-                print(f"{self.get_plugin_name()}: No matches found for {msg_event.message_chain}")
                 return
 
             quoted_msg_event = await app.get_message_from_id(msg_event.quote.id)
-            if not isinstance(quoted_msg_event, Union[GroupMessage]):
-                print(f"{self.get_plugin_name()}: No forward found for {quoted_msg_event}")
+            if not isinstance(quoted_msg_event, Union[GroupMessage | FriendMessage]):
                 return
 
             quoted_msg: MessageChain = quoted_msg_event.message_chain
 
             if not quoted_msg.has(Forward):
-                print(f"{self.get_plugin_name()}: No forward found for {quoted_msg.content}")
                 return
 
             images = await extract_images_from_forward(quoted_msg.get(Forward)[0])
-            await app.send_message(msg_event, f"Extracted {len(images)} images")
-            save_path = await make_image_zipper(
-                images=images, save_dir=self.config_registry.get_config(PicExtractor.CONFIG_CACHE_DIR)
+            images_fp = await download_file(
+                [img.url for img in images], save_dir=self.config_registry.get_config(self.CONFIG_CACHE_DIR)
             )
-
-            await app.upload_file(save_path, target=msg_event.sender.group)
+            await app.send_message(msg_event, f"Extracted {len(images_fp)} images")
+            await app.send_message(msg_event, images)
