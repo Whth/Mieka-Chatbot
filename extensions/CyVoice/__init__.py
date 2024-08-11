@@ -3,6 +3,17 @@ from typing import List, Callable, Optional
 
 from modules.file_manager import get_pwd
 from modules.plugin_base import AbstractPlugin
+from modules.shared import EnumCMD
+
+
+class CMD(EnumCMD):
+    read = ["r", "rd"]
+    change = ["ch", "chg"]
+    list = ["l", "li"]
+    current = ["e", "cr"]
+    set = ["s"]
+    config = ["c"]
+
 
 __all__ = ["CyVoice"]
 
@@ -135,7 +146,7 @@ class CyVoice(AbstractPlugin):
                 )
             )
 
-        async def read_sentence(sentence: str) -> Voice:
+        async def read_sentence(*sentence: str) -> Voice:
             """
             Generates a voice using the given sentence.
 
@@ -148,6 +159,7 @@ class CyVoice(AbstractPlugin):
             Raises:
                 None.
             """
+            sentence = " ".join(sentence)
             if self._config_registry.get_config(self.CONFIG_ENABLE_TRANSLATE) and translate:
                 sentence = translate(self._config_registry.get_config(self.CONFIG_TARGET_LANGUAGE), sentence, "auto")
 
@@ -191,35 +203,35 @@ class CyVoice(AbstractPlugin):
             required_permissions=self.required_permission,
             children_node=[
                 ExecutableNode(
-                    name=self.__LIST_CV_CMD,
+                    **CMD.list.export(),
                     source=list_out_speakers,
                     help_message=f"{list_out_configs.__doc__}",
                 ),
                 ExecutableNode(
-                    name=self.__CHANGE_CV_CMD,
+                    **CMD.change.export(),
                     source=change_cv_index,
                     help_message=f"{change_cv_index.__doc__}",
                 ),
                 ExecutableNode(
-                    name=self.__READ_CMD,
+                    **CMD.read.export(),
                     source=read_sentence,
                     help_message=f"{read_sentence.__doc__}",
                 ),
                 ExecutableNode(
-                    name=self.__CURRENT_CV_CMD,
+                    **CMD.current.export(),
                     source=get_current_cv,
                     help_message=f"{get_current_cv.__doc__}",
                 ),
                 NameSpaceNode(
-                    name=self.__CONFIG_CMD,
+                    **CMD.config.export(),
                     children_node=[
                         ExecutableNode(
-                            name=self.__CONFIG_LIST_CMD,
+                            **CMD.list.export(),
                             source=list_out_configs,
                             help_message=f"{list_out_configs.__doc__}",
                         ),
                         ExecutableNode(
-                            name=self.__CONFIG_SET_CMD,
+                            **CMD.set.export(),
                             source=cmd_builder.build_setter_hall(),
                         ),
                     ],

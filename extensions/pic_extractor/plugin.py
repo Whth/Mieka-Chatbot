@@ -84,9 +84,9 @@ class PicExtractor(AbstractPlugin):
             if not quoted_msg.has(Forward):
                 return
 
-            images = await extract_images_from_forward(quoted_msg.get(Forward)[0])
+            images = await extract_images_from_forward(quoted_msg.get_first(Forward))
             images_fp = await download_file(
                 [img.url for img in images], save_dir=self.config_registry.get_config(self.CONFIG_CACHE_DIR)
             )
             await app.send_message(msg_event, f"Extracted {len(images_fp)} images")
-            await app.send_message(msg_event, images)
+            (await app.send_message(msg_event, images)) if images else None

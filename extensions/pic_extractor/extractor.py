@@ -11,13 +11,23 @@ async def extract_images_from_forward(forward: Forward) -> List[Image]:
     ret_images: List[Image] = []
     search_stack: List[ForwardNode] = []
     search_stack.extend(forward.node_list)
+
     while search_stack:
         node = search_stack.pop(0)
-        if node.message_chain.has(Forward):
-            for sub_forward in node.message_chain.get(Forward):
+
+        if nodes := node.message_chain.get(Forward):
+            prev_len = len(search_stack)
+            for sub_forward in nodes:
                 search_stack.extend(sub_forward.node_list)
-        if node.message_chain.has(Image):
-            ret_images.extend(node.message_chain.get(Image))
+            if (cur_len := len(search_stack)) > prev_len:
+                print(f"{cur_len-prev_len} forward nodes harvested")
+            continue
+        if images := node.message_chain.get(Image):
+            print(f"Harvested {len(images)} images")
+            ret_images.extend(images)
+            continue
+
+        print(f"Nothing harvest in {node.message_chain}")
 
     return ret_images
 

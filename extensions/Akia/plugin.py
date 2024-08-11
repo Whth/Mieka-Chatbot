@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Dict, List, Set, Any, Optional
 
 import openai
+from graia.ariadne.message.chain import MessageChain
 from graia.ariadne import Ariadne
 from graia.ariadne.event.lifecycle import ApplicationLaunch
 from graia.ariadne.event.message import GroupMessage, FriendMessage
@@ -240,7 +241,7 @@ class Akia(AbstractPlugin):
                 self.config_registry.get_config(self.CONFIG_STOP_SIGN),
             )
 
-            await app.send_message(message_event, ret_message)
+            await app.send_message(message_event, MessageChain([Plain(ret_message)]))
 
         @self.receiver(
             FriendMessage,
@@ -278,7 +279,7 @@ class Akia(AbstractPlugin):
                 self.config_registry.get_config(self.CONFIG_STOP_SIGN),
             )
 
-            await app.send_message(message_event, ret_message)
+            await app.send_message(message_event, MessageChain([Plain(ret_message)]))
 
         list_configs: Set[str] = {
             self.CONFIG_MUTE,
